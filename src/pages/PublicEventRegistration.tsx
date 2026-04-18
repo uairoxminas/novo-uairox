@@ -1,0 +1,997 @@
+import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+// ============ DATA HOOK ============
+function usePublicEvent(eventId?: string) {
+  const [event, setEvent] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [kits, setKits] = useState<any[]>([]);
+  const [stages, setStages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!eventId) return;
+    async function load() {
+      setLoading(true);
+      const [evRes, catRes, batchRes, kitRes, stgRes] = await Promise.all([
+        supabase.from('events').select('*').eq('id', eventId as string).single(),
+        supabase.from('categories').select('*').eq('event_id', eventId as string).order('created_at'),
+        supabase.from('price_batches').select('*').eq('event_id', eventId as string).eq('active', true).order('order_index'),
+        supabase.from('athlete_kits').select('*').eq('event_id', eventId as string).eq('active', true).order('created_at'),
+        supabase.from('event_stages').select('*').eq('event_id', eventId as string).order('order_index'),
+      ]);
+      setEvent(evRes.data);
+      setCategories(catRes.data || []);
+      setBatches(batchRes.data || []);
+      setKits(kitRes.data || []);
+      setStages(stgRes.data || []);
+      setLoading(false);
+    }
+    load();
+  }, [eventId]);
+
+  return { event, categories, batches, kits, stages, loading };
+}
+
+// ============ HELPERS ============
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+function formatDateShort(dateStr: string) {
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  const month = d.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+  const year = d.getFullYear();
+  return `${day} ${month}, ${year}`;
+}
+
+function getActiveBatch(batches: any[], categoryId?: string) {
+  const now = new Date();
+  
+  // Garantir que varremos por ordem e não falhamos na quebra de lote
+  const validBatches = batches.filter(b => {
+    if (categoryId) {
+      return !b.category_id || b.category_id === categoryId;
+    }
+    return !b.category_id; // Global request só vê globais
+  });
+
+  const sorted = [...validBatches].sort((a,b) => (a.order_index || 0) - (b.order_index || 0));
+  
+  return sorted.find(b => {
+    // Regra 1: Validação de Tempo
+    const start = b.start_date ? new Date(b.start_date) : null;
+    const end = b.end_date ? new Date(b.end_date) : null;
+    if (start && now < start) return false;
+    if (end && now > end) return false;
+    
+    // Regra 2: Validação de Limite Físico de Volume
+    if (b.max_registrations && (b.registrations_count || 0) >= b.max_registrations) return false;
+    
+    // Passou nas duas regras? Ele é o lote Ativo!
+    return true;
+  }) || null;
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function getDaysUntil(dateStr: string) {
+  const diff = new Date(dateStr).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+// ============ MAIN PAGE ============
+export default function PublicEventRegistration() {
+  const { id } = useParams<{ id: string }>();
+  const { event, categories, batches, kits, stages, loading } = usePublicEvent(id);
+  const [showRegistration, setShowRegistration] = useState(false);
+  const [categoryId, setCategoryId] = useState('');
+  const registrationRef = useRef<HTMLDivElement>(null);
+
+  const globalActiveBatch = getActiveBatch(batches);
+  const globalIsSoldOut = batches.length > 0 && !globalActiveBatch;
+
+  const scrollToRegistration = () => {
+    setShowRegistration(true);
+    setTimeout(() => registrationRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="w-10 h-10 border-3 border-[#EDAC02] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center text-center px-4">
+        <div>
+          <p className="text-6xl mb-4">🏃</p>
+          <h1 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">Evento não encontrado</h1>
+          <p className="text-sm text-zinc-500">Verifique o link e tente novamente</p>
+          <a href="/" className="inline-block mt-6 px-6 py-3 bg-[#EDAC02] text-black font-black uppercase tracking-widest text-sm">← Voltar</a>
+        </div>
+      </div>
+    );
+  }
+
+  const daysUntil = getDaysUntil(event.date);
+  const city = event.location.split('-').pop()?.trim() || event.location;
+
+  return (
+    <div className="min-h-screen bg-[#050505]">
+      {/* ============ HERO ============ */}
+      <section className="relative min-h-[80vh] flex items-end overflow-hidden">
+        {event.image_url ? (
+          <>
+            <img src={event.image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#EDAC02]/10 via-[#050505] to-[#050505]">
+            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(237,172,2,0.1) 35px, rgba(237,172,2,0.1) 70px)' }} />
+          </div>
+        )}
+
+        {/* Back button */}
+        <a href="/" className="absolute top-6 left-6 z-30 flex items-center gap-2 text-white/60 hover:text-white transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          <span className="text-sm font-bold uppercase tracking-widest">Voltar</span>
+        </a>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
+          <div className="max-w-3xl">
+            {/* Status badge */}
+            {event.status === 'open' && !globalIsSoldOut && (
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#EDAC02] text-black font-black uppercase tracking-widest text-xs mb-6">
+                <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse"></span>
+                Inscrições Abertas
+              </span>
+            )}
+            {event.status === 'open' && globalIsSoldOut && (
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white font-black uppercase tracking-widest text-xs mb-6 border border-red-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-white opacity-50"></span>
+                INSCRIÇÕES ESGOTADAS
+              </span>
+            )}
+
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white uppercase tracking-tighter italic leading-none mb-4">
+              {event.title}
+            </h1>
+
+            <div className="flex items-center gap-6 text-white/60 font-black uppercase tracking-widest text-sm mb-8">
+              <span className="flex items-center gap-2">📅 {formatDateShort(event.date)}</span>
+              <span className="flex items-center gap-2">📍 {city}</span>
+              {daysUntil > 0 && <span className="text-[#EDAC02]">⏱️ {daysUntil} dias</span>}
+            </div>
+
+            {event.description && (
+              <p className="text-lg text-white/50 max-w-xl leading-relaxed mb-10">{event.description}</p>
+            )}
+
+          </div>
+        </div>
+      </section>
+
+      {/* ============ PROVAS / STAGES ============ */}
+      {stages.length > 0 && (
+        <section className="py-24 bg-[#050505] border-y border-[#1a1a1a]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-16 border-b border-[#1a1a1a] pb-8 gap-6">
+              <div>
+                <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                  O <span className="text-[#EDAC02]">Percurso</span>
+                </h2>
+                <p className="text-zinc-500 text-lg mt-2">
+                  Corrida + Funcional · 8 UaiZones
+                </p>
+              </div>
+              {event.status === 'open' && (
+                <button onClick={scrollToRegistration} className="px-8 py-4 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest skew-x-[-10deg] hover:bg-white transition-colors flex-shrink-0">
+                  <span className="inline-block skew-x-[10deg]">Inscrever →</span>
+                </button>
+              )}
+            </div>
+
+            {(() => {
+              const isTemplated = stages.some((s: any) => s.name.startsWith('RUN ') || s.name.startsWith('🏃'));
+              if (isTemplated) {
+                const pairs: any[][] = [];
+                const sorted = [...stages].sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
+                for (let i = 0; i < sorted.length; i += 2) {
+                  pairs.push([sorted[i], sorted[i + 1]].filter(Boolean));
+                }
+                const sampleRun = pairs[0]?.find((s: any) => s.name.startsWith('RUN ') || s.name.startsWith('🏃'));
+                const unifiedRunText = sampleRun?.distance_meters >= 1000 ? `${(sampleRun.distance_meters/1000).toFixed(0)}km` : `${sampleRun?.distance_meters || 400}m`;
+                
+                return (
+                  <div className="flex flex-col w-full">
+                    {/* Run Summary Banner */}
+                    <div className="flex justify-center mb-10 w-full relative">
+                       <div className="absolute inset-0 top-1/2 -translate-y-1/2 w-full h-px bg-[#262626]"></div>
+                       <div className="bg-[#EDAC02] text-black px-8 py-2 md:py-3 shadow-[4px_4px_0_0_#000] border-2 border-[#1a1a1a] relative z-10 w-max max-w-[90%] skew-x-[-5deg]">
+                         <span className="font-black text-xl md:text-3xl uppercase tracking-widest text-center block skew-x-[5deg]">
+                           CORRIDA {pairs.length} X {unifiedRunText}
+                         </span>
+                       </div>
+                    </div>
+                    {/* The 8 Zones Grid */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-x-8 md:gap-y-8 w-full">
+                      {pairs.map((pair, idx) => {
+                        const zone = pair.find((s: any) => !s.name.startsWith('RUN ') && !s.name.startsWith('🏃'));
+                        if (!zone) return null;
+                        
+                        return (
+                          <div key={idx} className="flex flex-col group">
+                            {/* Image container */}
+                            <div className="relative aspect-[4/3] bg-zinc-950 overflow-hidden mb-4 border border-[#1a1a1a]">
+                              {zone.image_url ? (
+                                <img src={zone.image_url} alt={zone.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-100 group-hover:scale-110" />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]">
+                                  <span className="text-5xl opacity-10 drop-shadow-xl group-hover:scale-110 transition-transform duration-500">🏋️</span>
+                                </div>
+                              )}
+                              
+                              {/* Number Badge */}
+                              <div className="absolute bottom-0 left-0 bg-[#EDAC02] text-black w-12 h-12 flex items-center justify-center text-xl font-black shadow-[3px_3px_0_0_#000]">
+                                {String(idx + 1).padStart(2, '0')}
+                              </div>
+                            </div>
+                            
+                            {/* Content */}
+                            <div>
+                               <h3 className="text-white text-lg md:text-xl font-black uppercase tracking-tight leading-tight mb-1">
+                                 {zone.name.replace(/UAIZONE \d+ – /i, '').replace(/UAIZONE \d+/i, '').trim()}
+                               </h3>
+                               <p className="text-[#EDAC02] font-mono font-bold text-base md:text-lg mb-1 uppercase tracking-tighter">
+                                 {zone.metric_text || (zone.distance_meters ? `${zone.distance_meters}M` : zone.description?.replace(/[🔴🔵🟢🟡🟠🟣⭐]/g, '').trim() || '-')}
+                               </p>
+                               {(zone.distance_meters != null || zone.metric_text) && (
+                                 <p className="text-zinc-500 text-xs md:text-[13px] uppercase tracking-widest font-bold">
+                                   {zone.weight_load ? zone.weight_load : (zone.description?.replace(/[🔴🔵🟢🟡🟠🟣⭐]/g, '').trim().startsWith(String(zone.distance_meters)) 
+                                     ? 'Carga Livre' 
+                                     : zone.description?.replace(/[🔴🔵🟢🟡🟠🟣⭐]/g, '').trim())}
+                                 </p>
+                               )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Simple List (non-templated / manual stages)
+              return (
+                <div className="max-w-4xl mx-auto space-y-3">
+                  {stages.map((stage: any, idx: number) => (
+                    <div key={stage.id} className="flex items-center gap-4 bg-[#0a0a0a] border border-[#1a1a1a] p-4 group hover:border-[#EDAC02]/30 transition-all">
+                      <div className="w-12 h-12 flex items-center justify-center bg-[#EDAC02]/10 text-[#EDAC02] font-black text-lg flex-shrink-0 group-hover:bg-[#EDAC02] group-hover:text-black transition-colors">
+                        {String(idx + 1).padStart(2, '0')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-black text-white uppercase tracking-tight truncate">{stage.name}</p>
+                        {stage.description && <p className="text-sm text-zinc-500 truncate mt-1">{stage.description}</p>}
+                      </div>
+                      {stage.distance_meters && (
+                        <span className="text-sm font-bold text-[#EDAC02] uppercase tracking-wider flex-shrink-0 font-mono">
+                          {stage.distance_meters >= 1000 ? `${(stage.distance_meters/1000).toFixed(0)}km` : `${stage.distance_meters}m`}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </section>
+      )}
+
+      {/* ============ KITS ============ */}
+      {kits.length > 0 && (
+        <section className="py-24 bg-[#080808] border-y border-[#1a1a1a]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-12 border-b border-[#1a1a1a] pb-8">
+              <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                Kits de <span className="text-[#EDAC02]">Atleta</span>
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {kits.map((kit: any) => (
+                <div key={kit.id} className="relative bg-[#050505] border border-[#1a1a1a] rounded-2xl overflow-hidden group hover:border-[#EDAC02]/30 transition-all shadow-xl">
+                  {/* Badge */}
+                  <div className={`absolute top-4 right-4 px-3 py-1 text-[10px] shadow-lg font-black tracking-widest uppercase rounded z-10 ${kit.is_optional === false ? 'bg-[#25D366] text-black' : 'bg-black text-[#EDAC02] border border-[#EDAC02]/30'}`}>
+                    {kit.is_optional === false ? 'Incluso na Inscrição' : 'Kit de Upgrade'}
+                  </div>
+                  
+                  {kit.image_url ? (
+                    <div className="relative w-full aspect-[4/3] bg-[#0a0a0a] border-b border-[#1a1a1a]">
+                       <img src={kit.image_url} alt={kit.name} className="absolute inset-0 w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" />
+                    </div>
+                  ) : (
+                    <div className="w-full aspect-[4/3] bg-gradient-to-br from-[#EDAC02]/5 to-[#1a1a1a] flex items-center justify-center border-b border-[#1a1a1a]">
+                       <span className="text-6xl opacity-50 drop-shadow-lg">🎽</span>
+                    </div>
+                  )}
+                  <div className="p-6 relative z-10">
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight">{kit.name}</h3>
+                    {kit.description && <p className="text-sm text-zinc-400 mt-3 border-l-2 border-[#262626] pl-3">{kit.description}</p>}
+                    <p className={`text-3xl font-black italic tracking-tighter mt-6 ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                      {kit.is_optional === false ? 'Grátis (Incluso)' : `+ R$ ${Number(kit.price).toFixed(2).replace('.', ',')}`}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============ CATEGORIAS & PREÇO ============ */}
+      {categories.length > 0 && (
+        <section className="py-24 bg-[#050505]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-16 border-b border-[#1a1a1a] pb-8">
+              <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                Escolha Sua <span className="text-[#EDAC02]">Categoria</span>
+              </h2>
+              <p className="text-zinc-500 text-lg mt-2">
+                Encontre a modalidade ideal para o seu nível.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {categories.map((cat: any) => {
+                const teamSize = cat.team_size || 1;
+                const localActiveBatch = getActiveBatch(batches, cat.id);
+                const relevantBatches = batches.filter(b => !b.category_id || b.category_id === cat.id);
+                const localIsSoldOut = relevantBatches.length > 0 && !localActiveBatch;
+                const price = (localActiveBatch ? Number(localActiveBatch.price) : Number(cat.price)) * teamSize;
+                return (
+                  <div key={cat.id} className="bg-[#0a0a0a] border border-[#1a1a1a] p-8 hover:border-[#EDAC02]/30 transition-all duration-300 group flex flex-col">
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-black text-white uppercase italic tracking-tight mb-4">{cat.name}</h3>
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        <span className="px-3 py-1 bg-[#EDAC02]/10 text-[#EDAC02] font-black uppercase tracking-widest text-[10px] border border-[#EDAC02]/20">
+                          {cat.team_size === 1 ? 'Individual' : `${cat.team_size} Participantes`}
+                        </span>
+                        {cat.gender_requirement !== 'any' && (
+                          <span className="px-3 py-1 bg-[#111] text-zinc-400 font-bold uppercase tracking-widest text-[10px] border border-[#262626]">
+                            {cat.gender_requirement === 'masculino' ? '♂ Masculino' : cat.gender_requirement === 'feminino' ? '♀ Feminino' : 'Misto'}
+                          </span>
+                        )}
+                        {cat.age_type !== 'livre' && cat.min_age && (
+                          <span className="px-3 py-1 bg-[#111] text-zinc-400 font-bold uppercase tracking-widest text-[10px] border border-[#262626]">
+                            {cat.min_age}-{cat.max_age || '+'} anos
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-6 border-t border-[#1a1a1a]">
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className={`text-3xl font-black italic tracking-tighter ${localIsSoldOut ? 'text-zinc-600' : 'text-[#EDAC02]'}`}>{formatCurrency(price)}</p>
+                          {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
+                        </div>
+                        {event.status === 'open' && !localIsSoldOut && (
+                          <button onClick={() => { setCategoryId(cat.id); scrollToRegistration(); }} className="px-6 py-3 bg-white text-black font-black uppercase tracking-widest text-xs skew-x-[-10deg] hover:bg-[#EDAC02] transition-colors">
+                            <span className="inline-block skew-x-[10deg]">Inscrever</span>
+                          </button>
+                        )}
+                        {event.status === 'open' && localIsSoldOut && (
+                          <div className="px-6 py-3 border border-red-500/30 text-red-500 bg-[#111] font-black uppercase tracking-widest text-xs skew-x-[-10deg]">
+                            <span className="inline-block skew-x-[10deg]">Esgotado</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============ CTA REGISTRATION ============ */}
+      {event.status === 'open' && !showRegistration && (
+        <section className="py-20 bg-[#EDAC02] text-center">
+          <div className="max-w-3xl mx-auto px-4">
+            <h2 className="text-4xl md:text-6xl font-black text-black uppercase tracking-tighter italic mb-4">
+              Pronto Para o Desafio?
+            </h2>
+            <p className="text-black/60 text-lg mb-8">
+              Vagas limitadas. Garanta a sua agora e faça parte da comunidade UAIROX.
+            </p>
+            <button onClick={scrollToRegistration} className="bg-black text-white px-12 py-5 font-black text-lg uppercase tracking-widest skew-x-[-10deg] hover:bg-[#111] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]">
+              <span className="inline-block skew-x-[10deg]">Inscrever Agora →</span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ============ REGISTRATION FORM ============ */}
+      {(showRegistration || event.status !== 'open') && (
+        <div ref={registrationRef}>
+          <RegistrationForm
+            eventId={id!}
+            event={event}
+            categories={categories}
+            batches={batches}
+            kits={kits}
+            initialCategoryId={categoryId}
+          />
+        </div>
+      )}
+
+      {/* ============ FOOTER ============ */}
+      <footer className="py-8 border-t border-[#1a1a1a] text-center bg-[#050505]">
+        <a href="/" className="inline-block mb-4">
+          <img 
+            src="/logo-uairox.webp" 
+            alt="UAIROX" 
+            className="w-[120px] h-auto object-contain mx-auto"
+            loading="lazy"
+          />
+        </a>
+        <p className="text-xs text-zinc-600">UAIROX © {new Date().getFullYear()} • Hybrid RUN</p>
+      </footer>
+    </div>
+  );
+}
+
+// ============ STEP INDICATOR ============
+function StepIndicator({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: total }, (_, i) => (
+        <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+          i < current ? 'bg-[#EDAC02]' : i === current ? 'bg-[#EDAC02]/50' : 'bg-[#262626]'
+        }`} />
+      ))}
+    </div>
+  );
+}
+
+// ============ REGISTRATION FORM ============
+function RegistrationForm({ eventId, event, categories, batches, kits, initialCategoryId }: {
+  eventId: string; event: any; categories: any[]; batches: any[]; kits: any[]; initialCategoryId: string;
+}) {
+  const [step, setStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
+
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
+  const [kitId, setKitId] = useState('');
+
+  // Auto-select mandatory kit se for o primeiro render e existir kit obrigatório
+  useEffect(() => {
+    if (kits && kits.length > 0 && !kitId) {
+      const mandatoryKits = kits.filter((k:any) => k.is_optional === false);
+      if (mandatoryKits.length > 0) {
+        setKitId(mandatoryKits[0].id);
+      }
+    }
+  }, [kits, kitId]);
+  const [athleteName, setAthleteName] = useState('');
+  const [athleteEmail, setAthleteEmail] = useState('');
+  const [athletePhone, setAthletePhone] = useState('');
+  const [athleteBirthDate, setAthleteBirthDate] = useState('');
+  const [athleteGender, setAthleteGender] = useState('');
+  const [athleteShirtSize, setAthleteShirtSize] = useState('');
+  const [teamName, setTeamName] = useState('');
+  const [teamMembers, setTeamMembers] = useState<{ name: string }[]>([]);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState<any>(null);
+
+  const [receiptUploading, setReceiptUploading] = useState(false);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card' | null>(null);
+
+  const selectedCategory = categories.find(c => c.id === categoryId);
+  const selectedKit = kits.find(k => k.id === kitId);
+  const formActiveBatch = getActiveBatch(batches, categoryId);
+  const teamSize = selectedCategory?.team_size || 1;
+  const isTeam = teamSize > 1;
+  const basePrice = (formActiveBatch ? Number(formActiveBatch.price) : (selectedCategory ? Number(selectedCategory.price) : 0)) * teamSize;
+  const kitPrice = selectedKit ? Number(selectedKit.price) : 0;
+  let discount = 0;
+  if (couponDiscount) {
+    discount = couponDiscount.discount_type === 'percentage'
+      ? (basePrice * couponDiscount.discount_value) / 100
+      : couponDiscount.discount_value;
+  }
+  const totalPrice = Math.max(0, basePrice + kitPrice - discount);
+
+  useEffect(() => {
+    if (isTeam && selectedCategory) {
+      const size = selectedCategory.team_size - 1;
+      setTeamMembers(prev => {
+        const arr = [...prev];
+        while (arr.length < size) arr.push({ name: '' });
+        return arr.slice(0, size);
+      });
+    }
+    
+    // Invalida o cupom se a categoria for alterada e o cupom não for compatível com a nova
+    if (couponDiscount && (couponDiscount as any).category_id && (couponDiscount as any).category_id !== categoryId) {
+      setCouponDiscount(null);
+      setCouponCode('');
+      toast.error('Cupom removido: Inválido para a nova categoria selecionada');
+    }
+  }, [categoryId, selectedCategory, couponDiscount]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    const { data } = await supabase
+      .from('discount_coupons').select('*')
+      .eq('event_id', eventId).eq('code', couponCode.toUpperCase()).eq('active', true).single();
+    if (data) {
+      if ((data as any).category_id && (data as any).category_id !== categoryId) { toast.error('Cupom não é válido para a sua categoria atual'); return; }
+      if (data.max_uses && (data.current_uses || 0) >= data.max_uses) { toast.error('Cupom esgotado'); return; }
+      setCouponDiscount(data);
+      toast.success(`Cupom aplicado: ${data.discount_type === 'percentage' ? `${data.discount_value}% OFF` : `R$ ${Number(data.discount_value).toFixed(2)} OFF`}`);
+    } else { toast.error('Cupom inválido'); }
+  };
+
+  const handleSubmit = async () => {
+    if (!categoryId || !athleteName.trim() || !athleteEmail.trim() || !athletePhone.trim() || !athleteBirthDate || !athleteGender || (event?.require_shirt_size && !athleteShirtSize)) { toast.error('Preencha os campos obrigatórios primeiro.'); return; }
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.from('registrations').insert({
+        event_id: eventId, category_id: categoryId, kit_id: kitId || null,
+        batch_id: formActiveBatch?.id || null, coupon_id: couponDiscount?.id || null,
+        status: 'pending', total_paid: totalPrice,
+        payment_method: formActiveBatch?.payment_link ? 'link' : 'pix',
+        athlete_name: athleteName.trim(), athlete_email: athleteEmail.trim(),
+        athlete_phone: athletePhone.trim() || null, athlete_birth_date: athleteBirthDate || null,
+        athlete_gender: athleteGender || null, athlete_shirt_size: athleteShirtSize || null,
+        team_name: isTeam ? teamName.trim() : null, team_members: isTeam ? teamMembers : null,
+      } as any).select().single();
+      if (error) throw error;
+      if (couponDiscount) {
+        await supabase.from('discount_coupons').update({ current_uses: (couponDiscount.current_uses || 0) + 1 }).eq('id', couponDiscount.id);
+      }
+      setRegistrationId(data.id);
+      
+      // Disparo automático do Email Via Edge Function (Fire and Forget)
+      supabase.functions.invoke('send-registration-email', {
+        body: { 
+          athlete_name: athleteName.trim(), 
+          athlete_email: athleteEmail.trim(), 
+          event_name: event?.title || 'UAIROX Evento',
+          whatsapp_link: event?.whatsapp_group_link || null
+        }
+      }).catch(err => console.error("Erro ao enviar email:", err));
+
+      setSuccess(true);
+    } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleUploadReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !registrationId) return;
+
+    setReceiptUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${registrationId}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('receipts')
+        .getPublicUrl(filePath);
+
+      const url = urlData.publicUrl;
+
+      // Update registration record
+      const { error: updateError } = await supabase
+        .from('registrations')
+        .update({ pix_receipt_url: url } as any)
+        .eq('id', registrationId);
+
+      if (updateError) throw updateError;
+
+      setReceiptUrl(url);
+      toast.success('Comprovante enviado com sucesso!');
+    } catch (err: any) {
+      toast.error('Erro ao enviar comprovante: ' + err.message);
+    } finally {
+      setReceiptUploading(false);
+    }
+  };
+
+  const inputClass = "w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors";
+  const labelClass = "block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5";
+
+  // ============ SUCCESS ============
+  if (success) {
+    return (
+      <section className="py-20 bg-[#050505]">
+        <div className="max-w-xl mx-auto px-4">
+          <div className="bg-[#0a0a0a] border border-green-500/30 rounded-2xl p-8 text-center">
+            <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h2 className="text-2xl font-black text-white mb-2">Inscrição Realizada! 🎉</h2>
+            <p className="text-sm text-zinc-400 mb-6">Sua inscrição em <span className="text-white font-bold">{event.title}</span> foi registrada.</p>
+            {totalPrice > 0 && (
+              <div className="bg-[#050505] rounded-xl p-5 mb-6 border border-[#1a1a1a] text-left">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">💰 Pagamento</p>
+                          {(() => {
+                  const hasPix = !!formActiveBatch?.pix_key;
+                  const hasCard = !!formActiveBatch?.payment_link;
+                  const showSelection = hasPix && hasCard && !selectedPaymentMethod;
+                  const methodToShow = selectedPaymentMethod || (hasPix && !hasCard ? 'pix' : !hasPix && hasCard ? 'card' : null);
+
+                  if (showSelection) {
+                    return (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-sm text-zinc-400 font-bold mb-1">Como você deseja pagar?</p>
+                        <button onClick={() => setSelectedPaymentMethod('pix')} className="flex items-center gap-4 w-full p-4 border border-[#262626] rounded-xl hover:border-[#EDAC02] hover:bg-[#EDAC02]/5 bg-[#0a0a0a] transition-all group text-left">
+                          <div className="w-12 h-12 rounded-full bg-[#EDAC02]/10 flex items-center justify-center text-[#EDAC02] group-hover:bg-[#EDAC02] group-hover:text-black transition-colors">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                          </div>
+                          <div>
+                            <p className="font-black text-white text-lg">PIX</p>
+                            <p className="text-xs text-zinc-500">Aprovação rápida e sem taxas</p>
+                          </div>
+                        </button>
+
+                        <button onClick={() => setSelectedPaymentMethod('card')} className="flex items-center gap-4 w-full p-4 border border-[#262626] rounded-xl hover:border-[#EDAC02] hover:bg-[#EDAC02]/5 bg-[#0a0a0a] transition-all group text-left">
+                          <div className="w-12 h-12 rounded-full bg-[#EDAC02]/10 flex items-center justify-center text-[#EDAC02] group-hover:bg-[#EDAC02] group-hover:text-black transition-colors">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                          </div>
+                          <div>
+                            <p className="font-black text-white text-lg">Cartão de Crédito</p>
+                            <p className="text-xs text-zinc-500">Parcele em até 12x</p>
+                          </div>
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                      {hasPix && hasCard && (
+                        <button onClick={() => setSelectedPaymentMethod(null)} className="text-[10px] text-zinc-500 hover:text-[#EDAC02] transition-colors mb-4 uppercase tracking-widest font-bold flex items-center gap-1 group">
+                          <svg className="w-3 h-3 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                          Escolher outra forma de pagamento
+                        </button>
+                      )}
+
+                      {methodToShow === 'pix' && formActiveBatch?.pix_key && (
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-1 font-bold">CHAVE PIX:</p>
+                          <div className="flex items-center gap-2 mb-4">
+                            <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all shadow-inner">{formActiveBatch.pix_key}</code>
+                            <button onClick={() => { navigator.clipboard.writeText(formActiveBatch.pix_key!); toast.success('PIX copiado!'); }} className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm hover:bg-[#d49b02] transition-colors shadow">Copiar</button>
+                          </div>
+
+                          {/* Área de Upload do Comprovante */}
+                          <div className="bg-[#111] border border-[#262626] rounded-xl p-4 shadow-inner mt-6">
+                            <p className="text-sm text-white font-bold mb-1">Anexar Comprovante</p>
+                            <p className="text-xs text-zinc-500 mb-4">Acelere a aprovação da sua inscrição enviando o comprovante agora.</p>
+                            
+                            {receiptUrl ? (
+                              <div className="flex flex-col gap-3 mt-1">
+                                <div className="flex items-center justify-center gap-2 text-green-500 bg-green-500/10 px-4 py-3 rounded-lg border border-green-500/20">
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                  <span className="text-sm font-bold">Comprovante Recebido!</span>
+                                </div>
+                                
+                                {event.whatsapp_group_link && (
+                                  <div className="p-4 bg-[#0a0a0a] border border-[#262626] rounded-xl text-center shadow-lg border-t-brand-500/30">
+                                    <p className="text-sm text-white font-black mb-1">Último Passo 🚀</p>
+                                    <p className="text-xs text-zinc-400 mb-4 px-2">Entre no grupo oficial do evento para receber todas as novidades.</p>
+                                    <a href={event.whatsapp_group_link} target="_blank" rel="noopener noreferrer" className="inline-flex w-full justify-center items-center gap-2 px-6 py-3 bg-[#25D366] text-black hover:text-white font-black rounded-lg hover:bg-[#128C7E] transition-all">
+                                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                                      Acessar GRUPO DE ATLETAS
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed ${receiptUploading ? 'border-[#EDAC02] opacity-70' : 'border-[#262626] hover:border-[#EDAC02]'} rounded-lg cursor-pointer bg-[#0a0a0a] transition-colors`}>
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                                  {receiptUploading ? (
+                                    <svg className="animate-spin h-6 w-6 text-[#EDAC02] mb-3 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : (
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600 mb-3 mx-auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                  )}
+                                  <p className="text-sm text-zinc-400 font-bold">
+                                    {receiptUploading ? 'Enviando comprovante...' : 'Enviar Imagem/PDF do Comprovante'}
+                                  </p>
+                                </div>
+                                <input 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*,application/pdf"
+                                  onChange={handleUploadReceipt}
+                                  disabled={receiptUploading}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {methodToShow === 'card' && formActiveBatch?.payment_link && (
+                        <div className="text-center pt-4 pb-2">
+                           <a href={formActiveBatch.payment_link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-5 bg-[#EDAC02] text-black font-black rounded-xl text-center hover:bg-[#d49b02] transition-colors text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1 transform">
+                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                             Pagar com Cartão de Crédito
+                           </a>
+                           <p className="text-xs text-zinc-500 mt-4">Você será redirecionado para o ambiente seguro de pagamento.</p>
+                           
+                            {/* Upload Area for Card Receipt */}
+                            <div className="bg-[#111] border border-[#262626] rounded-xl p-4 shadow-inner mt-6 text-left">
+                              <p className="text-sm text-white font-bold mb-1">Anexar Comprovante</p>
+                              <p className="text-xs text-zinc-500 mb-4">Após o pagamento, anexe o print ou recibo gerado para liberar sua inscrição.</p>
+                              
+                              {receiptUrl ? (
+                                <div className="flex flex-col gap-3 mt-1">
+                                  <div className="flex items-center justify-center gap-2 text-green-500 bg-green-500/10 px-4 py-3 rounded-lg border border-green-500/20">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                    <span className="text-sm font-bold">Comprovante Recebido!</span>
+                                  </div>
+                                  
+                                  {event.whatsapp_group_link && (
+                                    <div className="p-4 bg-[#0a0a0a] border border-[#262626] rounded-xl text-center shadow-lg border-t-brand-500/30">
+                                      <p className="text-sm text-white font-black mb-1">Último Passo 🚀</p>
+                                      <p className="text-xs text-zinc-400 mb-4 px-2">Entre no grupo oficial do evento para receber todas as novidades.</p>
+                                      <a href={event.whatsapp_group_link} target="_blank" rel="noopener noreferrer" className="inline-flex w-full justify-center items-center gap-2 px-6 py-3 bg-[#25D366] text-black hover:text-white font-black rounded-lg hover:bg-[#128C7E] transition-all">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                                        Acessar GRUPO DE ATLETAS
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed ${receiptUploading ? 'border-[#EDAC02] opacity-70' : 'border-[#262626] hover:border-[#EDAC02]'} rounded-lg cursor-pointer bg-[#0a0a0a] transition-colors`}>
+                                  <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                                    {receiptUploading ? (
+                                      <svg className="animate-spin h-6 w-6 text-[#EDAC02] mb-3 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                    ) : (
+                                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600 mb-3 mx-auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                    )}
+                                    <p className="text-sm text-zinc-400 font-bold">
+                                      {receiptUploading ? 'Enviando comprovante...' : 'Enviar Imagem/PDF do Comprovante'}
+                                    </p>
+                                  </div>
+                                  <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*,application/pdf"
+                                    onChange={handleUploadReceipt}
+                                    disabled={receiptUploading}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            <p className="text-xs text-zinc-500 mb-2">Código da Inscrição: <span className="text-white font-mono">{registrationId?.slice(0, 8)}</span></p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (event.status !== 'open') return null;
+
+  const steps = [
+    { title: 'Categoria', subtitle: 'Escolha sua modalidade' },
+    { title: 'Dados', subtitle: 'Informações do atleta' },
+    { title: 'Revisão', subtitle: 'Confirme e finalize' },
+  ];
+
+  const canAdvance = () => {
+    if (step === 0) return !!categoryId;
+    if (step === 1) {
+      if (!athleteName.trim() || !athleteEmail.trim() || !athletePhone.trim() || !athleteBirthDate || !athleteGender) return false;
+      if (event?.require_shirt_size && !athleteShirtSize) return false;
+      
+      if (isTeam) {
+        if (!teamName.trim()) return false;
+        if (teamMembers.some(m => !m.name.trim())) return false;
+      }
+      return true;
+    }
+    return true;
+  };
+
+  return (
+    <section id="inscricao" className="py-20 bg-[#050505] border-t border-[#1a1a1a]">
+      <div className="max-w-xl mx-auto px-4 space-y-6">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">
+            Inscreva<span className="text-[#EDAC02]">-se</span>
+          </h2>
+        </div>
+
+        <StepIndicator current={step} total={steps.length} />
+        <div className="flex items-center justify-between mt-3">
+          <div>
+            <h3 className="text-lg font-black text-white">{steps[step].title}</h3>
+            <p className="text-xs text-zinc-500">{steps[step].subtitle}</p>
+          </div>
+          <span className="text-xs text-zinc-600 font-mono">{step + 1}/{steps.length}</span>
+        </div>
+
+        {/* STEP 0: Category */}
+        {step === 0 && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {categories.map(cat => {
+                const localBatch = getActiveBatch(batches, cat.id);
+                const relevantBatches = batches.filter(b => !b.category_id || b.category_id === cat.id);
+                const soldOut = relevantBatches.length > 0 && !localBatch;
+                const price = (localBatch ? Number(localBatch.price) : Number(cat.price)) * (cat.team_size || 1);
+                
+                return (
+                  <button key={cat.id} onClick={() => !soldOut && setCategoryId(cat.id)} disabled={soldOut}
+                    className={`w-full text-left p-4 rounded-xl border transition-all ${categoryId === cat.id ? 'border-[#EDAC02] bg-[#EDAC02]/5' : (soldOut ? 'border-red-500/20 bg-red-500/5 opacity-50 cursor-not-allowed' : 'border-[#1a1a1a] bg-[#0a0a0a] hover:border-zinc-700')}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`font-bold ${soldOut ? 'text-red-400' : 'text-white'}`}>{cat.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-[#111] text-zinc-400 border border-[#262626]">{cat.team_size === 1 ? 'Individual' : `${cat.team_size} pessoas`}</span>
+                          {cat.gender_requirement !== 'any' && <span className="text-[10px] px-2 py-0.5 rounded bg-[#111] text-zinc-400 border border-[#262626]">{cat.gender_requirement === 'masculino' ? '♂ Masc' : '♀ Fem'}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-lg font-black ${soldOut ? 'text-zinc-500' : 'text-[#EDAC02]'}`}>{soldOut ? 'ESGOTADO' : formatCurrency(price)}</p>
+                        {localBatch && !soldOut && <p className="text-[10px] text-zinc-500 uppercase">{localBatch.name}</p>}
+                      </div>
+                    </div>
+                    {categoryId === cat.id && <div className="mt-2 flex items-center gap-1.5 text-[#EDAC02]"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg><span className="text-xs font-bold">Selecionada</span></div>}
+                  </button>
+                );
+              })}
+            </div>
+            {kits.length > 0 && (() => {
+              const mandatoryKits = kits.filter(k => k.is_optional === false);
+              return (
+              <div className="mt-8 border-t border-[#1a1a1a] pt-6">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">ESCOLHA SEU KIT</p>
+                <div className="space-y-3">
+                  {mandatoryKits.length === 0 && (
+                    <button onClick={() => setKitId('')} className={`w-full text-left p-3 rounded-xl border transition-all ${!kitId ? 'border-[#EDAC02] bg-[#EDAC02]/5' : 'border-[#1a1a1a] bg-[#0a0a0a]'}`}><span className="text-sm font-bold text-zinc-400">Não Quero Kit</span></button>
+                  )}
+                  {kits.map(kit => (
+                    <button key={kit.id} onClick={() => setKitId(kit.id)} className={`w-full text-left p-4 rounded-xl border transition-all ${kitId === kit.id ? 'border-[#EDAC02] bg-[#EDAC02]/5 shadow-[0_0_20px_rgba(237,172,2,0.1)]' : 'border-[#1a1a1a] bg-[#0a0a0a] opacity-80 hover:opacity-100 hover:border-zinc-700'}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                           <div className="flex items-center gap-2 mb-1.5">
+                             <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase ${kit.is_optional === false ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'bg-transparent text-zinc-400 border border-[#262626]'}`}>
+                            {kit.is_optional === false ? 'Incluso na Inscrição' : 'Opcional'}
+                             </span>
+                           </div>
+                           <p className="font-black text-white text-base leading-tight">{kit.name}</p>
+                           {kit.description && <p className="text-xs text-zinc-500 mt-1">{kit.description}</p>}
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-4">
+                           <span className={`text-xl font-black italic tracking-tighter block ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                             {kit.is_optional === false ? 'Grátis' : `+ ${formatCurrency(Number(kit.price))}`}
+                           </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* STEP 1: Athlete Data */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-4">
+              <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">Dados Pessoais</p>
+              <div><label className={labelClass}>Nome Completo *</label><input value={athleteName} onChange={e => setAthleteName(e.target.value)} placeholder="Seu nome completo" className={inputClass} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={labelClass}>Email *</label><input type="email" value={athleteEmail} onChange={e => setAthleteEmail(e.target.value)} placeholder="seu@email.com" className={inputClass} /></div>
+                <div><label className={labelClass}>Telefone / WhatsApp *</label><input value={athletePhone} onChange={e => setAthletePhone(e.target.value)} placeholder="(31) 99999-9999" className={inputClass} /></div>
+              </div>
+              <div className={`grid ${event?.require_shirt_size ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
+                <div><label className={labelClass}>Data de Nascimento *</label><input type="date" value={athleteBirthDate} onChange={e => setAthleteBirthDate(e.target.value)} className={inputClass} /></div>
+                <div><label className={labelClass}>Gênero *</label><select value={athleteGender} onChange={e => setAthleteGender(e.target.value)} className={inputClass}><option value="">Selecione</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
+                {event?.require_shirt_size && <div><label className={labelClass}>Tam. Camisa *</label><select value={athleteShirtSize} onChange={e => setAthleteShirtSize(e.target.value)} className={inputClass}><option value="">Selecione</option>{['PP','P','M','G','GG','XGG'].map(s=><option key={s} value={s}>{s}</option>)}</select></div>}
+              </div>
+            </div>
+            {isTeam && (
+              <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-4">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">👥 Equipe ({selectedCategory?.team_size} participantes)</p>
+                <div><label className={labelClass}>Nome da Equipe *</label><input value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Nome do time" className={inputClass} /></div>
+                {teamMembers.map((member, i) => <div key={i}><label className={labelClass}>Membro {i+2} - Nome Completo *</label><input value={member.name} onChange={e => { const arr=[...teamMembers]; arr[i].name=e.target.value; setTeamMembers(arr); }} placeholder="Nome completo" className={inputClass} /></div>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* STEP 2: Review */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-3">
+              <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">Resumo</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-zinc-400">Atleta</span><span className="text-white font-bold">{athleteName}</span></div>
+                <div className="flex justify-between"><span className="text-zinc-400">Email</span><span className="text-white">{athleteEmail}</span></div>
+                {athletePhone && <div className="flex justify-between"><span className="text-zinc-400">Telefone</span><span className="text-white">{athletePhone}</span></div>}
+                <div className="border-t border-[#1a1a1a] my-2" />
+                <div className="flex justify-between"><span className="text-zinc-400">Categoria</span><span className="text-white font-bold">{selectedCategory?.name}</span></div>
+                {isTeam && <div className="flex justify-between"><span className="text-zinc-400">Equipe</span><span className="text-white">{teamName||'—'}</span></div>}
+                {selectedKit && <div className="flex justify-between"><span className="text-zinc-400">Kit</span><span className="text-white">{selectedKit.name}</span></div>}
+              </div>
+            </div>
+            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5">
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">🏷️ Cupom</p>
+              <div className="flex gap-2">
+                <input value={couponCode} onChange={e => setCouponCode(e.target.value)} placeholder="CODIGO" className={`flex-1 ${inputClass} font-mono uppercase`} />
+                <button onClick={handleApplyCoupon} className="px-4 py-3 bg-[#111] border border-[#262626] rounded-lg text-sm font-bold text-white hover:border-[#EDAC02]/50 transition-colors">Aplicar</button>
+              </div>
+              {couponDiscount && <div className="mt-2 flex items-center gap-2 text-green-400 text-xs"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg><span>Cupom <strong>{couponDiscount.code}</strong> aplicado!</span></div>}
+            </div>
+            <div className="bg-[#0a0a0a] border border-[#EDAC02]/20 rounded-xl p-5">
+              <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">💰 Total</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-zinc-400">Inscrição</span><span className="text-white">{formatCurrency(basePrice)}</span></div>
+                {kitPrice > 0 && <div className="flex justify-between"><span className="text-zinc-400">Kit</span><span className="text-white">+ {formatCurrency(kitPrice)}</span></div>}
+                {discount > 0 && <div className="flex justify-between"><span className="text-green-400">Desconto</span><span className="text-green-400">- {formatCurrency(discount)}</span></div>}
+                <div className="border-t border-[#1a1a1a] pt-2 mt-2 flex justify-between"><span className="text-white font-bold">Total</span><span className="text-2xl font-black text-[#EDAC02]">{formatCurrency(totalPrice)}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex gap-3 pt-2">
+          {step > 0 && <button onClick={() => setStep(s => s - 1)} className="flex-1 py-3.5 border border-[#262626] rounded-xl text-zinc-400 font-bold hover:bg-[#111] transition-colors">← Voltar</button>}
+          {step < steps.length - 1 ? (
+            <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} className="flex-1 py-3.5 bg-[#EDAC02] text-black font-black rounded-xl hover:bg-[#d49b02] transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Continuar →</button>
+          ) : (
+            <button onClick={handleSubmit} disabled={submitting} className="flex-1 py-3.5 bg-[#EDAC02] text-black font-black rounded-xl hover:bg-[#d49b02] transition-colors disabled:opacity-50">
+              {submitting ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />Processando...</span> : '✅ Confirmar Inscrição'}
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}

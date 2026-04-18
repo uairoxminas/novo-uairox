@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Integral CF", Inter, sans-serif;
+  --font-display: "Integral CF", Inter, sans-serif;
+  --color-brand-400: #f5c442;
+  --color-brand-500: #EDAC02;
+  --color-brand-600: #c98c00;
+  --color-brand-900: #664400;
+  --color-dark-bg: #050505;
+  --color-dark-card: #121212;
+  --color-dark-border: #262626;
+  --color-dark-text: #e4e4e7;
+  --color-dark-muted: #a1a1aa;
+}
+
+:root {
+  --header-height: 96px;
+}
+
+/* SETUP DA FONTE INTEGRAL CF */
+@font-face {
+  font-family: 'Integral CF';
+  src: local('Integral CF Regular'), local('IntegralCF-Regular'), local('Integral CF');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Integral CF';
+  src: local('Integral CF Bold'), local('IntegralCF-Bold');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Integral CF';
+  src: local('Integral CF Heavy'), local('IntegralCF-Heavy'), local('Integral CF ExtraBold');
+  font-weight: 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Integral CF';
+  src: local('Integral CF Heavy Oblique'), local('IntegralCF-HeavyOblique');
+  font-weight: 900;
+  font-style: italic;
+}
+
+body { 
+  background-color: #050505; 
+  color: #e4e4e7; 
+  overflow-x: hidden; 
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: #EDAC02; }
+
+.station-btn.active { border-left-color: #EDAC02; background-color: #171717; color: #fff; }
+.station-btn.active .station-number { background-color: #EDAC02; color: #000; }
+
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  pointer-events: none;
+}
+
+.event-card:hover .event-bg-text {
+  transform: scale(1.1) rotate(-5deg);
+  color: rgba(237, 172, 2, 0.1); 
+}
+
+.img-placeholder-bg {
+  background: linear-gradient(45deg, #121212, #1c1917);
+  background-size: 200% 200%;
+  animation: gradientMove 5s ease infinite;
+}
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.bg-grid-pattern {
+  background-image: linear-gradient(to right, #262626 1px, transparent 1px), linear-gradient(to bottom, #262626 1px, transparent 1px);
+}
