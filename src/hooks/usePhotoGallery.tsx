@@ -46,8 +46,9 @@ export interface PhotoPurchase {
 }
 
 // ============ GOOGLE DRIVE HELPERS ============
+const GOOGLE_API_KEY = 'AIzaSyCmEeA9TkNF9zQng1GToxHryrd6Li9UpsM';
+
 export function extractDriveFileId(url: string): string {
-  // Handle various Google Drive URL formats
   const patterns = [
     /\/file\/d\/([a-zA-Z0-9_-]+)/,
     /id=([a-zA-Z0-9_-]+)/,
@@ -57,8 +58,16 @@ export function extractDriveFileId(url: string): string {
     const match = url.match(p);
     if (match) return match[1];
   }
-  // If it's already just an ID
   return url.trim();
+}
+
+export function extractDriveFolderId(url: string): string | null {
+  const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+export function isDriveFolderUrl(url: string): boolean {
+  return /drive\.google\.com\/drive\/folders\//.test(url) || /\/folders\//.test(url);
 }
 
 export function getDriveThumbnailUrl(fileId: string, width = 800): string {
@@ -67,6 +76,33 @@ export function getDriveThumbnailUrl(fileId: string, width = 800): string {
 
 export function getDriveDownloadUrl(fileId: string): string {
   return `https://drive.google.com/uc?export=download&id=${fileId}`;
+}
+
+/** Scan a Google Drive folder and return all image file IDs */
+export async function scanDriveFolder(folderId: string): Promise<Array<{ id: string; name: string }>> {
+  const allFiles: Array<{ id: string; name: string }> = [];
+  let pageToken = '';
+
+  do {
+    const params = new URLSearchParams({
+      q: `'${folderId}' in parents and trashed = false and mimeType contains 'image'`,
+      fields: 'nextPageToken,files(id,name)',
+      key: GOOGLE_API_KEY,
+      pageSize: '1000',
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`);
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`Google Drive API error: ${err}`);
+    }
+    const data = await resp.json();
+    allFiles.push(...(data.files || []));
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+
+  return allFiles;
 }
 
 // ============ PUBLIC HOOKS ============

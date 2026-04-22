@@ -11,6 +11,9 @@ import {
   useDeletePhoto,
   useUpdatePurchaseStatus,
   extractDriveFileId,
+  extractDriveFolderId,
+  isDriveFolderUrl,
+  scanDriveFolder,
   getDriveThumbnailUrl,
   type PhotoGallery,
   type GalleryPhoto,
@@ -148,13 +151,55 @@ function BulkAddPhotos({ galleryId, onClose }: { galleryId: string; onClose: () 
   const [rawText, setRawText] = useState('');
   const [defaultBib, setDefaultBib] = useState('');
   const [photographer, setPhotographer] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [scannedFiles, setScannedFiles] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [scanError, setScanError] = useState('');
 
-  const handleAdd = async () => {
+  // Detect if user pasted a folder link
+  const handleTextChange = async (text: string) => {
+    setRawText(text);
+    setScanError('');
+    
+    const trimmed = text.trim();
+    if (isDriveFolderUrl(trimmed) && trimmed.split('\n').length === 1) {
+      const folderId = extractDriveFolderId(trimmed);
+      if (folderId) {
+        setScanning(true);
+        setScannedFiles(null);
+        try {
+          const files = await scanDriveFolder(folderId);
+          setScannedFiles(files);
+          if (files.length === 0) {
+            setScanError('Nenhuma imagem encontrada na pasta. Verifique se a pasta está compartilhada como "Qualquer pessoa com o link".');
+          }
+        } catch (err: any) {
+          setScanError('Erro ao escanear pasta: ' + (err.message || 'Verifique se a pasta está pública'));
+          setScannedFiles(null);
+        } finally {
+          setScanning(false);
+        }
+      }
+    } else {
+      setScannedFiles(null);
+    }
+  };
+
+  const handleAddFromFolder = async () => {
+    if (!scannedFiles || scannedFiles.length === 0) return;
+    const photos = scannedFiles.map((f) => ({
+      gallery_id: galleryId,
+      drive_file_id: f.id,
+      bib_number: defaultBib || undefined,
+      photographer: photographer.trim() || undefined,
+    }));
+    await bulkAdd.mutateAsync(photos as any);
+    onClose();
+  };
+
+  const handleAddFromLinks = async () => {
     const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
-
     const photos = lines.map((line) => {
-      // Support format: URL | BIB or just URL
       const parts = line.split('|').map(p => p.trim());
       const url = parts[0];
       const bib = parts[1] || defaultBib || undefined;
@@ -165,31 +210,69 @@ function BulkAddPhotos({ galleryId, onClose }: { galleryId: string; onClose: () 
         photographer: photographer.trim() || undefined,
       };
     });
-
     await bulkAdd.mutateAsync(photos as any);
     onClose();
   };
+
+  const isFolderMode = scannedFiles !== null || scanning;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 pt-8">
       <div className="bg-[#0a0a0a] border border-[#262626] rounded-2xl w-full max-w-2xl relative">
         <div className="flex items-center justify-between p-6 border-b border-[#262626]">
-          <h2 className="text-xl font-black text-white">📸 Adicionar Fotos em Massa</h2>
+          <h2 className="text-xl font-black text-white">📸 Adicionar Fotos</h2>
           <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-5">
+          {/* Instructions */}
           <div className="bg-[#050505] border border-[#262626] rounded-lg p-4">
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Cole os links do Google Drive, um por linha.</p>
-            <p className="text-xs text-zinc-600 mb-1">Formato: <code className="text-brand-400">link_do_drive | numero_bib</code></p>
-            <p className="text-xs text-zinc-600">Ou apenas o link (usará o BIB padrão abaixo)</p>
+            <p className="text-xs text-[#EDAC02] mb-2 font-black uppercase tracking-widest">📁 Modo automático</p>
+            <p className="text-xs text-zinc-400 mb-1">Cole o <strong className="text-white">link da pasta</strong> do Google Drive — o sistema escaneará todas as fotos automaticamente!</p>
+            <p className="text-xs text-zinc-600">Ou cole links individuais (um por linha), formato: <code className="text-brand-400">link | bib</code></p>
           </div>
+
+          {/* Input */}
           <textarea
             value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            rows={10}
+            onChange={(e) => handleTextChange(e.target.value)}
+            rows={scanning || scannedFiles ? 2 : 8}
             className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm font-mono focus:border-[#EDAC02] outline-none resize-none"
-            placeholder={`https://drive.google.com/file/d/abc123/view | 42\nhttps://drive.google.com/file/d/def456/view | 42\nhttps://drive.google.com/file/d/ghi789/view | 15`}
+            placeholder="https://drive.google.com/drive/folders/xxxxx"
           />
+
+          {/* Scanning state */}
+          {scanning && (
+            <div className="flex items-center gap-3 py-6 justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-[#EDAC02]" />
+              <p className="text-zinc-400 font-bold text-sm">Escaneando pasta do Google Drive...</p>
+            </div>
+          )}
+
+          {/* Scan error */}
+          {scanError && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+              <p className="text-red-400 text-sm font-bold">❌ {scanError}</p>
+            </div>
+          )}
+
+          {/* Scanned results */}
+          {scannedFiles && scannedFiles.length > 0 && (
+            <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-4">
+              <p className="text-green-400 text-sm font-bold mb-2">
+                ✅ {scannedFiles.length} foto(s) encontradas na pasta!
+              </p>
+              <div className="max-h-32 overflow-y-auto">
+                {scannedFiles.slice(0, 10).map((f) => (
+                  <p key={f.id} className="text-zinc-500 text-xs truncate">📷 {f.name}</p>
+                ))}
+                {scannedFiles.length > 10 && (
+                  <p className="text-zinc-600 text-xs mt-1">...e mais {scannedFiles.length - 10} fotos</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Options */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">BIB Padrão (opcional)</label>
@@ -200,12 +283,23 @@ function BulkAddPhotos({ galleryId, onClose }: { galleryId: string; onClose: () 
               <input type="text" value={photographer} onChange={(e) => setPhotographer(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" placeholder="Nome do fotógrafo" />
             </div>
           </div>
+
+          {/* Actions */}
           <div className="flex justify-between items-center pt-4 border-t border-[#262626]">
-            <p className="text-xs text-zinc-500">{rawText.split('\n').filter(l => l.trim()).length} link(s) detectados</p>
+            <p className="text-xs text-zinc-500">
+              {isFolderMode
+                ? `${scannedFiles?.length || 0} foto(s) na pasta`
+                : `${rawText.split('\n').filter(l => l.trim()).length} link(s)`
+              }
+            </p>
             <div className="flex gap-3">
               <button onClick={onClose} className="px-6 py-3 text-zinc-400 font-bold text-sm hover:text-white">Cancelar</button>
-              <button onClick={handleAdd} disabled={bulkAdd.isPending || !rawText.trim()} className="px-8 py-3 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest rounded-lg hover:bg-[#ffc832] disabled:opacity-50">
-                {bulkAdd.isPending ? 'Adicionando...' : 'Adicionar Fotos'}
+              <button
+                onClick={isFolderMode ? handleAddFromFolder : handleAddFromLinks}
+                disabled={bulkAdd.isPending || scanning || (!isFolderMode && !rawText.trim()) || (isFolderMode && (!scannedFiles || scannedFiles.length === 0))}
+                className="px-8 py-3 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest rounded-lg hover:bg-[#ffc832] disabled:opacity-50"
+              >
+                {bulkAdd.isPending ? 'Adicionando...' : `Adicionar ${isFolderMode ? scannedFiles?.length || 0 : ''} Fotos`}
               </button>
             </div>
           </div>
