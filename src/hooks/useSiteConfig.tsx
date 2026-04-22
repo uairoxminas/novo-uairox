@@ -188,6 +188,20 @@ export interface HomeStatsNewConfig {
   val_4: string; label_4: string;
 }
 
+export interface SquadPageConfig {
+  badge_text: string;
+  title: string;
+  description: string;
+  cta_button_text: string;
+}
+
+export interface SquadPageConfig {
+  badge_text: string;
+  title: string;
+  description: string;
+  cta_button_text: string;
+}
+
 // Legacy configs (for backwards compatibility)
 interface HeroConfig {
   title: string;
@@ -234,6 +248,7 @@ export interface SiteConfig {
   home_stats_new: HomeStatsNewConfig;
   home_predictor_new?: HomePredictorNewConfig;
   home_footer?: HomeFooterConfig;
+  squad_page?: SquadPageConfig;
 }
 
 const defaultConfig: SiteConfig = {
@@ -385,6 +400,12 @@ const defaultConfig: SiteConfig = {
     ig_link: '#',
     yt_link: '#',
     copyright: '© 2026 UAIROX Hybrid Racing. Todos os direitos reservados.'
+  },
+  squad_page: {
+    badge_text: "Embaixadores Oficiais",
+    title: "O Motor do UAIROX",
+    description: "Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.",
+    cta_button_text: "Quero fazer parte do Squad",
   }
 };
 

@@ -32,6 +32,12 @@ export default function AdminLandingConfig() {
     yt_link: '#',
     copyright: '© 2026 UAIROX Hybrid Racing. Todos os direitos reservados.'
   });
+  const [squadPageConfig, setSquadPageConfig] = useState(config?.squad_page || {
+    badge_text: 'Embaixadores Oficiais',
+    title: 'O Motor do UAIROX',
+    description: 'Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.',
+    cta_button_text: 'Quero fazer parte do Squad'
+  });
 
   const [isUploading, setIsUploading] = useState(false);
   const [editingRaceTypeIdx, setEditingRaceTypeIdx] = useState(0);
@@ -44,6 +50,7 @@ export default function AdminLandingConfig() {
     if (config?.home_events_new) setEventsConfig(config.home_events_new);
     if (config?.home_predictor_new) setPredictorConfig(config.home_predictor_new);
     if (config?.home_footer) setFooterConfig(config.home_footer);
+    if (config?.squad_page) setSquadPageConfig(config.squad_page);
     
     // Migração em tempo de execução para os 3 tipos de prova (Race Types legados)
     if (config?.home_format_new) {
@@ -64,6 +71,7 @@ export default function AdminLandingConfig() {
   const handleSaveEvents = () => updateConfig.mutate({ key: "home_events_new", value: eventsConfig });
   const handleSavePredictor = () => updateConfig.mutate({ key: "home_predictor_new", value: predictorConfig });
   const handleSaveFooter = () => updateConfig.mutate({ key: "home_footer", value: footerConfig });
+  const handleSaveSquad = () => updateConfig.mutate({ key: "squad_page", value: squadPageConfig });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -727,6 +735,36 @@ export default function AdminLandingConfig() {
           <button onClick={handleSaveFooter} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar Rodapé</button>
         </div>
       </div>
+      
+      <div className="bg-[#121212] border border-[#262626] rounded-xl p-6 space-y-6">
+        <h2 className="text-xl font-bold text-brand-500 mb-4">Página SQUAD</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">Tag/Badge (Ex: Embaixadores Oficiais)</label>
+            <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={squadPageConfig?.badge_text || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), badge_text: e.target.value}) as any)} />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">Título Principal (Ex: O Motor do UAIROX)</label>
+            <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={squadPageConfig?.title || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), title: e.target.value}) as any)} />
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição Curta</label>
+          <textarea className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white h-24" value={squadPageConfig?.description || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), description: e.target.value}) as any)}></textarea>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-bold text-zinc-400 mb-2">Texto do Botão CTA (Ex: Quero fazer parte do Squad)</label>
+          <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={squadPageConfig?.cta_button_text || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), cta_button_text: e.target.value}) as any)} />
+        </div>
+
+        <div className="flex justify-end pt-4 border-t border-dark-border mt-4">
+          <button onClick={handleSaveSquad} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar SQUAD</button>
+        </div>
+      </div>
+
     </div>
   );
 }

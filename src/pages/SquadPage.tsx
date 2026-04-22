@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Crown, Star, MapPin, Users, Check, X, Award, Medal, Trophy } from 'lucide-react';
+import { Crown, Star, MapPin, Users, Check, X, Award, Medal, Trophy, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useSiteConfig } from '@/hooks/useSiteConfig';
 
 type SquadRole = 'coach' | 'athlete' | 'influencer';
 type SquadTier = 'iniciante' | 'bronze' | 'prata' | 'ouro' | 'elite';
@@ -43,16 +44,57 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
     role: 'coach' as SquadRole,
     location: '',
     why_join: '',
+    avatar_url: '',
   });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     try {
-      const { error } = await (supabase.from('squad_applications' as any) as any).insert([formData]);
+      let finalAvatarUrl = '';
+
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+        const filePath = `squad_avatars/${fileName}`;
+
+        // Using the same bucket structure as site-assets or a generic public one. We'll use 'kits' or 'site-assets'
+        // Trying site-assets since it's the default for site configs
+        const { error: uploadError } = await supabase.storage
+          .from('site-assets')
+          .upload(filePath, avatarFile);
+
+        if (uploadError) {
+          console.error("Upload error (fallback to no avatar):", uploadError);
+        } else {
+          const { data } = supabase.storage.from('site-assets').getPublicUrl(filePath);
+          finalAvatarUrl = data.publicUrl;
+        }
+      }
+
+      const applicationData = {
+        ...formData,
+        avatar_url: finalAvatarUrl
+      };
+
+      const { error } = await (supabase.from('squad_applications' as any) as any).insert([applicationData]);
       if (error) throw error;
       setSubmitted(true);
     } catch (error) {
@@ -106,6 +148,20 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
               </p>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="flex flex-col items-center mb-6">
+                  <div className="relative group cursor-pointer mb-2">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-dark-border bg-[#111] flex items-center justify-center">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Upload className="text-zinc-500 group-hover:text-brand-500 transition-colors" />
+                      )}
+                    </div>
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </div>
+                  <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Sua Foto (Opcional)</p>
+                </div>
+
                 <input
                   required
                   type="text"
@@ -171,11 +227,12 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-4 py-4 bg-brand-500 text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-colors disabled:opacity-50"
+                  className="w-full mt-4 py-4 bg-brand-500 text-black font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <span className="inline-block skew-x-[10deg]">
                     {loading ? 'Enviando...' : 'Enviar Solicitação'}
                   </span>
+                  {loading && <Loader2 size={16} className="animate-spin skew-x-[10deg]" />}
                 </button>
               </form>
             </>
@@ -190,7 +247,15 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
 export default function SquadPage() {
   const [members, setMembers] = useState<SquadMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { data: config } = useSiteConfig();
+  
+  const squadConfig = config?.squad_page || {
+    badge_text: 'Embaixadores Oficiais',
+    title: 'O Motor do UAIROX',
+    description: 'Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.',
+    cta_button_text: 'Quero fazer parte do Squad'
+  };
 
   useEffect(() => {
     async function fetchSquad() {
@@ -220,19 +285,19 @@ export default function SquadPage() {
         <div className="max-w-4xl mx-auto px-4">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-brand-500 text-xs font-bold uppercase tracking-widest mb-6">
-              <Crown size={14} /> Embaixadores Oficiais
+              <Crown size={14} /> {squadConfig.badge_text}
             </div>
             <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter italic mb-4">
-              O Motor do UAIROX
+              {squadConfig.title}
             </h1>
             <p className="text-zinc-400 text-lg md:text-xl font-inter max-w-2xl mx-auto mb-8">
-              Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.
+              {squadConfig.description}
             </p>
             <button
-              onClick={() => setShowModal(true)}
-              className="px-8 py-4 bg-brand-500 text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-transform hover:scale-105"
+              onClick={() => setIsModalOpen(true)}
+              className="px-8 py-4 bg-brand-500 text-black font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-transform hover:scale-105"
             >
-              <span className="inline-block skew-x-[10deg]">Quero fazer parte do Squad</span>
+              <span className="inline-block skew-x-[10deg]">{squadConfig.cta_button_text}</span>
             </button>
           </motion.div>
         </div>
@@ -380,7 +445,7 @@ export default function SquadPage() {
 
       {/* Application Modal */}
       <AnimatePresence>
-        {showModal && <ApplicationModal onClose={() => setShowModal(false)} />}
+        {isModalOpen && <ApplicationModal onClose={() => setIsModalOpen(false)} />}
       </AnimatePresence>
     </div>
   );
