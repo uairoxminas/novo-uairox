@@ -10,11 +10,11 @@ import JudgeLayout from './components/layout/JudgeLayout';
 
 // Páginas Públicas (Visitantes)
 import HomePage from './pages/HomePage';
-import EventsPage from './pages/EventsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import SquadPage from './pages/SquadPage';
 import GalleryPage from './pages/GalleryPage';
 import LocationsPage from './pages/LocationsPage';
+import StorePage from './pages/StorePage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Páginas Auth
@@ -33,6 +33,8 @@ import AdminRaceDayControlPage from './pages/admin/AdminRaceDayControlPage';
 import AdminRaceDayLiveMonitor from './pages/admin/AdminRaceDayLiveMonitor';
 import AdminResultsEventsPage from './pages/admin/AdminResultsEventsPage';
 import AdminResultsManagerPage from './pages/admin/AdminResultsManagerPage';
+import AdminStore from './pages/admin/AdminStore';
+import AdminPhotos from './pages/admin/AdminPhotos';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 
 // Páginas Juiz
@@ -41,6 +43,7 @@ import JudgeDashboard from './pages/judge/JudgeDashboard';
 // Auth
 import { AuthProvider } from './hooks/useAuth';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import ScrollToHash from './components/utils/ScrollToHash';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +59,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToHash />
         <Toaster
           position="top-right"
           toastOptions={{
@@ -70,11 +74,11 @@ export default function App() {
           {/* 1. Visitantes (Área Pública) */}
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
-            <Route path="/events" element={<EventsPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/squad" element={<SquadPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/locations" element={<LocationsPage />} />
+            <Route path="/store" element={<StorePage />} />
           </Route>
 
           {/* Área de Autenticação */}
@@ -108,6 +112,8 @@ export default function App() {
             <Route path="raceday/:id/heat/:heatId" element={<AdminRaceDayLiveMonitor />} />
             <Route path="results" element={<AdminResultsEventsPage />} />
             <Route path="results/:id" element={<AdminResultsManagerPage />} />
+            <Route path="store" element={<AdminStore />} />
+            <Route path="photos" element={<AdminPhotos />} />
           </Route>
 
           {/* 4. Área do Juiz */}

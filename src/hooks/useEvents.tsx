@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 // ============ TYPES ============
+export type EventType = 'experience' | 'oficial';
+
 export interface EventRow {
   id: string;
   title: string;
@@ -13,6 +15,7 @@ export interface EventRow {
   image_url: string | null;
   status: string | null;
   race_status: string | null;
+  event_type: EventType;
   whatsapp_group_link: string | null;
   created_at: string;
   updated_at: string;
@@ -116,6 +119,7 @@ export function useCreateEvent() {
       description?: string;
       image_url?: string;
       status?: string;
+      event_type?: EventType;
     }) => {
       const { data, error } = await supabase
         .from("events")

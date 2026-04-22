@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Timer, Trophy } from 'lucide-react';
+import { Timer, Trophy, ShoppingBag, Camera } from 'lucide-react';
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
   const location = useLocation();
@@ -32,7 +32,7 @@ export default function AdminLayout() {
             </h2>
           </Link>
         </div>
-        <nav className="p-4 space-y-1 flex-1">
+        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
           <NavItem
             to="/admin"
             label="Visão Geral"
@@ -47,6 +47,16 @@ export default function AdminLayout() {
             to="/admin/events"
             label="Eventos"
             icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+          />
+          <NavItem
+            to="/admin/store"
+            label="🛍️ Loja"
+            icon={<ShoppingBag className="w-4 h-4" />}
+          />
+          <NavItem
+            to="/admin/photos"
+            label="📸 Fotos"
+            icon={<Camera className="w-4 h-4" />}
           />
           <NavItem
             to="/admin/raceday"

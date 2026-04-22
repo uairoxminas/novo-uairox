@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
 import { usePublicEvents } from '@/hooks/useEvents';
+import { Play } from 'lucide-react';
 
 export default function HomePage() {
   const { data: config, isLoading } = useSiteConfig();
@@ -524,9 +525,92 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     };
   };
 
+  // Split events by type
+  const experienceEvents = dbEvents?.filter((ev: any) => ev.event_type === 'experience') || [];
+  const oficialEvents = dbEvents?.filter((ev: any) => ev.event_type !== 'experience') || [];
+
+  const renderEventCard = (ev: any) => {
+    const card = getCardProps(ev);
+    const city = getCity(ev.location);
+    const acronym = getAcronym(ev.location);
+    const dateLabel = formatDateLabel(ev.date, ev.end_date);
+
+    return (
+      <div
+        key={ev.id}
+        className={`event-card relative bg-dark-card border ${card.is_badge_active ? 'border-brand-500' : 'border-dark-border'} ${card.is_disabled ? 'border-dark-border/50 opacity-70 hover:opacity-100' : 'hover:border-brand-500 cursor-pointer'} p-8 flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-2 group h-[450px]`}
+      >
+        {ev.image_url ? (
+          <>
+            <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-110 opacity-60" style={{ backgroundImage: `url(${ev.image_url})` }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent z-0" />
+          </>
+        ) : (
+          <div className="event-bg-text absolute -right-6 -top-12 text-[12rem] font-black text-white/5 leading-none italic pointer-events-none transition-all duration-500 z-0">
+            {acronym}
+          </div>
+        )}
+
+        <div className="relative z-10">
+          <div className="flex justify-between items-start mb-6">
+            {card.is_badge_active ? (
+              <span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500 text-white font-black uppercase tracking-widest text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                {card.badge_text}
+              </span>
+            ) : (
+              <span className={`inline-block px-3 py-1 ${card.is_disabled ? 'bg-dark-border text-dark-muted' : 'bg-white text-black'} font-black uppercase tracking-widest text-xs`}>
+                {card.badge_text}
+              </span>
+            )}
+          </div>
+          <h3 className={`text-4xl font-black uppercase italic mb-1 ${card.is_disabled ? 'text-dark-muted' : 'text-white'}`}>
+            {city}
+          </h3>
+          <p className={`${card.is_disabled ? 'text-dark-muted/60' : card.is_badge_active ? 'text-brand-400' : 'text-white/60'} font-black tracking-widest uppercase text-sm mb-6`}>
+            {dateLabel}
+          </p>
+          <p className="text-dark-muted text-sm mb-6 line-clamp-3 font-inter">
+            {ev.description}
+          </p>
+        </div>
+
+        <div className="relative z-10 mt-auto">
+          {card.btn_link && !card.is_disabled ? (
+            <a
+              href={card.btn_link}
+              className={`block w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors text-center ${
+                card.is_badge_active
+                  ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
+                  : 'border-2 border-dark-border text-white group-hover:border-white'
+              }`}
+            >
+              <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
+            </a>
+          ) : (
+            <button
+              className={`w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors ${
+                card.is_disabled
+                  ? 'bg-dark-bg border border-dark-border text-dark-muted'
+                  : card.is_badge_active
+                    ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
+                    : 'border-2 border-dark-border text-white group-hover:border-white'
+              }`}
+            >
+              <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const hasAnyEvents = (dbEvents && dbEvents.length > 0);
+
   return (
     <section id="etapas" className="py-24 bg-[#080808] border-b border-dark-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Section Header */}
         <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-dark-border pb-8">
           <div>
             <h2 className="text-4xl md:text-5xl font-black text-white mb-2 uppercase tracking-tighter italic">
@@ -541,90 +625,81 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {dbEvents && dbEvents.length > 0 ? (
-            dbEvents.map((ev: any) => {
-                const card = getCardProps(ev);
-                const city = getCity(ev.location);
-                const acronym = getAcronym(ev.location);
-                const dateLabel = formatDateLabel(ev.date, ev.end_date);
-
-                return (
-                  <div
-                    key={ev.id}
-                    className={`event-card relative bg-dark-card border ${card.is_badge_active ? 'border-brand-500' : 'border-dark-border'} ${card.is_disabled ? 'border-dark-border/50 opacity-70 hover:opacity-100' : 'hover:border-brand-500 cursor-pointer'} p-8 flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-2 group h-[450px]`}
-                  >
-                    {ev.image_url ? (
-                      <>
-                        <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-110 opacity-60" style={{ backgroundImage: `url(${ev.image_url})` }} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent z-0" />
-                      </>
-                    ) : (
-                      <div className="event-bg-text absolute -right-6 -top-12 text-[12rem] font-black text-white/5 leading-none italic pointer-events-none transition-all duration-500 z-0">
-                        {acronym}
-                      </div>
-                    )}
-
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-6">
-                        {card.is_badge_active ? (
-                          <span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500 text-white font-black uppercase tracking-widest text-xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                            {card.badge_text}
-                          </span>
-                        ) : (
-                          <span className={`inline-block px-3 py-1 ${card.is_disabled ? 'bg-dark-border text-dark-muted' : 'bg-white text-black'} font-black uppercase tracking-widest text-xs`}>
-                            {card.badge_text}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className={`text-4xl font-black uppercase italic mb-1 ${card.is_disabled ? 'text-dark-muted' : 'text-white'}`}>
-                        {city}
-                      </h3>
-                      <p className={`${card.is_disabled ? 'text-dark-muted/60' : card.is_badge_active ? 'text-brand-400' : 'text-white/60'} font-black tracking-widest uppercase text-sm mb-6`}>
-                        {dateLabel}
-                      </p>
-                      <p className="text-dark-muted text-sm mb-6 line-clamp-3 font-inter">
-                        {ev.description}
-                      </p>
-                    </div>
-
-                    <div className="relative z-10 mt-auto">
-                      {card.btn_link && !card.is_disabled ? (
-                        <a
-                          href={card.btn_link}
-                          className={`block w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors text-center ${
-                            card.is_badge_active
-                              ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
-                              : 'border-2 border-dark-border text-white group-hover:border-white'
-                          }`}
-                        >
-                          <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
-                        </a>
-                      ) : (
-                        <button
-                          className={`w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors ${
-                            card.is_disabled
-                              ? 'bg-dark-bg border border-dark-border text-dark-muted'
-                              : card.is_badge_active
-                                ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
-                                : 'border-2 border-dark-border text-white group-hover:border-white'
-                          }`}
-                        >
-                          <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
-                        </button>
-                      )}
-                    </div>
+        {!hasAnyEvents ? (
+          <div className="col-span-full py-20 text-center bg-dark-card/50 border border-dark-border rounded-xl">
+            <p className="text-zinc-500 font-bold uppercase tracking-widest italic text-lg">Em breve novas etapas serão anunciadas.</p>
+          </div>
+        ) : (
+          <div className="space-y-16">
+            {/* EVENTOS EXPERIENCE (SIMULADOS) */}
+            <div>
+              <div className="mb-8">
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="flex items-center gap-3">
+                    <Play size={24} className="text-brand-500 fill-brand-500" />
+                    <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic">
+                      {eventsConfig?.experience_title || 'Eventos Experience'}
+                    </h3>
                   </div>
-                );
-            })
-          ) : (
-            <div className="col-span-full py-20 text-center bg-dark-card/50 border border-dark-border rounded-xl">
-              <p className="text-zinc-500 font-bold uppercase tracking-widest italic text-lg">Em breve novas etapas serão anunciadas.</p>
+                  <span className="px-3 py-1 bg-brand-500/10 border border-brand-500/30 text-brand-400 font-black uppercase tracking-widest text-[10px]">
+                    Simulados
+                  </span>
+                  <div className="flex-1 h-px bg-dark-border ml-4"></div>
+                </div>
+                {eventsConfig?.experience_description && (
+                  <p className="text-dark-muted text-sm md:text-base font-inter ml-11">
+                    {eventsConfig.experience_description}
+                  </p>
+                )}
+              </div>
+
+              {experienceEvents.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {experienceEvents.map(renderEventCard)}
+                </div>
+              ) : (
+                <div className="py-12 text-center bg-dark-card/30 border border-dark-border/50 rounded-xl">
+                  <p className="text-zinc-600 font-bold uppercase tracking-widest text-sm italic">Nenhum evento experience programado no momento.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* EVENTOS OFICIAIS */}
+            <div>
+              <div className="mb-8">
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🏆</span>
+                    <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic">
+                      {eventsConfig?.oficial_title || 'Eventos Oficiais'}
+                    </h3>
+                  </div>
+                  <span className="px-3 py-1 bg-white/5 border border-white/10 text-zinc-400 font-black uppercase tracking-widest text-[10px]">
+                    Competição
+                  </span>
+                  <div className="flex-1 h-px bg-dark-border ml-4"></div>
+                </div>
+                {eventsConfig?.oficial_description && (
+                  <p className="text-dark-muted text-sm md:text-base font-inter ml-11">
+                    {eventsConfig.oficial_description}
+                  </p>
+                )}
+              </div>
+
+              {oficialEvents.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {oficialEvents.map(renderEventCard)}
+                </div>
+              ) : (
+                <div className="py-12 text-center bg-dark-card/30 border border-dark-border/50 rounded-xl">
+                  <p className="text-zinc-600 font-bold uppercase tracking-widest text-sm italic">Nenhum evento oficial programado no momento.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
 }
+

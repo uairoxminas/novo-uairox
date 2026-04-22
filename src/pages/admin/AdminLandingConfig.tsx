@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSiteConfig, useUpdateSiteConfig } from "@/hooks/useSiteConfig";
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Upload, Trash2 } from 'lucide-react';
+import { Loader2, Upload, Trash2, Play } from 'lucide-react';
 export default function AdminLandingConfig() {
   const { data: config, isLoading } = useSiteConfig();
   const updateConfig = useUpdateSiteConfig();
@@ -19,7 +19,9 @@ export default function AdminLandingConfig() {
     title_prefix: '', title_highlight: '', description: '', stations: [], race_types: []
   });
   const [eventsConfig, setEventsConfig] = useState(config?.home_events_new || {
-    title_prefix: '', title_highlight: '', description: '', season_label: ''
+    title_prefix: '', title_highlight: '', description: '', season_label: '',
+    experience_title: 'Eventos Experience', experience_description: 'Eventos não competitivos que simulam a prova oficial com distância de corrida e cargas reduzidas',
+    oficial_title: 'Eventos Oficiais', oficial_description: 'Competições oficiais UAIROX com percurso completo e ranking válido'
   });
   const [predictorConfig, setPredictorConfig] = useState(config?.home_predictor_new || {
     badge_text: '', title_top: '', title_highlight: '', description: ''
@@ -651,6 +653,42 @@ export default function AdminLandingConfig() {
           <div>
             <label className="block text-sm font-bold text-zinc-400 mb-2">Label da Temporada</label>
             <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={eventsConfig?.season_label || ''} onChange={(e) => setEventsConfig(prev => ({...(prev || {}), season_label: e.target.value}) as any)} />
+          </div>
+        </div>
+
+        {/* Experience Subsection */}
+        <div className="border-t border-dark-border pt-6 mt-4">
+          <div className="flex items-center gap-3 mb-4">
+            <Play size={18} className="text-brand-500 fill-brand-500" />
+            <h3 className="text-lg font-bold text-white">Linha: Eventos Experience (Simulados)</h3>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">Título da Linha Experience</label>
+              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" placeholder="Ex: Eventos Experience" value={eventsConfig?.experience_title || ''} onChange={(e) => setEventsConfig(prev => ({...(prev || {}), experience_title: e.target.value}) as any)} />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição da Linha Experience</label>
+              <textarea className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white h-16" placeholder="Ex: Eventos não competitivos que simulam a prova oficial com distância de corrida e cargas reduzidas" value={eventsConfig?.experience_description || ''} onChange={(e) => setEventsConfig(prev => ({...(prev || {}), experience_description: e.target.value}) as any)}></textarea>
+            </div>
+          </div>
+        </div>
+
+        {/* Oficial Subsection */}
+        <div className="border-t border-dark-border pt-6 mt-4">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-lg">🏆</span>
+            <h3 className="text-lg font-bold text-white">Linha: Eventos Oficiais</h3>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">Título da Linha Oficial</label>
+              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" placeholder="Ex: Eventos Oficiais" value={eventsConfig?.oficial_title || ''} onChange={(e) => setEventsConfig(prev => ({...(prev || {}), oficial_title: e.target.value}) as any)} />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição da Linha Oficial</label>
+              <textarea className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white h-16" placeholder="Ex: Competições oficiais UAIROX com percurso completo e ranking válido" value={eventsConfig?.oficial_description || ''} onChange={(e) => setEventsConfig(prev => ({...(prev || {}), oficial_description: e.target.value}) as any)}></textarea>
+            </div>
           </div>
         </div>
 

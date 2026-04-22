@@ -12,6 +12,7 @@ import {
   EVENT_STATUS_MAP,
   type EventWithStats,
   type EventStatus,
+  type EventType,
 } from '@/hooks/useEvents';
 
 // ============ STATUS BADGE ============
@@ -51,6 +52,7 @@ function EventFormDialog({
   const [uploading, setUploading] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState(event?.whatsapp_group_link || '');
   const [requireShirtSize, setRequireShirtSize] = useState((event as any)?.require_shirt_size || false);
+  const [eventType, setEventType] = useState<EventType>((event?.event_type as EventType) || 'oficial');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +90,7 @@ function EventFormDialog({
       location: location.trim(),
       description: description.trim() || null,
       status,
+      event_type: eventType,
       image_url: finalImageUrl.trim() || null,
       whatsapp_group_link: whatsappLink.trim() || null,
       require_shirt_size: requireShirtSize,
@@ -190,6 +193,27 @@ function EventFormDialog({
                   }`}
                 >
                   {val.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Event Type */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Tipo de Evento</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([['experience', '🏋️ Experience (Simulado)'], ['oficial', '🏆 Oficial']] as [EventType, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setEventType(key)}
+                  className={`p-3 rounded-lg border text-sm font-bold transition-all ${
+                    eventType === key
+                      ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
+                      : 'border-[#262626] bg-[#050505] text-zinc-500 hover:border-zinc-600'
+                  }`}
+                >
+                  {label}
                 </button>
               ))}
             </div>
