@@ -56,8 +56,18 @@ function WatermarkedPhoto({ photo, isSelected, onToggleSelect, onEnlarge }: { ph
           loading="lazy"
         />
         {/* Watermark Overlay */}
-        <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center overflow-hidden bg-black/10">
-          <img src="/logo-uairox.webp" alt="Marca D'água" className="w-1/2 opacity-20 rotate-[-15deg] object-contain" />
+        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden bg-black/10 flex items-center justify-center">
+          <div 
+            className="absolute w-[200%] h-[200%]"
+            style={{
+              backgroundImage: `url('/logo-uairox.webp')`,
+              backgroundSize: '160px',
+              backgroundRepeat: 'repeat',
+              backgroundPosition: 'center',
+              opacity: 0.4,
+              transform: 'rotate(-25deg)',
+            }}
+          />
         </div>
         
         {/* Selection Checkmark */}
@@ -97,8 +107,18 @@ function PhotoLightbox({ photo, gallery, onClose }: { photo: GalleryPhoto; galle
           className="max-w-full max-h-[85vh] object-contain"
         />
         {/* Watermark on lightbox */}
-        <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center">
-          <img src="/logo-uairox.webp" alt="Marca D'água" className="w-1/2 opacity-10 rotate-[-15deg] object-contain" />
+        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden flex items-center justify-center">
+          <div 
+            className="absolute w-[200%] h-[200%]"
+            style={{
+              backgroundImage: `url('/logo-uairox.webp')`,
+              backgroundSize: '250px',
+              backgroundRepeat: 'repeat',
+              backgroundPosition: 'center',
+              opacity: 0.4,
+              transform: 'rotate(-25deg)',
+            }}
+          />
         </div>
         {photo.photographer && (
           <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/60 text-zinc-400 text-xs">
