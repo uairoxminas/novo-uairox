@@ -6,6 +6,7 @@ import {
   useGalleryPhotos,
   useCreatePurchase,
   getDriveThumbnailUrl,
+  extractDriveFileId,
   type PhotoGallery,
   type GalleryPhoto,
 } from '@/hooks/usePhotoGallery';
@@ -454,7 +455,7 @@ export default function GalleryPage() {
                   <div className="relative aspect-[16/9] bg-[#0a0a0a]">
                     {gallery.cover_image_url ? (
                       <img
-                        src={getDriveThumbnailUrl(gallery.cover_image_url, 800)}
+                        src={getDriveThumbnailUrl(extractDriveFileId(gallery.cover_image_url), 800)}
                         alt={gallery.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                         loading="lazy"
