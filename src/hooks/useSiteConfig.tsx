@@ -148,6 +148,10 @@ export interface HomeEventsNewConfig {
   title_highlight: string;
   description: string;
   season_label: string;
+  experience_title?: string;
+  experience_description?: string;
+  oficial_title?: string;
+  oficial_description?: string;
   events: HomeEventItem[];
 }
 

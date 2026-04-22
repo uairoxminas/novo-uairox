@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Eye, EyeOff, Star, Upload, Loader2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, Star, Upload, Loader2, X, ShoppingBag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   useAdminStoreProducts,

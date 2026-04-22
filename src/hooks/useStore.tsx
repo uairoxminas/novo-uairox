@@ -33,7 +33,7 @@ export function useStoreProducts() {
   return useQuery({
     queryKey: ['store-products-public'],
     queryFn: async (): Promise<StoreProduct[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('store_products')
         .select('*')
         .eq('is_active', true)
@@ -53,7 +53,7 @@ export function useAdminStoreProducts() {
   return useQuery({
     queryKey: ['store-products-admin'],
     queryFn: async (): Promise<StoreProduct[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('store_products')
         .select('*')
         .order('sort_order', { ascending: true })
@@ -70,7 +70,7 @@ export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (product: Omit<ProductInsert, 'is_active' | 'is_featured' | 'sort_order'> & Partial<Pick<ProductInsert, 'is_active' | 'is_featured' | 'sort_order'>>) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('store_products')
         .insert(product as any)
         .select()
@@ -94,7 +94,7 @@ export function useUpdateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: ProductUpdate) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('store_products')
         .update({ ...updates, updated_at: new Date().toISOString() } as any)
         .eq('id', id)
@@ -119,7 +119,7 @@ export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('store_products')
         .delete()
         .eq('id', id);

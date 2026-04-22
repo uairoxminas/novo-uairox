@@ -82,7 +82,7 @@ export function useEvents() {
         _registrations_count: regMap[ev.id]?.count || 0,
         _categories_count: catMap[ev.id] || 0,
         _revenue: regMap[ev.id]?.revenue || 0,
-      })) as EventWithStats[];
+      })) as unknown as EventWithStats[];
     },
   });
 }
@@ -100,7 +100,7 @@ export function useEvent(eventId?: string) {
         .single();
 
       if (error) throw error;
-      return data as EventRow;
+      return data as unknown as EventRow;
     },
     enabled: !!eventId,
   });
@@ -121,7 +121,7 @@ export function useCreateEvent() {
       status?: string;
       event_type?: EventType;
     }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("events")
         .insert({
           ...event,

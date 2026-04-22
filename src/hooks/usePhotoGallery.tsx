@@ -75,7 +75,7 @@ export function usePublicGalleries() {
   return useQuery({
     queryKey: ['photo-galleries-public'],
     queryFn: async (): Promise<PhotoGallery[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('photo_galleries')
         .select('*')
         .eq('is_active', true)
@@ -86,7 +86,7 @@ export function usePublicGalleries() {
       const galleries = (data || []) as any[];
       const withCounts = await Promise.all(
         galleries.map(async (g) => {
-          const { count } = await supabase
+          const { count } = await (supabase as any)
             .from('gallery_photos')
             .select('*', { count: 'exact', head: true })
             .eq('gallery_id', g.id);
@@ -103,7 +103,7 @@ export function useGalleryPhotos(galleryId: string | null) {
     queryKey: ['gallery-photos', galleryId],
     enabled: !!galleryId,
     queryFn: async (): Promise<GalleryPhoto[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('gallery_photos')
         .select('*')
         .eq('gallery_id', galleryId!)
@@ -121,7 +121,7 @@ export function useAdminGalleries() {
   return useQuery({
     queryKey: ['photo-galleries-admin'],
     queryFn: async (): Promise<PhotoGallery[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('photo_galleries')
         .select('*')
         .order('created_at', { ascending: false });
@@ -130,7 +130,7 @@ export function useAdminGalleries() {
       const galleries = (data || []) as any[];
       const withCounts = await Promise.all(
         galleries.map(async (g) => {
-          const { count } = await supabase
+          const { count } = await (supabase as any)
             .from('gallery_photos')
             .select('*', { count: 'exact', head: true })
             .eq('gallery_id', g.id);
@@ -147,7 +147,7 @@ export function useAdminGalleryPhotos(galleryId: string | null) {
     queryKey: ['admin-gallery-photos', galleryId],
     enabled: !!galleryId,
     queryFn: async (): Promise<GalleryPhoto[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('gallery_photos')
         .select('*')
         .eq('gallery_id', galleryId!)
@@ -162,7 +162,7 @@ export function useAdminPurchases(galleryId?: string) {
   return useQuery({
     queryKey: ['photo-purchases-admin', galleryId],
     queryFn: async (): Promise<PhotoPurchase[]> => {
-      let q = supabase.from('photo_purchases').select('*').order('created_at', { ascending: false });
+      let q = (supabase as any).from('photo_purchases').select('*').order('created_at', { ascending: false });
       if (galleryId) q = q.eq('gallery_id', galleryId);
       const { data, error } = await q;
       if (error) throw error;
@@ -180,7 +180,7 @@ export function useCreateGallery() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (gallery: Partial<PhotoGallery>) => {
-      const { data, error } = await supabase.from('photo_galleries').insert(gallery as any).select().single();
+      const { data, error } = await (supabase as any).from('photo_galleries').insert(gallery as any).select().single();
       if (error) throw error;
       return data;
     },
@@ -197,7 +197,7 @@ export function useUpdateGallery() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<PhotoGallery> & { id: string }) => {
-      const { error } = await supabase.from('photo_galleries').update(updates as any).eq('id', id);
+      const { error } = await (supabase as any).from('photo_galleries').update(updates as any).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -213,7 +213,7 @@ export function useDeleteGallery() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('photo_galleries').delete().eq('id', id);
+      const { error } = await (supabase as any).from('photo_galleries').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -229,7 +229,7 @@ export function useBulkAddPhotos() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (photos: Array<{ gallery_id: string; drive_file_id: string; bib_number?: string; photographer?: string }>) => {
-      const { error } = await supabase.from('gallery_photos').insert(photos as any);
+      const { error } = await (supabase as any).from('gallery_photos').insert(photos as any);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {
@@ -246,7 +246,7 @@ export function useDeletePhoto() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('gallery_photos').delete().eq('id', id);
+      const { error } = await (supabase as any).from('gallery_photos').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -262,7 +262,7 @@ export function useCreatePurchase() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (purchase: Partial<PhotoPurchase>) => {
-      const { data, error } = await supabase.from('photo_purchases').insert(purchase as any).select().single();
+      const { data, error } = await (supabase as any).from('photo_purchases').insert(purchase as any).select().single();
       if (error) throw error;
       return data;
     },
@@ -278,7 +278,7 @@ export function useUpdatePurchaseStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from('photo_purchases').update({ status } as any).eq('id', id);
+      const { error } = await (supabase as any).from('photo_purchases').update({ status } as any).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
