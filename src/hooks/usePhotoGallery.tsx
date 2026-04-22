@@ -71,6 +71,7 @@ export function isDriveFolderUrl(url: string): boolean {
 }
 
 export function getDriveThumbnailUrl(fileId: string, width = 800): string {
+  // Use the thumbnail endpoint - works for publicly shared files
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
 }
 
