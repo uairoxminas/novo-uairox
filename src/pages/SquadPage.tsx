@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Crown, Star, MapPin, Instagram, Users, Check, X, Award, Medal, Trophy } from 'lucide-react';
+import { Crown, Star, MapPin, Users, Check, X, Award, Medal, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 type SquadRole = 'coach' | 'athlete' | 'influencer';
@@ -52,7 +52,7 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
     setLoading(true);
     
     try {
-      const { error } = await supabase.from('squad_applications').insert([formData]);
+      const { error } = await (supabase.from('squad_applications' as any) as any).insert([formData]);
       if (error) throw error;
       setSubmitted(true);
     } catch (error) {
@@ -195,15 +195,14 @@ export default function SquadPage() {
   useEffect(() => {
     async function fetchSquad() {
       setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('squad_members')
+        try {
+        const { data, error } = await (supabase.from('squad_members' as any) as any)
           .select('*')
           .eq('is_active', true)
           .order('display_order', { ascending: true });
 
         if (error) throw error;
-        if (data) setMembers(data);
+        if (data) setMembers(data as SquadMember[]);
       } catch (err) {
         console.error('Error fetching squad:', err);
         // Supress error locally if table doesn't exist yet during setup
@@ -362,7 +361,7 @@ export default function SquadPage() {
                             rel="noopener noreferrer"
                             className="flex items-center justify-center gap-2 w-full py-2 bg-[#111] hover:bg-brand-500 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
                           >
-                            <Instagram size={14} /> Seguir
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> Seguir
                           </a>
                         ) : (
                           <div className="py-2 text-zinc-600 text-xs font-bold uppercase tracking-widest">
