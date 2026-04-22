@@ -35,6 +35,7 @@ import AdminResultsEventsPage from './pages/admin/AdminResultsEventsPage';
 import AdminResultsManagerPage from './pages/admin/AdminResultsManagerPage';
 import AdminStore from './pages/admin/AdminStore';
 import AdminPhotos from './pages/admin/AdminPhotos';
+import AdminSquad from './pages/admin/AdminSquad';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 
 // Páginas Juiz
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="results/:id" element={<AdminResultsManagerPage />} />
             <Route path="store" element={<AdminStore />} />
             <Route path="photos" element={<AdminPhotos />} />
+            <Route path="squad" element={<AdminSquad />} />
           </Route>
 
           {/* 4. Área do Juiz */}

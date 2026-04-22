@@ -16,6 +16,8 @@ CREATE TABLE public.squad_members (
     bio TEXT,
     instagram_handle TEXT,
     avatar_url TEXT,
+    coupon_code TEXT,
+    coupon_usage_count INTEGER NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT true,
     display_order INTEGER NOT NULL DEFAULT 0
 );
