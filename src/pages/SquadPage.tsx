@@ -1,164 +1,376 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Crown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Crown, Star, MapPin, Instagram, Users, Check, X, Award, Medal, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+
+type SquadRole = 'coach' | 'athlete' | 'influencer';
+type SquadTier = 'iniciante' | 'bronze' | 'prata' | 'ouro' | 'elite';
 
 interface SquadMember {
   id: string;
   full_name: string;
-  avatar_url: string | null;
-  role: string;
+  role: SquadRole;
+  tier: SquadTier;
+  location: string;
   bio: string | null;
-  instagram: string | null;
+  instagram_handle: string | null;
+  avatar_url: string | null;
 }
 
-export default function SquadPage() {
-  const [members, setMembers] = useState<SquadMember[]>([]);
-  const [loading, setLoading] = useState(true);
+const TIER_COLORS = {
+  iniciante: 'var(--uairox-zinc)',
+  bronze: '#cd7f32',
+  prata: '#c0c0c0',
+  ouro: '#ffd700',
+  elite: '#e11d48', // Red for Elite/Blood
+};
 
-  useEffect(() => {
-    async function fetchSquad() {
-      setLoading(true);
-      const { data } = await supabase
-        .from('partner_profiles')
-        .select('id, full_name, avatar_url, role, bio, instagram_handle')
-        .eq('is_public', true)
-        .order('display_order', { ascending: true });
+const TIER_ICONS = {
+  iniciante: Star,
+  bronze: Medal,
+  prata: Medal,
+  ouro: Trophy,
+  elite: Crown,
+};
 
-      if (data) {
-        setMembers(data.map((m: any) => ({
-          id: m.id,
-          full_name: m.full_name || 'Squad Member',
-          avatar_url: m.avatar_url,
-          role: m.role || 'Athlete',
-          bio: m.bio,
-          instagram: m.instagram_handle,
-        })));
-      }
+// ============ APPLICATION MODAL ============
+function ApplicationModal({ onClose }: { onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    instagram_handle: '',
+    role: 'coach' as SquadRole,
+    location: '',
+    why_join: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase.from('squad_applications').insert([formData]);
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      alert('Erro ao enviar solicitação. Tente novamente mais tarde.');
+    } finally {
       setLoading(false);
-    }
-    fetchSquad();
-  }, []);
-
-  const getRoleBadge = (role: string) => {
-    switch (role.toLowerCase()) {
-      case 'elite_athlete':
-      case 'elite athlete':
-        return { label: 'Elite Athlete', color: 'var(--uairox-gold)' };
-      case 'head_coach':
-      case 'head coach':
-        return { label: 'Head Coach', color: 'var(--status-success)' };
-      case 'coach':
-        return { label: 'Coach', color: '#60a5fa' };
-      default:
-        return { label: role, color: 'var(--uairox-zinc-light)' };
     }
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <section className="py-16 md:py-24 text-center">
-        <div className="container-uairox max-w-3xl">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--uairox-gold)]/30 bg-[var(--uairox-gold)]/5 text-[var(--uairox-gold)] text-xs font-semibold uppercase tracking-wider mb-6">
-              <Crown size={14} />
-              Programa Oficial
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        className="bg-[#0a0a0a] border border-dark-border w-full max-w-xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white">
+          <X size={20} />
+        </button>
+
+        <div className="p-6 md:p-8">
+          {submitted ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-brand-500/10 border border-brand-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Check className="text-brand-500" size={32} />
+              </div>
+              <h2 className="text-2xl font-black text-white uppercase italic mb-2">Solicitação Enviada!</h2>
+              <p className="text-zinc-400 font-inter">
+                Nossa equipe vai analisar seu perfil e entrará em contato pelo WhatsApp ou Instagram em breve.
+              </p>
+              <button
+                onClick={onClose}
+                className="mt-8 px-8 py-3 bg-brand-500 text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-colors"
+              >
+                <span className="inline-block skew-x-[10deg]">Fechar</span>
+              </button>
             </div>
-            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-white">
-              Squad UAIROX
+          ) : (
+            <>
+              <h2 className="text-2xl font-black text-white uppercase italic mb-1">Junte-se ao Esquadrão</h2>
+              <p className="text-zinc-400 text-sm mb-6">
+                Preencha o formulário abaixo para se candidatar como embaixador oficial.
+              </p>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <input
+                  required
+                  type="text"
+                  placeholder="Nome Completo"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none"
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    required
+                    type="email"
+                    placeholder="E-mail"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none"
+                  />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="WhatsApp"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    required
+                    type="text"
+                    placeholder="@ do Instagram"
+                    value={formData.instagram_handle}
+                    onChange={(e) => setFormData({ ...formData, instagram_handle: e.target.value })}
+                    className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none"
+                  />
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as SquadRole })}
+                    className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none appearance-none"
+                  >
+                    <option value="coach">Coach (Treinador)</option>
+                    <option value="athlete">Atleta</option>
+                    <option value="influencer">Influenciador</option>
+                  </select>
+                </div>
+                <input
+                  required
+                  type="text"
+                  placeholder="Local de Treino / Box (Ex: Belo Horizonte, MG)"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none"
+                />
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Por que você quer ser um embaixador UAIROX? Como você pode ajudar a comunidade a crescer?"
+                  value={formData.why_join}
+                  onChange={(e) => setFormData({ ...formData, why_join: e.target.value })}
+                  className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none resize-none"
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full mt-4 py-4 bg-brand-500 text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-colors disabled:opacity-50"
+                >
+                  <span className="inline-block skew-x-[10deg]">
+                    {loading ? 'Enviando...' : 'Enviar Solicitação'}
+                  </span>
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ============ MAIN SQUAD PAGE ============
+export default function SquadPage() {
+  const [members, setMembers] = useState<SquadMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    async function fetchSquad() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('squad_members')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        if (data) setMembers(data);
+      } catch (err) {
+        console.error('Error fetching squad:', err);
+        // Supress error locally if table doesn't exist yet during setup
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSquad();
+  }, []);
+
+  return (
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="pt-32 pb-16 md:pt-40 md:pb-24 text-center border-b border-dark-border">
+        <div className="max-w-4xl mx-auto px-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-brand-500/30 bg-brand-500/5 text-brand-500 text-xs font-bold uppercase tracking-widest mb-6">
+              <Crown size={14} /> Embaixadores Oficiais
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter italic mb-4">
+              O Motor do UAIROX
             </h1>
-            <p className="mt-4 text-[var(--uairox-zinc-light)] text-base md:text-lg max-w-xl mx-auto">
-              Conheça nossos embaixadores e treinadores oficiais.{' '}
-              <strong className="text-white">Atletas de elite</strong> que representam a comunidade UAIROX.
+            <p className="text-zinc-400 text-lg md:text-xl font-inter max-w-2xl mx-auto mb-8">
+              Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.
             </p>
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-8 py-4 bg-brand-500 text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-transform hover:scale-105"
+            >
+              <span className="inline-block skew-x-[10deg]">Quero fazer parte do Squad</span>
+            </button>
           </motion.div>
         </div>
       </section>
 
-      {/* Squad Grid */}
-      <section className="pb-20">
-        <div className="container-uairox">
+      {/* Como Funciona */}
+      <section className="py-16 md:py-24 border-b border-dark-border bg-dark-bg/50">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black text-white uppercase italic">Benefícios & Níveis</h2>
+            <p className="text-zinc-500 mt-2">Como funciona a mecânica do programa</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[
+              { id: 'bronze', label: 'Bronze', desc: 'Acesso VIP + Descontos em Loja.', color: TIER_COLORS.bronze },
+              { id: 'prata', label: 'Prata', desc: 'Isenção de inscrição em 1 evento.', color: TIER_COLORS.prata },
+              { id: 'ouro', label: 'Ouro', desc: 'Kits exclusivos e Isenção Total.', color: TIER_COLORS.ouro },
+              { id: 'elite', label: 'Elite', desc: 'Patrocínio Oficial UAIROX e Vagas.', color: TIER_COLORS.elite },
+            ].map((tier) => (
+              <div key={tier.id} className="bg-[#050505] border border-dark-border p-6 text-center hover:border-brand-500 transition-colors">
+                <div 
+                  className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 border-2"
+                  style={{ borderColor: tier.color, backgroundColor: `${tier.color}10`, color: tier.color }}
+                >
+                  <Award size={28} />
+                </div>
+                <h3 className="text-white font-black uppercase text-xl mb-2" style={{ color: tier.color }}>{tier.label}</h3>
+                <p className="text-zinc-400 text-sm font-inter">{tier.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Roster Grid */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black text-white uppercase italic">O Esquadrão</h2>
+            <p className="text-zinc-500 mt-2">Nossos parceiros oficiais divididos por nível</p>
+          </div>
+
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="card-uairox h-72 animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-80 bg-dark-card border border-dark-border animate-pulse" />
               ))}
             </div>
           ) : members.length === 0 ? (
-            <div className="text-center py-20">
-              <Crown className="mx-auto mb-4 text-[var(--uairox-zinc)]" size={48} />
-              <h3 className="font-heading text-lg text-white">Squad em formação</h3>
-              <p className="mt-2 text-sm text-[var(--uairox-zinc-light)]">
-                Em breve nossos embaixadores estarão aqui.
+            <div className="text-center py-20 bg-dark-card border border-dark-border">
+              <Users className="mx-auto mb-4 text-zinc-700" size={48} />
+              <h3 className="text-white font-black uppercase italic text-xl">Squad em formação</h3>
+              <p className="mt-2 text-zinc-500 text-sm">
+                Seja um dos primeiros a entrar para o nosso time de embaixadores oficiais!
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {members.map((member, index) => {
-                const badge = getRoleBadge(member.role);
+                const TierIcon = TIER_ICONS[member.tier] || Star;
+                const tierColor = TIER_COLORS[member.tier] || TIER_COLORS.iniciante;
+
                 return (
                   <motion.div
                     key={member.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: index * 0.1 }}
-                    className="card-uairox p-6 text-center"
+                    className="group relative bg-[#0a0a0a] border border-dark-border hover:border-brand-500 transition-all overflow-hidden flex flex-col"
                   >
-                    {/* Avatar */}
-                    <div className="relative w-24 h-24 mx-auto mb-4">
-                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-[var(--uairox-gold)]/40">
-                        {member.avatar_url ? (
-                          <img
-                            src={member.avatar_url}
-                            alt={member.full_name}
-                            className="w-full h-full object-cover"
-                          />
+                    {/* Top Tier Bar */}
+                    <div className="h-1.5 w-full" style={{ backgroundColor: tierColor }} />
+
+                    <div className="p-6 flex-1 flex flex-col items-center text-center">
+                      {/* Avatar */}
+                      <div className="relative w-28 h-28 mb-4">
+                        <div 
+                          className="w-full h-full rounded-full overflow-hidden border-[3px]"
+                          style={{ borderColor: tierColor }}
+                        >
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt={member.full_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-[#111] flex items-center justify-center text-zinc-600">
+                              <Users size={32} />
+                            </div>
+                          )}
+                        </div>
+                        {/* Tier Badge */}
+                        <div 
+                          className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-lg"
+                          style={{ backgroundColor: tierColor, color: '#000' }}
+                          title={`Nível: ${member.tier.toUpperCase()}`}
+                        >
+                          <TierIcon size={16} />
+                        </div>
+                      </div>
+
+                      {/* Name & Role */}
+                      <h3 className="font-black text-white text-lg uppercase leading-tight mb-1">{member.full_name}</h3>
+                      <span className="text-brand-500 text-xs font-bold uppercase tracking-widest mb-3">
+                        {member.role === 'coach' ? 'Coach' : member.role === 'athlete' ? 'Atleta' : 'Influencer'}
+                      </span>
+
+                      {/* Location */}
+                      {member.location && (
+                        <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-4">
+                          <MapPin size={12} /> {member.location}
+                        </div>
+                      )}
+
+                      {/* Bio */}
+                      {member.bio && (
+                        <p className="text-zinc-500 text-sm font-inter line-clamp-3 mb-6">
+                          "{member.bio}"
+                        </p>
+                      )}
+
+                      <div className="mt-auto w-full pt-4 border-t border-dark-border/50">
+                        {/* Instagram Link */}
+                        {member.instagram_handle ? (
+                          <a
+                            href={`https://instagram.com/${member.instagram_handle.replace('@', '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full py-2 bg-[#111] hover:bg-brand-500 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
+                          >
+                            <Instagram size={14} /> Seguir
+                          </a>
                         ) : (
-                          <div className="w-full h-full bg-[var(--uairox-space-surface)] flex items-center justify-center text-[var(--uairox-zinc)]">
-                            <Crown size={32} />
+                          <div className="py-2 text-zinc-600 text-xs font-bold uppercase tracking-widest">
+                            SQUAD UAIROX
                           </div>
                         )}
                       </div>
                     </div>
-
-                    {/* Name */}
-                    <h3 className="font-heading text-base text-white">{member.full_name}</h3>
-
-                    {/* Role Badge */}
-                    <span
-                      className="inline-block mt-2 px-3 py-0.5 rounded-full text-xs font-semibold"
-                      style={{
-                        color: badge.color,
-                        border: `1px solid ${badge.color}`,
-                        backgroundColor: `${badge.color}15`,
-                      }}
-                    >
-                      {badge.label}
-                    </span>
-
-                    {/* Bio */}
-                    {member.bio && (
-                      <p className="mt-4 text-sm text-[var(--uairox-zinc-light)] leading-relaxed line-clamp-3">
-                        {member.bio}
-                      </p>
-                    )}
-
-                    {/* Instagram */}
-                    {member.instagram && (
-                      <a
-                        href={`https://instagram.com/${member.instagram.replace('@', '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 btn-outline w-full py-2.5 text-xs"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
-                        Seguir no Instagram
-                      </a>
-                    )}
                   </motion.div>
                 );
               })}
@@ -166,6 +378,11 @@ export default function SquadPage() {
           )}
         </div>
       </section>
+
+      {/* Application Modal */}
+      <AnimatePresence>
+        {showModal && <ApplicationModal onClose={() => setShowModal(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
