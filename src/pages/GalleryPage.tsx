@@ -17,56 +17,62 @@ function formatPrice(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+// ============ PRICE CALCULATOR ============
+function calculateCustomPrice(count: number): number {
+  const getExactPrice = (n: number) => {
+    let rem = n;
+    let t = 0;
+    t += Math.floor(rem / 30) * 250; rem %= 30;
+    t += Math.floor(rem / 20) * 200; rem %= 20;
+    t += Math.floor(rem / 10) * 120; rem %= 10;
+    t += Math.floor(rem / 5) * 80; rem %= 5;
+    t += rem * 20;
+    return t;
+  };
+
+  return Math.min(
+    getExactPrice(count),
+    getExactPrice(Math.ceil(count / 5) * 5),
+    getExactPrice(Math.ceil(count / 10) * 10),
+    getExactPrice(Math.ceil(count / 20) * 20),
+    getExactPrice(Math.ceil(count / 30) * 30)
+  );
+}
+
 // ============ WATERMARKED PHOTO ============
-function WatermarkedPhoto({ photo, onClick }: { photo: GalleryPhoto; onClick: () => void }) {
+function WatermarkedPhoto({ photo, isSelected, onToggleSelect, onEnlarge }: { photo: GalleryPhoto; isSelected: boolean; onToggleSelect: () => void; onEnlarge: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="group relative overflow-hidden cursor-pointer bg-[#0a0a0a] border border-dark-border"
-      onClick={onClick}
+      className={`group relative overflow-hidden cursor-pointer bg-[#0a0a0a] border transition-all ${isSelected ? 'border-brand-500 ring-2 ring-brand-500 ring-offset-2 ring-offset-[#0a0a0a]' : 'border-dark-border'}`}
+      onClick={onToggleSelect}
     >
       <div className="relative aspect-[4/3]">
         <img
           src={getDriveThumbnailUrl(photo.drive_file_id, 600)}
           alt={photo.caption || 'Foto UAIROX'}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+          className={`w-full h-full object-cover transition-transform duration-700 ${isSelected ? 'scale-105' : 'group-hover:scale-105'}`}
           loading="lazy"
         />
         {/* Watermark Overlay */}
-        <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center overflow-hidden"
-          style={{
-            background: 'repeating-linear-gradient(-45deg, transparent, transparent 80px, rgba(237,172,2,0.08) 80px, rgba(237,172,2,0.08) 82px)',
-          }}
+        <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center overflow-hidden bg-black/10">
+          <img src="/logo-uairox.webp" alt="Marca D'água" className="w-1/2 opacity-20 rotate-[-15deg] object-contain" />
+        </div>
+        
+        {/* Selection Checkmark */}
+        <div className={`absolute top-3 left-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-500 border-brand-500' : 'bg-black/50 border-white/50 group-hover:border-white'}`}>
+          {isSelected && <Check size={14} className="text-black font-black" />}
+        </div>
+        
+        {/* Hover Enlarge */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); onEnlarge(); }}
+          className="absolute bottom-3 right-3 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-white/[0.12] font-black text-4xl md:text-5xl uppercase tracking-[0.3em] italic rotate-[-25deg] whitespace-nowrap select-none">
-              UAIROX
-            </span>
-          </div>
-          <div className="absolute top-4 right-4">
-            <span className="text-white/[0.08] font-black text-lg uppercase tracking-widest italic select-none">
-              UAIROX
-            </span>
-          </div>
-          <div className="absolute bottom-4 left-4">
-            <span className="text-white/[0.08] font-black text-lg uppercase tracking-widest italic select-none">
-              UAIROX
-            </span>
-          </div>
-        </div>
-        {/* Hover effect */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <Camera className="text-white" size={32} />
-        </div>
+          <Search size={16} />
+        </button>
       </div>
-      {photo.bib_number && (
-        <div className="absolute top-3 left-3">
-          <span className="px-2 py-1 bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest">
-            BIB {photo.bib_number}
-          </span>
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -92,9 +98,7 @@ function PhotoLightbox({ photo, gallery, onClose }: { photo: GalleryPhoto; galle
         />
         {/* Watermark on lightbox */}
         <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center">
-          <span className="text-white/[0.10] font-black text-6xl md:text-8xl uppercase tracking-[0.3em] italic rotate-[-25deg] whitespace-nowrap select-none">
-            UAIROX
-          </span>
+          <img src="/logo-uairox.webp" alt="Marca D'água" className="w-1/2 opacity-10 rotate-[-15deg] object-contain" />
         </div>
         {photo.photographer && (
           <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/60 text-zinc-400 text-xs">
@@ -107,24 +111,19 @@ function PhotoLightbox({ photo, gallery, onClose }: { photo: GalleryPhoto; galle
 }
 
 // ============ PURCHASE MODAL ============
-function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
+function PurchaseModal({ gallery, selectedPhotos, totalPrice, onClose }: {
   gallery: PhotoGallery;
-  photos: GalleryPhoto[];
-  bibFilter: string;
+  selectedPhotos: Set<string>;
+  totalPrice: number;
   onClose: () => void;
 }) {
   const createPurchase = useCreatePurchase();
-  const [packageType, setPackageType] = useState<'single' | 'pack_5' | 'all'>('all');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [bib, setBib] = useState(bibFilter);
   const [showPix, setShowPix] = useState(false);
   const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const price = packageType === 'single' ? gallery.price_single : packageType === 'pack_5' ? gallery.price_pack_5 : gallery.price_all;
-  const bibPhotos = bib ? photos.filter((p) => p.bib_number === bib) : photos;
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -133,9 +132,9 @@ function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
       buyer_name: name.trim(),
       buyer_email: email.trim() || null,
       buyer_phone: phone.trim() || null,
-      bib_number: bib || null,
-      package_type: packageType,
-      amount: price,
+      bib_number: null,
+      package_type: `${selectedPhotos.size} foto(s)`,
+      amount: totalPrice,
       payment_method: showPix ? 'pix' : 'link',
       status: 'pending',
     } as any);
@@ -174,27 +173,14 @@ function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
 
           {!submitted ? (
             <>
-              {/* Package Selection */}
-              <div className="space-y-2 mb-6">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pacote</label>
-                {[
-                  { key: 'single' as const, label: '1 Foto', price: gallery.price_single },
-                  { key: 'pack_5' as const, label: 'Pacote 5 Fotos', price: gallery.price_pack_5 },
-                  { key: 'all' as const, label: `Todas as Fotos${bib ? ` (BIB ${bib})` : ''}`, price: gallery.price_all },
-                ].map((pkg) => (
-                  <button
-                    key={pkg.key}
-                    onClick={() => setPackageType(pkg.key)}
-                    className={`w-full flex items-center justify-between p-4 transition-all ${
-                      packageType === pkg.key
-                        ? 'bg-brand-500/10 border border-brand-500 text-white'
-                        : 'bg-dark-card border border-dark-border text-zinc-400 hover:border-zinc-500'
-                    }`}
-                  >
-                    <span className="font-bold text-sm">{pkg.label}</span>
-                    <span className="font-black text-lg">{formatPrice(pkg.price)}</span>
-                  </button>
-                ))}
+              {/* Purchase Summary */}
+              <div className="bg-brand-500/10 border border-brand-500 p-4 mb-6 text-center">
+                <p className="text-white font-bold mb-1">
+                  {selectedPhotos.size} foto{selectedPhotos.size !== 1 ? 's' : ''} selecionada{selectedPhotos.size !== 1 ? 's' : ''}
+                </p>
+                <p className="text-brand-500 font-black text-2xl uppercase tracking-tighter">
+                  Total: {formatPrice(totalPrice)}
+                </p>
               </div>
 
               {/* Buyer Info */}
@@ -205,8 +191,6 @@ function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
                   className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm placeholder:text-zinc-600 focus:border-brand-500 outline-none" />
                 <input type="tel" placeholder="WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm placeholder:text-zinc-600 focus:border-brand-500 outline-none" />
-                <input type="text" placeholder="Número do peito (BIB)" value={bib} onChange={(e) => setBib(e.target.value)}
-                  className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm placeholder:text-zinc-600 focus:border-brand-500 outline-none" />
               </div>
 
               {/* Actions */}
@@ -215,7 +199,7 @@ function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
                   <a href={gallery.payment_link} target="_blank" rel="noopener noreferrer" onClick={handleSubmit}
                     className="flex items-center justify-center gap-2 w-full py-4 bg-white text-black font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-500 hover:text-white transition-colors">
                     <span className="inline-flex items-center gap-2 skew-x-[10deg]">
-                      <ExternalLink size={16} /> Pagar {formatPrice(price)}
+                      <ExternalLink size={16} /> Pagar {formatPrice(totalPrice)}
                     </span>
                   </a>
                 )}
@@ -224,7 +208,7 @@ function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
                     <button onClick={() => setShowPix(!showPix)}
                       className="flex items-center justify-center gap-2 w-full py-4 border-2 border-dark-border text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:border-brand-500 transition-colors">
                       <span className="inline-flex items-center gap-2 skew-x-[10deg]">
-                        <Tag size={16} /> Pagar com PIX — {formatPrice(price)}
+                        <Tag size={16} /> Pagar com PIX — {formatPrice(totalPrice)}
                       </span>
                     </button>
                     <AnimatePresence>
@@ -274,20 +258,18 @@ function PurchaseModal({ gallery, photos, bibFilter, onClose }: {
 // ============ GALLERY VIEW ============
 function GalleryView({ gallery, onBack }: { gallery: PhotoGallery; onBack: () => void }) {
   const { data: photos, isLoading } = useGalleryPhotos(gallery.id);
-  const [bibSearch, setBibSearch] = useState('');
   const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null);
   const [showPurchase, setShowPurchase] = useState(false);
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
 
-  const filteredPhotos = useMemo(() => {
-    if (!photos) return [];
-    if (!bibSearch.trim()) return photos;
-    return photos.filter((p) => p.bib_number && p.bib_number.includes(bibSearch.trim()));
-  }, [photos, bibSearch]);
+  const togglePhoto = (id: string) => {
+    const newSet = new Set(selectedPhotos);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedPhotos(newSet);
+  };
 
-  const uniqueBibs = useMemo(() => {
-    if (!photos) return [];
-    return [...new Set(photos.map((p) => p.bib_number).filter(Boolean))].sort();
-  }, [photos]);
+  const currentTotal = useMemo(() => calculateCustomPrice(selectedPhotos.size), [selectedPhotos.size]);
 
   return (
     <>
@@ -302,74 +284,12 @@ function GalleryView({ gallery, onBack }: { gallery: PhotoGallery; onBack: () =>
               {gallery.title}
             </h1>
             {gallery.description && <p className="text-dark-muted max-w-xl font-inter mb-6">{gallery.description}</p>}
-
-            {/* Search + Buy */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                <input
-                  type="text"
-                  placeholder="Buscar por número do peito (BIB)..."
-                  value={bibSearch}
-                  onChange={(e) => setBibSearch(e.target.value)}
-                  className="w-full bg-dark-card border border-dark-border pl-12 pr-4 py-3.5 text-white text-sm placeholder:text-zinc-600 focus:border-brand-500 outline-none transition-colors"
-                />
-                {bibSearch && (
-                  <button onClick={() => setBibSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white">
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={() => setShowPurchase(true)}
-                className="px-8 py-3.5 bg-brand-500 text-white font-black uppercase tracking-widest text-sm skew-x-[-10deg] hover:bg-brand-400 transition-colors"
-              >
-                <span className="inline-flex items-center gap-2 skew-x-[10deg]">
-                  <Download size={16} /> Comprar Fotos
-                </span>
-              </button>
-            </div>
-
-            {/* Bib pills */}
-            {uniqueBibs.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                <button
-                  onClick={() => setBibSearch('')}
-                  className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition-all ${!bibSearch ? 'bg-brand-500 text-white' : 'bg-dark-card border border-dark-border text-zinc-500 hover:text-white'}`}
-                >
-                  Todas ({photos?.length || 0})
-                </button>
-                {uniqueBibs.map((bib) => (
-                  <button
-                    key={bib}
-                    onClick={() => setBibSearch(bib!)}
-                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition-all ${bibSearch === bib ? 'bg-brand-500 text-white' : 'bg-dark-card border border-dark-border text-zinc-500 hover:text-white'}`}
-                  >
-                    BIB {bib}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Price Bar */}
-            <div className="flex flex-wrap gap-4 mt-6 py-4 border-t border-dark-border">
-              {[
-                { label: '1 Foto', price: gallery.price_single },
-                { label: '5 Fotos', price: gallery.price_pack_5 },
-                { label: 'Todas', price: gallery.price_all },
-              ].map((pkg) => (
-                <div key={pkg.label} className="flex items-baseline gap-2">
-                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{pkg.label}:</span>
-                  <span className="text-brand-500 font-black">{formatPrice(pkg.price)}</span>
-                </div>
-              ))}
-            </div>
           </motion.div>
         </div>
       </section>
 
       {/* Photos Grid */}
-      <section className="py-12 md:py-16">
+      <section className="py-12 md:py-16 mb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {isLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -377,27 +297,62 @@ function GalleryView({ gallery, onBack }: { gallery: PhotoGallery; onBack: () =>
                 <div key={i} className="aspect-[4/3] bg-dark-card border border-dark-border animate-pulse" />
               ))}
             </div>
-          ) : filteredPhotos.length === 0 ? (
+          ) : !photos || photos.length === 0 ? (
             <div className="text-center py-20">
               <Camera className="mx-auto mb-4 text-zinc-700" size={48} />
               <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">
-                {bibSearch ? `Nenhuma foto encontrada para BIB ${bibSearch}` : 'Nenhuma foto nesta galeria ainda.'}
+                Nenhuma foto nesta galeria ainda.
               </p>
             </div>
           ) : (
             <>
               <p className="text-zinc-500 text-sm mb-6 font-inter">
-                {filteredPhotos.length} foto{filteredPhotos.length !== 1 ? 's' : ''} {bibSearch ? `para BIB ${bibSearch}` : 'disponíveis'}
+                {photos.length} foto{photos.length !== 1 ? 's' : ''} disponíveis. Clique nas fotos para selecionar.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {filteredPhotos.map((photo) => (
-                  <WatermarkedPhoto key={photo.id} photo={photo} onClick={() => setLightboxPhoto(photo)} />
+                {photos.map((photo) => (
+                  <WatermarkedPhoto 
+                    key={photo.id} 
+                    photo={photo} 
+                    isSelected={selectedPhotos.has(photo.id)}
+                    onToggleSelect={() => togglePhoto(photo.id)}
+                    onEnlarge={() => setLightboxPhoto(photo)} 
+                  />
                 ))}
               </div>
             </>
           )}
         </div>
       </section>
+
+      {/* Floating Action Bar */}
+      <AnimatePresence>
+        {selectedPhotos.size > 0 && !showPurchase && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-0 left-0 right-0 z-40 p-4 pointer-events-none"
+          >
+            <div className="max-w-3xl mx-auto bg-brand-500 rounded-2xl shadow-[0_0_40px_rgba(237,172,2,0.3)] pointer-events-auto flex items-center justify-between p-4 px-6">
+              <div>
+                <p className="text-black font-black uppercase tracking-widest text-sm mb-0.5">
+                  {selectedPhotos.size} foto{selectedPhotos.size > 1 ? 's' : ''}
+                </p>
+                <p className="text-black/70 text-xs font-bold">
+                  Total: {formatPrice(currentTotal)}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPurchase(true)}
+                className="bg-black text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-zinc-900 transition-colors"
+              >
+                Comprar
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Lightbox */}
       <AnimatePresence>
@@ -407,7 +362,12 @@ function GalleryView({ gallery, onBack }: { gallery: PhotoGallery; onBack: () =>
       {/* Purchase Modal */}
       <AnimatePresence>
         {showPurchase && photos && (
-          <PurchaseModal gallery={gallery} photos={photos} bibFilter={bibSearch} onClose={() => setShowPurchase(false)} />
+          <PurchaseModal 
+            gallery={gallery} 
+            selectedPhotos={selectedPhotos} 
+            totalPrice={currentTotal} 
+            onClose={() => setShowPurchase(false)} 
+          />
         )}
       </AnimatePresence>
     </>
