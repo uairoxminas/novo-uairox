@@ -205,6 +205,72 @@ export interface SquadPageConfig {
   tier_elite_desc: string;
 }
 
+}
+
+export interface ExperiencePageConfig {
+  hero: {
+    title_top: string;
+    title_highlight: string;
+    description: string;
+    bg_image: string | null;
+  };
+  objective: {
+    title: string;
+    subtitle: string;
+    items: Array<{
+      title: string;
+      description: string;
+      icon: string;
+    }>;
+  };
+  format: {
+    title: string;
+    subtitle: string;
+    stations: Array<{
+      name: string;
+      metric: string;
+    }>;
+  };
+  pricing: {
+    title: string;
+    default_price: string;
+    includes: string;
+    excludes: string;
+    optional: string;
+  };
+  business_model: {
+    title: string;
+    description: string;
+    tiers: Array<{
+      label: string;
+      description: string;
+    }>;
+  };
+  branding: {
+    title: string;
+    rules: Array<{
+      title: string;
+      description: string;
+      is_prohibited: boolean;
+    }>;
+  };
+  responsibilities: {
+    title: string;
+    uairox_tasks: string[];
+    box_tasks: string[];
+  };
+  gallery: {
+    title: string;
+    images: string[];
+  };
+  cta: {
+    title: string;
+    description: string;
+    button_text: string;
+    button_link: string;
+  };
+}
+
 // Legacy configs (for backwards compatibility)
 interface HeroConfig {
   title: string;
@@ -252,6 +318,7 @@ export interface SiteConfig {
   home_predictor_new?: HomePredictorNewConfig;
   home_footer?: HomeFooterConfig;
   squad_page?: SquadPageConfig;
+  experience_page?: ExperiencePageConfig;
 }
 
 const defaultConfig: SiteConfig = {
@@ -382,7 +449,7 @@ const defaultConfig: SiteConfig = {
     title_highlight: "EXPERIENCE",
     description: "Leve uma simulação da prova oficial para o seu box, academia ou centro de treinamento e proporcione um dia épico de superação para sua comunidade.",
     btn_primary_text: "Saber Mais",
-    btn_primary_link: "#pagina-info-experience",
+    btn_primary_link: "/experience",
     btn_secondary_text: "Falar com Consultor",
     btn_secondary_link: "mailto:contato@uairox.com.br",
   },
@@ -419,6 +486,84 @@ const defaultConfig: SiteConfig = {
     tier_ouro_desc: "Kits exclusivos e Isenção Total.",
     tier_elite_label: "Elite",
     tier_elite_desc: "Patrocínio Oficial UAIROX e Vagas.",
+  },
+  experience_page: {
+    hero: {
+      title_top: "UAIROX",
+      title_highlight: "EXPERIENCE",
+      description: "Uma imersão desenhada para levar a cultura das corridas fitness híbridas para dentro da sua comunidade. É uma ferramenta estratégica para gerar engajamento, atrair novos alunos e proporcionar uma vivência real de evento para o seu negócio.",
+      bg_image: null,
+    },
+    objective: {
+      title: "OBJETIVO E CARÁTER",
+      subtitle: "Qual o propósito do Experience?",
+      items: [
+        { title: "Experiência Real", description: "Realizar uma simulação reduzida da prova oficial UAIROX, gerando o desejo de treinar para competições oficiais e usufruir dos benefícios do treinamento híbrido.", icon: "target" },
+        { title: "Não Competitivo", description: "O evento é estritamente inclusivo e participativo. Não possui caráter competitivo. O foco é a superação individual e o espírito de comunidade. Por este motivo, não haverá pódios, medalhas ou bandeiras de premiação.", icon: "heart" },
+      ]
+    },
+    format: {
+      title: "FORMATO E PROVA",
+      subtitle: "As simulações ocorrem sempre em DUPLAS (Masculinas, Femininas ou Mistas). O DESAFIO:",
+      stations: [
+        { name: "RUN 400 mts + UAIZONE 1", metric: "800 mts SKIERG" },
+        { name: "RUN 400 mts + UAIZONE 2", metric: "SLED PUSH (50m)" },
+        { name: "RUN 400 mts + UAIZONE 3", metric: "SLED PULL (50m)" },
+        { name: "RUN 400 mts + UAIZONE 4", metric: "BURPEE BROAD JUMP (80m)" },
+        { name: "RUN 400 mts + UAIZONE 5", metric: "ROWERG (800 mts)" },
+        { name: "RUN 400 mts + UAIZONE 6", metric: "FARMER CARRY (200 mts)" },
+        { name: "RUN 400 mts + UAIZONE 7", metric: "SANDBAG LUNGES (100m)" },
+        { name: "RUN 400 mts + UAIZONE 8", metric: "WALL BALLS (80 reps)" },
+      ]
+    },
+    pricing: {
+      title: "INSCRIÇÕES E VALORES",
+      default_price: "R$ 120,00 por dupla",
+      includes: "Participação no evento e acesso à estrutura UAIROX.",
+      excludes: "Não há kits, brindes, medalhas ou camisetas inclusos no valor base.",
+      optional: "Opcional 'UAIROX Finisher': O box pode optar por incluir a pulseira oficial de participação. Isso gera um acréscimo de R$ 10,00 por atleta (R$ 20,00 por dupla) no valor da inscrição."
+    },
+    business_model: {
+      title: "MODELO DE NEGÓCIO",
+      description: "O modelo de parceria visa cobrir os custos operacionais e bonificar o Box/CT pelo engajamento:",
+      tiers: [
+        { label: "De 01 a 25 Inscrições", description: "Receita integral da UAIROX (para cobertura de custos logísticos, equipe e sistema)." },
+        { label: "De 26 Inscrições em diante", description: "Receita integral do Box / CT." }
+      ]
+    },
+    branding: {
+      title: "CAMISAS E BRANDING",
+      rules: [
+        { title: "Regra Obrigatória", description: "A arte deve conter a logomarca da UAIROX como realizadora.", is_prohibited: false },
+        { title: "Proibição", description: "É terminantemente proibido o uso da marca ou nome 'HYROX' em qualquer material, por questões de direitos de imagem e controle de marca.", is_prohibited: true },
+      ]
+    },
+    responsibilities: {
+      title: "RESPONSABILIDADES",
+      uairox_tasks: [
+        "Disponibilizar a plataforma para inscrições e recebimento de valores.",
+        "Organização geral da prova e alinhamento de regras/padrões no grupo de atletas.",
+        "Fornecer equipamentos específicos (que o box não possua).",
+        "Fornecer o Sistema de Arbitragem Eletrônica. (Obs: Não haverá Judges nas estações, reforçando o caráter não competitivo).",
+        "Toda a estrutura de sinalização e marketing visual do evento.",
+        "Divulgação nas redes sociais oficiais da UAIROX."
+      ],
+      box_tasks: [
+        "Cessão do espaço físico e equipamentos já disponíveis na unidade.",
+        "Garantir a limpeza do espaço antes e após o evento.",
+        "Divulgação ativa entre seus alunos (canais internos e redes sociais do box)."
+      ]
+    },
+    gallery: {
+      title: "VIVENCIE O EXPERIENCE",
+      images: []
+    },
+    cta: {
+      title: "Pronto para levar a UAIROX para o seu Box?",
+      description: "Fale com nosso time de parceiros e descubra como agendar o evento na sua unidade.",
+      button_text: "Falar com Consultor",
+      button_link: "mailto:contato@uairox.com.br"
+    }
   }
 };
 

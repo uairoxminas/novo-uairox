@@ -12,6 +12,7 @@ import JudgeLayout from './components/layout/JudgeLayout';
 import HomePage from './pages/HomePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import SquadPage from './pages/SquadPage';
+import ExperiencePage from './pages/ExperiencePage';
 import GalleryPage from './pages/GalleryPage';
 import LocationsPage from './pages/LocationsPage';
 import StorePage from './pages/StorePage';
@@ -26,6 +27,7 @@ import AthleteDashboard from './pages/athlete/AthleteDashboard';
 // Páginas Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminLandingConfig from './pages/admin/AdminLandingConfig';
+import AdminExperienceConfig from './pages/admin/AdminExperienceConfig';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminEventConfig from './pages/admin/AdminEventConfig';
 import AdminRaceDayPage from './pages/admin/AdminRaceDayPage';
@@ -77,6 +79,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/squad" element={<SquadPage />} />
+            <Route path="/experience" element={<ExperiencePage />} />
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/store" element={<StorePage />} />
@@ -106,6 +109,7 @@ export default function App() {
           }>
             <Route index element={<AdminDashboard />} />
             <Route path="landing" element={<AdminLandingConfig />} />
+            <Route path="experience" element={<AdminExperienceConfig />} />
             <Route path="events" element={<AdminEvents />} />
             <Route path="events/:id" element={<AdminEventConfig />} />
             <Route path="raceday" element={<AdminRaceDayPage />} />

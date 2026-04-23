@@ -21,6 +21,7 @@ export default function Header() {
                 </div>
                 <div className="hidden md:flex space-x-8 items-center">
                     <Link to="/#etapas" className="text-sm font-bold uppercase tracking-widest text-dark-muted hover:text-white transition-colors">Eventos</Link>
+                    <Link to="/experience" className="text-sm font-bold uppercase tracking-widest text-brand-500 hover:text-white transition-colors">Experience</Link>
                     <Link to="/leaderboard" className="text-sm font-bold uppercase tracking-widest text-dark-muted hover:text-white transition-colors">Resultados</Link>
                     <Link to="/store" className="text-sm font-bold uppercase tracking-widest text-dark-muted hover:text-white transition-colors">Loja</Link>
                     <Link to="/gallery" className="text-sm font-bold uppercase tracking-widest text-dark-muted hover:text-white transition-colors">Fotos</Link>
