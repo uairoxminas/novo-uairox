@@ -134,32 +134,34 @@ export default function ExperiencePage() {
                 {pricing.title}
               </h3>
               
-              <div className="bg-[#111] border border-dark-border p-8 rounded-xl space-y-6">
-                <div>
-                  <div className="text-sm text-zinc-500 font-bold uppercase mb-1">Valor Padrão</div>
-                  <div className="text-3xl font-black text-brand-500 uppercase">{pricing.default_price}</div>
-                </div>
-                
-                <div className="space-y-3 pt-4 border-t border-dark-border">
-                  <div className="flex gap-3">
-                    <CheckCircle2 className="text-brand-500 shrink-0 mt-0.5" size={20} />
-                    <p className="text-zinc-300 text-sm">{pricing.includes}</p>
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="bg-[#111] border border-dark-border p-8 rounded-xl space-y-6 flex-1">
+                  <div>
+                    <div className="text-sm text-zinc-500 font-bold uppercase mb-1">Valor Padrão</div>
+                    <div className="text-3xl font-black text-brand-500 uppercase">{pricing.default_price}</div>
                   </div>
-                  <div className="flex gap-3">
-                    <XCircle className="text-red-500 shrink-0 mt-0.5" size={20} />
-                    <p className="text-zinc-300 text-sm">{pricing.excludes}</p>
+                  
+                  <div className="space-y-3 pt-4 border-t border-dark-border">
+                    <div className="flex gap-3">
+                      <CheckCircle2 className="text-brand-500 shrink-0 mt-0.5" size={20} />
+                      <p className="text-zinc-300 text-sm">{pricing.includes}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <XCircle className="text-red-500 shrink-0 mt-0.5" size={20} />
+                      <p className="text-zinc-300 text-sm">{pricing.excludes}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-dark-border bg-brand-500/5 p-4 rounded-lg border border-brand-500/10">
+                    <p className="text-sm text-zinc-300"><span className="text-brand-500 font-bold">Pulseira Finisher:</span> {pricing.optional}</p>
                   </div>
                 </div>
-                
-                <div className="pt-4 border-t border-dark-border bg-brand-500/5 p-4 rounded-lg border border-brand-500/10">
-                  <p className="text-sm text-zinc-300"><span className="text-brand-500 font-bold">Pulseira Finisher:</span> {pricing.optional}</p>
-                </div>
+                {pricing.image_url && (
+                  <div className="flex-1 rounded-xl overflow-hidden border border-dark-border min-h-[250px]">
+                    <img src={pricing.image_url} alt="Valores Experience" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
-              {pricing.image_url && (
-                <div className="mt-6 rounded-xl overflow-hidden border border-dark-border">
-                  <img src={pricing.image_url} alt="Valores Experience" className="w-full h-auto" />
-                </div>
-              )}
             </div>
 
             {/* Modelo de Negócio */}
