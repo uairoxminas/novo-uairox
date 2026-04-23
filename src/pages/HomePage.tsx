@@ -350,7 +350,7 @@ function UairoxPredictor({ config }: { config: any }) {
   const strengthBtns = [
     { key: 'iniciante' as const, label: 'Iniciante' },
     { key: 'intermed' as const, label: 'Intermediário' },
-    { key: 'monstro' as const, label: 'Monstro' },
+    { key: 'monstro' as const, label: 'Bruto(a)' },
   ];
 
   const btnActive = 'bg-[#EDAC02] text-black border-[#EDAC02]';
@@ -428,11 +428,11 @@ function UairoxPredictor({ config }: { config: any }) {
               {/* Strength level */}
               <div>
                 <label className="block font-black text-white uppercase tracking-widest text-xs mb-4">Força nas UaiZones</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1 sm:gap-2">
                   {strengthBtns.map(b => (
                     <button key={b.key} onClick={() => setActiveStrength(b.key)}
-                      className={`border py-3 px-2 text-xs font-black uppercase tracking-wider transition-all skew-x-[-6deg] ${activeStrength === b.key ? btnActive : btnInactive}`}>
-                      <span className="inline-block skew-x-[6deg]">{b.label}</span>
+                      className={`border py-3 px-0.5 sm:px-2 text-[9px] sm:text-xs font-black uppercase tracking-tighter sm:tracking-wider transition-all skew-x-[-6deg] ${activeStrength === b.key ? btnActive : btnInactive}`}>
+                      <span className="inline-block skew-x-[6deg] truncate w-full">{b.label}</span>
                     </button>
                   ))}
                 </div>
