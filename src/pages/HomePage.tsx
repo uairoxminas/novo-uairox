@@ -83,7 +83,7 @@ export default function HomePage() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <a href={hero?.cta_primary_link || "#etapas"} className="bg-white text-dark-bg px-6 py-4 md:px-10 md:py-5 font-black text-sm md:text-lg hover:bg-brand-500 hover:text-white transition-colors uppercase tracking-widest skew-x-[-10deg]">
+                  <a href={hero?.cta_primary_link || "#etapas"} className="bg-white text-dark-bg px-4 py-2.5 md:px-10 md:py-5 font-black text-xs md:text-lg hover:bg-brand-500 hover:text-white transition-colors uppercase tracking-widest skew-x-[-10deg]">
                       <span className="inline-block skew-x-[10deg]">{hero?.cta_primary_text && hero.cta_primary_text !== 'Ver Calendário' ? hero.cta_primary_text : "Próximos Eventos"}</span>
                   </a>
               </div>
