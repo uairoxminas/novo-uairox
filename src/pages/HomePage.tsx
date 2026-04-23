@@ -45,7 +45,7 @@ export default function HomePage() {
   return (
     <div className="relative z-10 antialiased font-sans selection:bg-brand-500 selection:text-white">
       {/* Hero Banner */}
-      <header className="relative min-h-[calc(100vh-6rem)] flex flex-col items-center justify-center text-center px-4 pt-24 border-b border-dark-border overflow-hidden">
+      <header className="relative min-h-[calc(100vh-5rem)] md:min-h-[calc(100vh-6rem)] flex flex-col items-center justify-center text-center px-4 pt-20 md:pt-24 border-b border-dark-border overflow-hidden">
           {/* Images Carousel */}
           {bgImages.length > 0 && (
             <div className="absolute inset-0 z-0 bg-dark-bg">
@@ -66,7 +66,7 @@ export default function HomePage() {
           
           <div className="relative z-10 max-w-6xl mx-auto w-full">
               {hero?.badge_text && (
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 border border-brand-500/30 text-brand-400 text-xs font-black tracking-[0.2em] uppercase mb-8 bg-brand-500/10 backdrop-blur-sm">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 md:px-4 md:py-1.5 border border-brand-500/30 text-brand-400 text-[10px] md:text-xs font-black tracking-[0.2em] uppercase mb-6 md:mb-8 bg-brand-500/10 backdrop-blur-sm">
                       {hero.badge_text}
                   </div>
               )}
@@ -83,7 +83,7 @@ export default function HomePage() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <a href={hero?.cta_primary_link || "#etapas"} className="bg-white text-dark-bg px-10 py-5 font-black text-lg hover:bg-brand-500 hover:text-white transition-colors uppercase tracking-widest skew-x-[-10deg]">
+                  <a href={hero?.cta_primary_link || "#etapas"} className="bg-white text-dark-bg px-6 py-4 md:px-10 md:py-5 font-black text-sm md:text-lg hover:bg-brand-500 hover:text-white transition-colors uppercase tracking-widest skew-x-[-10deg]">
                       <span className="inline-block skew-x-[10deg]">{hero?.cta_primary_text && hero.cta_primary_text !== 'Ver Calendário' ? hero.cta_primary_text : "Próximos Eventos"}</span>
                   </a>
               </div>
@@ -91,7 +91,7 @@ export default function HomePage() {
       </header>
 
       {/* A Prova: O Formato */}
-      <section id="formato" className="py-24 bg-dark-bg border-b border-dark-border relative overflow-hidden">
+      <section id="formato" className="py-12 md:py-24 bg-dark-bg border-b border-dark-border relative overflow-hidden">
           <div className="absolute top-0 right-0 w-1/2 h-full bg-dark-card/50 transform skew-x-12 translate-x-1/4"></div>
           
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -105,7 +105,7 @@ export default function HomePage() {
                         <button
                           key={idx}
                           onClick={() => { setActiveRaceTypeIndex(idx); setActiveStation(1); }}
-                          className={`px-8 py-3 font-black tracking-widest uppercase italic transition-colors 
+                          className={`px-4 py-2 md:px-8 md:py-3 text-xs md:text-sm font-black tracking-widest uppercase italic transition-colors 
                             ${activeRaceTypeIndex === idx ? 'bg-brand-500 text-white' : 'bg-dark-card border border-dark-border text-dark-muted hover:text-white'}`}
                         >
                           {rt.name}
@@ -125,7 +125,7 @@ export default function HomePage() {
                               <button 
                                 key={station.id}
                                 onClick={() => setActiveStation(station.id)}
-                                className={`station-btn text-left p-4 border-l-4 text-dark-muted hover:bg-dark-card transition-all flex items-center gap-4 uppercase font-bold tracking-widest text-sm ${activeStation === station.id ? 'active border-brand-500' : 'border-dark-border'}`}
+                                className={`station-btn text-left p-3 md:p-4 border-l-4 text-dark-muted hover:bg-dark-card transition-all flex items-center gap-3 md:gap-4 uppercase font-bold tracking-widest text-xs md:text-sm ${activeStation === station.id ? 'active border-brand-500' : 'border-dark-border'}`}
                               >
                                   <span className="station-number w-8 h-8 flex items-center justify-center bg-dark-bg border border-dark-border text-xs font-black rounded-sm transition-colors">{station.id}</span>
                                   {station.name}
@@ -136,7 +136,7 @@ export default function HomePage() {
 
                   {currentStation && (
                       <div className="w-full lg:w-2/3">
-                          <div className="bg-dark-card border border-dark-border p-8 md:p-12 h-full flex flex-col justify-center relative overflow-hidden group">
+                          <div className="bg-dark-card border border-dark-border p-5 md:p-8 lg:p-12 h-full flex flex-col justify-center relative overflow-hidden group">
                               
                               {/* Station Dynamic Background */}
                               {currentStation.image_url && (
@@ -152,16 +152,16 @@ export default function HomePage() {
                                 </div>
                               )}
 
-                              <div className="absolute -right-10 -bottom-10 text-[20rem] font-black text-white/5 leading-none italic pointer-events-none transition-all z-0">{currentStation.id}</div>
+                              <div className="absolute -right-10 -bottom-10 text-[10rem] md:text-[20rem] font-black text-white/5 leading-none italic pointer-events-none transition-all z-0">{currentStation.id}</div>
                               
                               <div className="relative z-10 transition-opacity duration-300">
                                   <div className="inline-block px-3 py-1 bg-white text-black font-black uppercase tracking-widest text-sm mb-6 shadow-xl">UAIZONE {currentStation.id}</div>
-                                  <h3 className="text-5xl md:text-6xl font-black text-white mb-6 uppercase tracking-tighter italic drop-shadow-md">{currentStation.name}</h3>
+                                  <h3 className="text-3xl md:text-5xl lg:text-6xl font-black text-white mb-4 md:mb-6 uppercase tracking-tighter italic drop-shadow-md">{currentStation.name}</h3>
                                   
                                   <div className="grid grid-cols-2 gap-6 mb-8">
                                       <div className="border-l-2 border-brand-500 pl-4 bg-dark-bg/30 backdrop-blur-sm p-3 rounded-r-lg">
                                           <p className="text-brand-500/80 text-xs font-bold uppercase tracking-widest mb-1">Distância/Reps</p>
-                                          <p className="text-2xl md:text-3xl font-black text-white drop-shadow-sm">{currentStation.metric}</p>
+                                          <p className="text-xl md:text-2xl lg:text-3xl font-black text-white drop-shadow-sm">{currentStation.metric}</p>
                                       </div>
                                       <div className="flex items-center">
                                           {currentStation.rules_link ? (
@@ -192,7 +192,7 @@ export default function HomePage() {
       <UpcomingEventsSection events={events} />
 
       {/* UAIROX EXPERIENCE */}
-      <section id="experience" className="py-24 bg-dark-bg relative overflow-hidden">
+      <section id="experience" className="py-12 md:py-24 bg-dark-bg relative overflow-hidden">
           <div className="absolute top-1/2 left-0 w-[600px] h-[600px] bg-brand-600/10 blur-[120px] rounded-full -translate-y-1/2 -translate-x-1/4 pointer-events-none"></div>
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -201,10 +201,10 @@ export default function HomePage() {
                       <div className="inline-flex items-center gap-2 px-3 py-1 bg-dark-card border border-dark-border text-dark-muted font-bold uppercase tracking-widest text-xs mb-6">
                           {experience?.badge_text}
                       </div>
-                      <h2 className="text-5xl md:text-7xl font-black text-white mb-6 uppercase tracking-tighter italic">
+                      <h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-white mb-4 md:mb-6 uppercase tracking-tighter italic">
                           {experience?.title_top}<br /> <span className="text-brand-500">{experience?.title_highlight}</span>
                       </h2>
-                      <p className="text-dark-muted text-xl mb-10 leading-relaxed font-inter">
+                      <p className="text-dark-muted text-base md:text-xl mb-6 md:mb-10 leading-relaxed font-inter">
                           {experience?.description}
                       </p>
                       
@@ -222,19 +222,19 @@ export default function HomePage() {
                       <div className="absolute -inset-4 border border-dark-border/40 transform rotate-2 -z-10 bg-dark-bg/50"></div>
                       
                       <div className="space-y-4 pt-12">
-                          <div className={`img-placeholder-bg border border-dark-border h-64 relative group overflow-hidden shadow-lg ${experience?.images?.[0] ? '!bg-none' : ''}`}>
+                          <div className={`img-placeholder-bg border border-dark-border h-40 md:h-64 relative group overflow-hidden shadow-lg ${experience?.images?.[0] ? '!bg-none' : ''}`}>
                             {experience?.images?.[0] && <img src={experience.images[0]} alt="Experience 1" className="w-full h-full object-cover" />}
                           </div>
-                          <div className={`img-placeholder-bg border border-dark-border h-48 relative group overflow-hidden shadow-lg ${experience?.images?.[1] ? '!bg-none' : ''}`}>
+                          <div className={`img-placeholder-bg border border-dark-border h-32 md:h-48 relative group overflow-hidden shadow-lg ${experience?.images?.[1] ? '!bg-none' : ''}`}>
                             {experience?.images?.[1] && <img src={experience.images[1]} alt="Experience 2" className="w-full h-full object-cover" />}
                           </div>
                       </div>
                       
                       <div className="space-y-4">
-                          <div className={`img-placeholder-bg border border-brand-500/50 h-56 relative group overflow-hidden shadow-[0_0_30px_rgba(237,172,2,0.15)] ${experience?.images?.[2] ? '!bg-none' : ''}`}>
+                          <div className={`img-placeholder-bg border border-brand-500/50 h-36 md:h-56 relative group overflow-hidden shadow-[0_0_30px_rgba(237,172,2,0.15)] ${experience?.images?.[2] ? '!bg-none' : ''}`}>
                             {experience?.images?.[2] && <img src={experience.images[2]} alt="Experience 3" className="w-full h-full object-cover" />}
                           </div>
-                          <div className={`img-placeholder-bg border border-dark-border h-64 relative group overflow-hidden shadow-lg ${experience?.images?.[3] ? '!bg-none' : ''}`}>
+                          <div className={`img-placeholder-bg border border-dark-border h-40 md:h-64 relative group overflow-hidden shadow-lg ${experience?.images?.[3] ? '!bg-none' : ''}`}>
                             {experience?.images?.[3] && <img src={experience.images[3]} alt="Experience 4" className="w-full h-full object-cover" />}
                           </div>
                       </div>
@@ -247,24 +247,24 @@ export default function HomePage() {
       <UairoxPredictor config={predictor} />
 
       {/* Estatísticas Rápidas */}
-      <section className="py-20 bg-[#EDAC02] px-4 border-y border-[#EDAC02] relative z-10">
+      <section className="py-10 md:py-20 bg-[#EDAC02] px-4 border-y border-[#EDAC02] relative z-10">
           <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-white/20">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 text-center md:divide-x divide-white/20">
                   <div>
-                      <h3 className="text-4xl md:text-6xl font-black text-white mb-2 italic tracking-tighter">{stats?.val_1}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-xs md:text-sm">{stats?.label_1}</p>
+                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_1}</h3>
+                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_1}</p>
                   </div>
                   <div>
-                      <h3 className="text-4xl md:text-6xl font-black text-white mb-2 italic tracking-tighter">{stats?.val_2}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-xs md:text-sm">{stats?.label_2}</p>
+                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_2}</h3>
+                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_2}</p>
                   </div>
                   <div>
-                      <h3 className="text-4xl md:text-6xl font-black text-white mb-2 italic tracking-tighter">{stats?.val_3}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-xs md:text-sm">{stats?.label_3}</p>
+                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_3}</h3>
+                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_3}</p>
                   </div>
                   <div>
-                      <h3 className="text-4xl md:text-6xl font-black text-white mb-2 italic tracking-tighter">{stats?.val_4}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-xs md:text-sm">{stats?.label_4}</p>
+                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_4}</h3>
+                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_4}</p>
                   </div>
               </div>
           </div>
@@ -345,7 +345,7 @@ function UairoxPredictor({ config }: { config: any }) {
         </div>
 
         {/* Card */}
-        <div className="bg-[#0d0d0d] border border-[#1a1a1a] p-8 lg:p-10 relative">
+        <div className="bg-[#0d0d0d] border border-[#1a1a1a] p-4 md:p-8 lg:p-10 relative">
           {/* Corner decorations */}
           <div className="absolute top-0 right-0 w-12 h-12 border-t-2 border-r-2 border-[#EDAC02]/30" />
           <div className="absolute bottom-0 left-0 w-12 h-12 border-b-2 border-l-2 border-[#EDAC02]/30" />
@@ -413,7 +413,7 @@ function UairoxPredictor({ config }: { config: any }) {
               <div className="absolute -right-4 -bottom-8 text-[10rem] font-black text-white/[0.02] italic leading-none pointer-events-none select-none">⏱</div>
 
               <p className="font-bold text-zinc-600 uppercase tracking-widest text-xs mb-3">Estimativa de Conclusão</p>
-              <div className="text-6xl md:text-7xl font-black text-white italic tracking-tighter mb-6 tabular-nums">
+              <div className="text-4xl md:text-6xl lg:text-7xl font-black text-white italic tracking-tighter mb-4 md:mb-6 tabular-nums">
                 {formatTime(total)}
               </div>
 
@@ -538,7 +538,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     return (
       <div
         key={ev.id}
-        className={`event-card relative bg-dark-card border ${card.is_badge_active ? 'border-brand-500' : 'border-dark-border'} ${card.is_disabled ? 'border-dark-border/50 opacity-70 hover:opacity-100' : 'hover:border-brand-500 cursor-pointer'} p-8 flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-2 group h-[450px]`}
+        className={`event-card relative bg-dark-card border ${card.is_badge_active ? 'border-brand-500' : 'border-dark-border'} ${card.is_disabled ? 'border-dark-border/50 opacity-70 hover:opacity-100' : 'hover:border-brand-500 cursor-pointer'} p-5 md:p-8 flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-2 group h-[360px] md:h-[450px]`}
       >
         {ev.image_url ? (
           <>
@@ -564,7 +564,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
               </span>
             )}
           </div>
-          <h3 className={`text-4xl font-black uppercase italic mb-1 ${card.is_disabled ? 'text-dark-muted' : 'text-white'}`}>
+          <h3 className={`text-2xl md:text-4xl font-black uppercase italic mb-1 ${card.is_disabled ? 'text-dark-muted' : 'text-white'}`}>
             {city}
           </h3>
           <p className={`${card.is_disabled ? 'text-dark-muted/60' : card.is_badge_active ? 'text-brand-400' : 'text-white/60'} font-black tracking-widest uppercase text-sm mb-6`}>
@@ -608,7 +608,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
   const hasAnyEvents = (dbEvents && dbEvents.length > 0);
 
   return (
-    <section id="etapas" className="py-24 bg-[#080808] border-b border-dark-border">
+    <section id="etapas" className="py-12 md:py-24 bg-[#080808] border-b border-dark-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-dark-border pb-8">

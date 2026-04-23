@@ -24,7 +24,7 @@ export default function ExperiencePage() {
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-brand-500 selection:text-black">
       {/* HERO SECTION */}
-      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden border-b border-dark-border">
+      <section className="relative pt-24 pb-12 md:pt-48 md:pb-32 overflow-hidden border-b border-dark-border">
         {hero.bg_image && (
           <div className="absolute inset-0 z-0">
             <div className="absolute inset-0 bg-black/80 z-10" />
@@ -44,12 +44,12 @@ export default function ExperiencePage() {
               <span className="block skew-x-[10deg]">Para Box & Academias</span>
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-black uppercase italic leading-none mb-6">
+            <h1 className="text-3xl md:text-5xl lg:text-7xl font-black uppercase italic leading-none mb-4 md:mb-6">
               {hero.title_top} <br className="hidden md:block" />
               <span className="text-brand-500">{hero.title_highlight}</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-zinc-400 max-w-2xl leading-relaxed">
+            <p className="text-base md:text-lg lg:text-xl text-zinc-400 max-w-2xl leading-relaxed">
               {hero.description}
             </p>
           </motion.div>
@@ -57,7 +57,7 @@ export default function ExperiencePage() {
       </section>
 
       {/* OBJECTIVE SECTION */}
-      <section className="py-20 bg-dark-bg relative overflow-hidden">
+      <section className="py-12 md:py-20 bg-dark-bg relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-sm font-bold text-brand-500 uppercase tracking-widest mb-2">{objective.subtitle}</h2>

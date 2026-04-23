@@ -16,7 +16,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-dark-bg py-16 px-4 text-center border-t border-dark-border">
+    <footer className="bg-dark-bg py-10 md:py-16 px-4 text-center border-t border-dark-border">
         <div className="max-w-7xl mx-auto flex flex-col items-center">
             <img 
                 src="/logo-uairox.webp" 
