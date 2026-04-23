@@ -443,7 +443,7 @@ function UairoxPredictor({ config }: { config: any }) {
             {/* ---- RIGHT: Result ---- */}
             <div className="flex flex-col justify-center items-center p-8 bg-[#050505] border border-[#1a1a1a] text-center relative overflow-hidden">
               {/* BG acronym */}
-              <div className="absolute -right-4 -bottom-8 text-[10rem] font-black text-white/[0.02] italic leading-none pointer-events-none select-none">⏱</div>
+              <div className="absolute -right-4 -bottom-8 text-[10rem] font-black text-white/[0.02] italic leading-none pointer-events-none select-none hidden md:block">⏱</div>
 
               <p className="font-bold text-zinc-600 uppercase tracking-widest text-xs mb-3">Estimativa de Conclusão</p>
               <div className="text-4xl md:text-6xl lg:text-7xl font-black text-white italic tracking-tighter mb-4 md:mb-6 tabular-nums">
