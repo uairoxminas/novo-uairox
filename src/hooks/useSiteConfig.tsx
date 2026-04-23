@@ -217,6 +217,7 @@ export interface ExperiencePageConfig {
   objective: {
     title: string;
     subtitle: string;
+    image_url?: string | null;
     items: Array<{
       title: string;
       description: string;
@@ -237,6 +238,7 @@ export interface ExperiencePageConfig {
     includes: string;
     excludes: string;
     optional: string;
+    image_url?: string | null;
   };
   business_model: {
     title: string;
@@ -258,6 +260,7 @@ export interface ExperiencePageConfig {
     title: string;
     uairox_tasks: string[];
     box_tasks: string[];
+    image_url?: string | null;
   };
   gallery: {
     title: string;
@@ -497,6 +500,7 @@ const defaultConfig: SiteConfig = {
     objective: {
       title: "OBJETIVO E CARÁTER",
       subtitle: "Qual o propósito do Experience?",
+      image_url: null,
       items: [
         { title: "Experiência Real", description: "Realizar uma simulação reduzida da prova oficial UAIROX, gerando o desejo de treinar para competições oficiais e usufruir dos benefícios do treinamento híbrido.", icon: "target" },
         { title: "Não Competitivo", description: "O evento é estritamente inclusivo e participativo. Não possui caráter competitivo. O foco é a superação individual e o espírito de comunidade. Por este motivo, não haverá pódios, medalhas ou bandeiras de premiação.", icon: "heart" },
@@ -521,7 +525,8 @@ const defaultConfig: SiteConfig = {
       default_price: "R$ 120,00 por dupla",
       includes: "Participação no evento e acesso à estrutura UAIROX.",
       excludes: "Não há kits, brindes, medalhas ou camisetas inclusos no valor base.",
-      optional: "Opcional 'UAIROX Finisher': O box pode optar por incluir a pulseira oficial de participação. Isso gera um acréscimo de R$ 10,00 por atleta (R$ 20,00 por dupla) no valor da inscrição."
+      optional: "Opcional 'UAIROX Finisher': O box pode optar por incluir a pulseira oficial de participação. Isso gera um acréscimo de R$ 10,00 por atleta (R$ 20,00 por dupla) no valor da inscrição.",
+      image_url: null
     },
     business_model: {
       title: "MODELO DE NEGÓCIO",
@@ -552,7 +557,8 @@ const defaultConfig: SiteConfig = {
         "Cessão do espaço físico e equipamentos já disponíveis na unidade.",
         "Garantir a limpeza do espaço antes e após o evento.",
         "Divulgação ativa entre seus alunos (canais internos e redes sociais do box)."
-      ]
+      ],
+      image_url: null
     },
     gallery: {
       title: "VIVENCIE O EXPERIENCE",

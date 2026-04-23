@@ -16,7 +16,14 @@ export default function AdminExperienceConfig() {
 
   useEffect(() => {
     if (config?.experience_page) {
-      setFormData(config.experience_page);
+      const dbConfig = config.experience_page;
+      setFormData({
+        ...dbConfig,
+        gallery: {
+          ...dbConfig.gallery,
+          images: dbConfig.gallery?.images || []
+        }
+      });
     }
   }, [config]);
 
@@ -64,6 +71,18 @@ export default function AdminExperienceConfig() {
     const url = await uploadImage(file);
     if (url) {
       setFormData({ ...formData, hero: { ...formData.hero, bg_image: url } });
+    }
+  };
+
+  const handleSectionImageUpload = async (section: 'objective' | 'pricing' | 'responsibilities', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadImage(file);
+    if (url) {
+      setFormData({ 
+        ...formData, 
+        [section]: { ...formData[section as keyof ExperiencePageConfig], image_url: url } 
+      });
     }
   };
 
@@ -185,6 +204,22 @@ export default function AdminExperienceConfig() {
 
             <hr className="border-dark-border" />
 
+            {/* OBJECTIVE IMAGE */}
+            <div>
+              <h3 className="text-xl font-black text-brand-500 uppercase italic mb-4">Imagem: Objetivo e Caráter</h3>
+              <div className="flex items-center gap-4">
+                {formData.objective?.image_url && (
+                  <img src={formData.objective.image_url} alt="Objective BG" className="h-16 w-32 object-cover rounded border border-dark-border" />
+                )}
+                <label className="cursor-pointer bg-[#111] border border-dark-border px-4 py-2 text-sm font-bold uppercase text-white hover:border-brand-500 transition-colors">
+                  <ImageIcon size={16} className="inline mr-2" /> Alterar Imagem
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleSectionImageUpload('objective', e)} />
+                </label>
+              </div>
+            </div>
+
+            <hr className="border-dark-border" />
+
             {/* CTA */}
             <div>
               <h3 className="text-xl font-black text-brand-500 uppercase italic mb-4">Chamada (CTA Final)</h3>
@@ -261,6 +296,18 @@ export default function AdminExperienceConfig() {
                   <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Opcional Finisher</label>
                   <textarea value={formData.pricing.optional} onChange={e => setFormData({...formData, pricing: {...formData.pricing, optional: e.target.value}})} rows={2} className="w-full bg-[#111] border border-dark-border p-3 text-white focus:border-brand-500 outline-none" />
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Imagem desta Seção</label>
+                  <div className="flex items-center gap-4">
+                    {formData.pricing?.image_url && (
+                      <img src={formData.pricing.image_url} alt="Pricing BG" className="h-16 w-32 object-cover rounded border border-dark-border" />
+                    )}
+                    <label className="cursor-pointer bg-[#111] border border-dark-border px-4 py-2 text-sm font-bold uppercase text-white hover:border-brand-500 transition-colors">
+                      <ImageIcon size={16} className="inline mr-2" /> Alterar Imagem
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleSectionImageUpload('pricing', e)} />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -289,6 +336,21 @@ export default function AdminExperienceConfig() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <hr className="border-dark-border" />
+
+            <div>
+              <h3 className="text-xl font-black text-brand-500 uppercase italic mb-4">Imagem: Responsabilidades e Branding</h3>
+              <div className="flex items-center gap-4">
+                {formData.responsibilities?.image_url && (
+                  <img src={formData.responsibilities.image_url} alt="Responsibilities BG" className="h-16 w-32 object-cover rounded border border-dark-border" />
+                )}
+                <label className="cursor-pointer bg-[#111] border border-dark-border px-4 py-2 text-sm font-bold uppercase text-white hover:border-brand-500 transition-colors">
+                  <ImageIcon size={16} className="inline mr-2" /> Alterar Imagem
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleSectionImageUpload('responsibilities', e)} />
+                </label>
               </div>
             </div>
           </div>

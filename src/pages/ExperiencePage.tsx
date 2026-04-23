@@ -64,8 +64,9 @@ export default function ExperiencePage() {
             <h3 className="text-3xl md:text-4xl font-black text-white uppercase italic">{objective.title}</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {objective.items.map((item, idx) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-center">
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+              {objective.items.map((item, idx) => (
               <motion.div 
                 key={idx}
                 initial={{ opacity: 0, y: 20 }}
@@ -81,6 +82,17 @@ export default function ExperiencePage() {
                 <p className="text-zinc-400 leading-relaxed">{item.description}</p>
               </motion.div>
             ))}
+            </div>
+            {objective.image_url && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="hidden lg:block h-full min-h-[300px] bg-[#111] rounded-2xl overflow-hidden border border-dark-border"
+              >
+                <img src={objective.image_url} alt="Objetivo Experience" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
+              </motion.div>
+            )}
           </div>
         </div>
       </section>
@@ -143,6 +155,11 @@ export default function ExperiencePage() {
                   <p className="text-sm text-zinc-300"><span className="text-brand-500 font-bold">Pulseira Finisher:</span> {pricing.optional}</p>
                 </div>
               </div>
+              {pricing.image_url && (
+                <div className="mt-6 rounded-xl overflow-hidden border border-dark-border h-48 md:h-64">
+                  <img src={pricing.image_url} alt="Valores Experience" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
+                </div>
+              )}
             </div>
 
             {/* Modelo de Negócio */}
@@ -197,8 +214,9 @@ export default function ExperiencePage() {
               {responsibilities.title}
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* UAIROX */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* UAIROX */}
               <div className="bg-[#111] border border-dark-border rounded-2xl overflow-hidden">
                 <div className="bg-brand-500 text-black font-black uppercase italic p-4 text-center text-lg">
                   Caberá à UAIROX
@@ -227,6 +245,13 @@ export default function ExperiencePage() {
                   ))}
                 </div>
               </div>
+              </div>
+              
+              {responsibilities.image_url && (
+                <div className="hidden lg:block h-full min-h-[300px] bg-[#111] rounded-2xl overflow-hidden border border-dark-border">
+                  <img src={responsibilities.image_url} alt="Responsabilidades Experience" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
+                </div>
+              )}
             </div>
           </div>
           
@@ -234,7 +259,7 @@ export default function ExperiencePage() {
       </section>
 
       {/* GALLERY */}
-      {gallery.images.length > 0 && (
+      {gallery?.images && gallery.images.length > 0 && (
         <section className="py-20 bg-dark-bg border-t border-dark-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl md:text-4xl font-black text-center text-white uppercase italic mb-12">
