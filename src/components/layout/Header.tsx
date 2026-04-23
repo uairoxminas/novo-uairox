@@ -79,7 +79,7 @@ export default function Header() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] md:hidden"
                 onClick={() => setMobileOpen(false)}
               />
 
@@ -89,7 +89,7 @@ export default function Header() {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'tween', duration: 0.3, ease: 'easeInOut' }}
-                className="fixed top-0 right-0 w-[80vw] max-w-[320px] h-full bg-[#0a0a0a] border-l border-dark-border z-50 md:hidden flex flex-col"
+                className="fixed top-0 right-0 w-[80vw] max-w-[320px] h-dvh bg-[#0a0a0a] border-l border-dark-border z-[101] md:hidden flex flex-col overflow-hidden"
               >
                 {/* Drawer Header */}
                 <div className="flex items-center justify-between p-5 border-b border-dark-border">
