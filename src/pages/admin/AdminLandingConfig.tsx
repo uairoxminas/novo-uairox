@@ -179,88 +179,48 @@ export default function AdminLandingConfig() {
 
     setIsUploading(true);
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+      const fileExt = file.name.split('.').pop() || "png";
+      const fileName = `sponsors/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('site-assets')
+        .upload(fileName, file, { upsert: true });
 
-          // Constraints for sponsor logos (height is more important for marquee)
-          const MAX_HEIGHT = 400;
+      if (error) throw error;
 
-          if (height > MAX_HEIGHT) {
-            const ratio = MAX_HEIGHT / height;
-            width = width * ratio;
-            height = MAX_HEIGHT;
-          }
+      const { data: { publicUrl } } = supabase.storage
+        .from('site-assets')
+        .getPublicUrl(fileName);
 
-          canvas.width = width;
-          canvas.height = height;
+      setSponsorsConfig(prev => {
+        const up = { ...prev };
+        if (!up.sponsors) up.sponsors = [];
+        
+        if (typeof sponsorIndex === 'number' && sponsorIndex >= 0) {
+          // Update existing
+          up.sponsors[sponsorIndex].logo_url = publicUrl;
+        } else {
+          // Add new
+          up.sponsors.push({
+            id: Date.now().toString(),
+            name: 'Novo Patrocinador',
+            logo_url: publicUrl,
+            link: ''
+          });
+        }
 
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
+        // Auto-save
+        setTimeout(() => {
+          updateConfig.mutate({ key: "home_sponsors_new", value: up });
+        }, 100);
 
-          canvas.toBlob(async (blob) => {
-            if (!blob) {
-              setIsUploading(false);
-              alert("Erro ao converter imagem.");
-              return;
-            }
+        return up as any;
+      });
 
-            try {
-              const fileExt = "webp";
-              const fileName = `sponsors/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-              
-              const { data, error } = await supabase.storage
-                .from('site-assets')
-                .upload(fileName, blob, { contentType: 'image/webp', upsert: true });
-
-              if (error) throw error;
-
-              const { data: { publicUrl } } = supabase.storage
-                .from('site-assets')
-                .getPublicUrl(fileName);
-
-              setSponsorsConfig(prev => {
-                const up = { ...prev };
-                if (!up.sponsors) up.sponsors = [];
-                
-                if (typeof sponsorIndex === 'number' && sponsorIndex >= 0) {
-                  // Update existing
-                  up.sponsors[sponsorIndex].logo_url = publicUrl;
-                } else {
-                  // Add new
-                  up.sponsors.push({
-                    id: Date.now().toString(),
-                    name: 'Novo Patrocinador',
-                    logo_url: publicUrl,
-                    link: ''
-                  });
-                }
-
-                // Auto-save
-                setTimeout(() => {
-                  updateConfig.mutate({ key: "home_sponsors_new", value: up });
-                }, 100);
-
-                return up as any;
-              });
-
-              setIsUploading(false);
-              alert("✓ Logo enviada para o servidor e salva com sucesso!");
-            } catch (err) {
-              console.error(err);
-              setIsUploading(false);
-              alert("Erro no upload da logo para o storage.");
-            }
-          }, 'image/webp', 0.8);
-        };
-      };
+      setIsUploading(false);
+      alert("✓ Logo enviada para o servidor e salva com sucesso!");
     } catch (error: any) {
+      console.error(error);
       alert("Erro ao processar logo do patrocinador.");
       setIsUploading(false);
     }
