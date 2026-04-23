@@ -422,6 +422,10 @@ const defaultConfig: SiteConfig = {
     enabled: true,
     whatsapp_link: "https://wa.me/5531999999999",
   },
+  home_sponsors_new: {
+    title: "PARCEIROS E PATROCINADORES",
+    sponsors: []
+  },
   home_hero_new: {
     badge_text: "A Corrida Fitness Para Todos",
     title_top: "8x1KM",
