@@ -307,16 +307,16 @@ export default function SquadPage() {
       <section className="py-16 md:py-24 border-b border-dark-border bg-dark-bg/50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-black text-white uppercase italic">Benefícios & Níveis</h2>
-            <p className="text-zinc-500 mt-2">Como funciona a mecânica do programa</p>
+            <h2 className="text-3xl font-black text-white uppercase italic">{squadConfig.benefits_title || 'Benefícios & Níveis'}</h2>
+            <p className="text-zinc-500 mt-2">{squadConfig.benefits_subtitle || 'Como funciona a mecânica do programa'}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              { id: 'bronze', label: 'Bronze', desc: 'Acesso VIP + Descontos em Loja.', color: TIER_COLORS.bronze },
-              { id: 'prata', label: 'Prata', desc: 'Isenção de inscrição em 1 evento.', color: TIER_COLORS.prata },
-              { id: 'ouro', label: 'Ouro', desc: 'Kits exclusivos e Isenção Total.', color: TIER_COLORS.ouro },
-              { id: 'elite', label: 'Elite', desc: 'Patrocínio Oficial UAIROX e Vagas.', color: TIER_COLORS.elite },
+              { id: 'bronze', label: squadConfig.tier_bronze_label || 'Bronze', desc: squadConfig.tier_bronze_desc || 'Acesso VIP + Descontos em Loja.', color: TIER_COLORS.bronze },
+              { id: 'prata', label: squadConfig.tier_prata_label || 'Prata', desc: squadConfig.tier_prata_desc || 'Isenção de inscrição em 1 evento.', color: TIER_COLORS.prata },
+              { id: 'ouro', label: squadConfig.tier_ouro_label || 'Ouro', desc: squadConfig.tier_ouro_desc || 'Kits exclusivos e Isenção Total.', color: TIER_COLORS.ouro },
+              { id: 'elite', label: squadConfig.tier_elite_label || 'Elite', desc: squadConfig.tier_elite_desc || 'Patrocínio Oficial UAIROX e Vagas.', color: TIER_COLORS.elite },
             ].map((tier) => (
               <div key={tier.id} className="bg-[#050505] border border-dark-border p-6 text-center hover:border-brand-500 transition-colors">
                 <div 

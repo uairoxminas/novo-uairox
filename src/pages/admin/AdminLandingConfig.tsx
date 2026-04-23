@@ -36,7 +36,17 @@ export default function AdminLandingConfig() {
     badge_text: 'Embaixadores Oficiais',
     title: 'O Motor do UAIROX',
     description: 'Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.',
-    cta_button_text: 'Quero fazer parte do Squad'
+    cta_button_text: 'Quero fazer parte do Squad',
+    benefits_title: "Benefícios & Níveis",
+    benefits_subtitle: "Como funciona a mecânica do programa",
+    tier_bronze_label: "Bronze",
+    tier_bronze_desc: "Acesso VIP + Descontos em Loja.",
+    tier_prata_label: "Prata",
+    tier_prata_desc: "Isenção de inscrição em 1 evento.",
+    tier_ouro_label: "Ouro",
+    tier_ouro_desc: "Kits exclusivos e Isenção Total.",
+    tier_elite_label: "Elite",
+    tier_elite_desc: "Patrocínio Oficial UAIROX e Vagas."
   });
 
   const [isUploading, setIsUploading] = useState(false);
@@ -758,6 +768,42 @@ export default function AdminLandingConfig() {
         <div>
           <label className="block text-sm font-bold text-zinc-400 mb-2">Texto do Botão CTA (Ex: Quero fazer parte do Squad)</label>
           <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={squadPageConfig?.cta_button_text || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), cta_button_text: e.target.value}) as any)} />
+        </div>
+
+        <div className="pt-6 mt-6 border-t border-[#262626]">
+          <h3 className="text-lg font-bold text-white mb-4">Benefícios & Níveis</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">Título (Ex: Benefícios & Níveis)</label>
+              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={squadPageConfig?.benefits_title || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), benefits_title: e.target.value}) as any)} />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 mb-2">Subtítulo</label>
+              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={squadPageConfig?.benefits_subtitle || ''} onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), benefits_subtitle: e.target.value}) as any)} />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {['bronze', 'prata', 'ouro', 'elite'].map((tier) => (
+              <div key={tier} className="bg-[#0a0a0a] border border-[#262626] p-4 rounded-lg flex flex-col md:flex-row gap-4 items-center">
+                <div className="w-full md:w-1/3">
+                  <label className="block text-xs font-bold text-zinc-500 mb-1 uppercase">Nome Nível {tier}</label>
+                  <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded p-2 text-white text-sm" 
+                    value={(squadPageConfig as any)?.[`tier_${tier}_label`] || ''} 
+                    onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), [`tier_${tier}_label`]: e.target.value}) as any)} 
+                  />
+                </div>
+                <div className="w-full md:w-2/3">
+                  <label className="block text-xs font-bold text-zinc-500 mb-1 uppercase">Descrição Nível {tier}</label>
+                  <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded p-2 text-white text-sm" 
+                    value={(squadPageConfig as any)?.[`tier_${tier}_desc`] || ''} 
+                    onChange={(e) => setSquadPageConfig(prev => ({...(prev || {}), [`tier_${tier}_desc`]: e.target.value}) as any)} 
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex justify-end pt-4 border-t border-dark-border mt-4">

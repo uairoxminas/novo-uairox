@@ -193,13 +193,16 @@ export interface SquadPageConfig {
   title: string;
   description: string;
   cta_button_text: string;
-}
-
-export interface SquadPageConfig {
-  badge_text: string;
-  title: string;
-  description: string;
-  cta_button_text: string;
+  benefits_title: string;
+  benefits_subtitle: string;
+  tier_bronze_label: string;
+  tier_bronze_desc: string;
+  tier_prata_label: string;
+  tier_prata_desc: string;
+  tier_ouro_label: string;
+  tier_ouro_desc: string;
+  tier_elite_label: string;
+  tier_elite_desc: string;
 }
 
 // Legacy configs (for backwards compatibility)
@@ -406,6 +409,16 @@ const defaultConfig: SiteConfig = {
     title: "O Motor do UAIROX",
     description: "Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.",
     cta_button_text: "Quero fazer parte do Squad",
+    benefits_title: "Benefícios & Níveis",
+    benefits_subtitle: "Como funciona a mecânica do programa",
+    tier_bronze_label: "Bronze",
+    tier_bronze_desc: "Acesso VIP + Descontos em Loja.",
+    tier_prata_label: "Prata",
+    tier_prata_desc: "Isenção de inscrição em 1 evento.",
+    tier_ouro_label: "Ouro",
+    tier_ouro_desc: "Kits exclusivos e Isenção Total.",
+    tier_elite_label: "Elite",
+    tier_elite_desc: "Patrocínio Oficial UAIROX e Vagas.",
   }
 };
 
