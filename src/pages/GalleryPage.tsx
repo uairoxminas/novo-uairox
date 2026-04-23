@@ -66,12 +66,13 @@ function WatermarkedPhoto({ photo, isSelected, onToggleSelect, onEnlarge }: { ph
           {isSelected && <Check size={14} className="text-black font-black" />}
         </div>
         
-        {/* Hover Enlarge */}
+        {/* Enlarge Button - always visible on mobile, hover on desktop */}
         <button 
           onClick={(e) => { e.stopPropagation(); onEnlarge(); }}
-          className="absolute bottom-3 right-3 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute bottom-3 right-3 p-2.5 bg-black/70 hover:bg-brand-500 rounded-full text-white transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 shadow-lg"
+          aria-label="Ampliar foto"
         >
-          <Search size={16} />
+          <Search size={18} />
         </button>
       </div>
     </motion.div>
