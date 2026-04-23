@@ -205,7 +205,7 @@ export interface SquadPageConfig {
   tier_elite_desc: string;
 }
 
-}
+
 
 export interface ExperiencePageConfig {
   hero: {
