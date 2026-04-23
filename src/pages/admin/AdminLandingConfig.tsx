@@ -615,7 +615,7 @@ export default function AdminLandingConfig() {
             {sponsorsConfig?.sponsors?.map((sponsor: any, idx: number) => (
               <div key={sponsor.id || idx} className="bg-dark-card border border-dark-border rounded-lg p-4 flex flex-col gap-3 relative">
                 <div className="bg-[#EDAC02] h-20 rounded p-2 flex items-center justify-center relative overflow-hidden group">
-                   <img src={sponsor.logo_url} alt="Logo" className="w-full h-full object-contain brightness-0" />
+                   <img src={sponsor.logo_url} alt="Logo" className="w-full h-full object-contain" />
                    <label className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs font-bold text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
                       Mudar Logo
                       <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={(e) => handleSponsorLogoUpload(e, idx)} />

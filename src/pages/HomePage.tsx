@@ -313,14 +313,14 @@ export default function HomePage() {
                                 <img 
                                   src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
                                   alt={sponsor?.name || `Sponsor ${idx}`} 
-                                  className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                                  className="h-12 md:h-16 object-contain" 
                                 />
                               </a>
                             ) : (
                               <img 
                                 src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
                                 alt={sponsor?.name || `Sponsor ${idx}`} 
-                                className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                                className="h-12 md:h-16 object-contain" 
                               />
                             )}
                           </li>
@@ -334,14 +334,14 @@ export default function HomePage() {
                                 <img 
                                   src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
                                   alt={sponsor?.name || `Sponsor ${idx}`} 
-                                  className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                                  className="h-12 md:h-16 object-contain" 
                                 />
                               </a>
                             ) : (
                               <img 
                                 src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
                                 alt={sponsor?.name || `Sponsor ${idx}`} 
-                                className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                                className="h-12 md:h-16 object-contain" 
                               />
                             )}
                           </li>
