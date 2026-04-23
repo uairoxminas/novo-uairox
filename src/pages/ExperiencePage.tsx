@@ -88,7 +88,7 @@ export default function ExperiencePage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
-                className="hidden lg:block h-full min-h-[300px] bg-[#111] rounded-2xl overflow-hidden border border-dark-border"
+                className="block h-48 md:h-64 lg:h-full lg:min-h-[300px] bg-[#111] rounded-2xl overflow-hidden border border-dark-border"
               >
                 <img src={objective.image_url} alt="Objetivo Experience" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
               </motion.div>
@@ -248,7 +248,7 @@ export default function ExperiencePage() {
               </div>
               
               {responsibilities.image_url && (
-                <div className="hidden lg:block h-full min-h-[300px] bg-[#111] rounded-2xl overflow-hidden border border-dark-border">
+                <div className="block h-48 md:h-64 lg:h-full lg:min-h-[300px] bg-[#111] rounded-2xl overflow-hidden border border-dark-border">
                   <img src={responsibilities.image_url} alt="Responsabilidades Experience" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
                 </div>
               )}
