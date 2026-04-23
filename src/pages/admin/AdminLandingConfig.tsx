@@ -120,24 +120,47 @@ export default function AdminLandingConfig() {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
 
-          // Convertendo magicamente para WEBP 80%
-          const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              setIsUploading(false);
+              alert("Erro ao converter imagem.");
+              return;
+            }
 
-          setHeroConfig(prev => {
-            const up = {
-              ...(prev || {}),
-              background_images: [...(prev?.background_images || []), compressedDataUrl]
-            } as any;
-            
-            // Já manda salvar logo no banco de dados para evitar erro
-            setTimeout(() => {
-                updateConfig.mutate({ key: "home_hero_new", value: up });
-            }, 100);
+            try {
+              const fileExt = "webp";
+              const fileName = `hero/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+              
+              const { data, error } = await supabase.storage
+                .from('site-assets')
+                .upload(fileName, blob, { contentType: 'image/webp', upsert: true });
 
-            return up;
-          });
+              if (error) throw error;
 
-          setIsUploading(false);
+              const { data: { publicUrl } } = supabase.storage
+                .from('site-assets')
+                .getPublicUrl(fileName);
+
+              setHeroConfig(prev => {
+                const up = {
+                  ...(prev || {}),
+                  background_images: [...(prev?.background_images || []), publicUrl]
+                } as any;
+                
+                setTimeout(() => {
+                    updateConfig.mutate({ key: "home_hero_new", value: up });
+                }, 100);
+
+                return up;
+              });
+
+              setIsUploading(false);
+            } catch (err) {
+              console.error(err);
+              setIsUploading(false);
+              alert("Erro no upload da imagem para o storage.");
+            }
+          }, 'image/webp', 0.8);
           alert("✓ Foto processada, espremida (WebP) e Salva!");
         };
       };
@@ -181,36 +204,60 @@ export default function AdminLandingConfig() {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
 
-          // WEBP 80%
-          const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
-
-          setSponsorsConfig(prev => {
-            const up = { ...prev };
-            if (!up.sponsors) up.sponsors = [];
-            
-            if (typeof sponsorIndex === 'number' && sponsorIndex >= 0) {
-              // Update existing
-              up.sponsors[sponsorIndex].logo_url = compressedDataUrl;
-            } else {
-              // Add new
-              up.sponsors.push({
-                id: Date.now().toString(),
-                name: 'Novo Patrocinador',
-                logo_url: compressedDataUrl,
-                link: ''
-              });
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              setIsUploading(false);
+              alert("Erro ao converter imagem.");
+              return;
             }
 
-            // Auto-save
-            setTimeout(() => {
-              updateConfig.mutate({ key: "home_sponsors_new", value: up });
-            }, 100);
+            try {
+              const fileExt = "webp";
+              const fileName = `sponsors/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+              
+              const { data, error } = await supabase.storage
+                .from('site-assets')
+                .upload(fileName, blob, { contentType: 'image/webp', upsert: true });
 
-            return up as any;
-          });
+              if (error) throw error;
 
-          setIsUploading(false);
-          alert("✓ Logo processada e salva com sucesso!");
+              const { data: { publicUrl } } = supabase.storage
+                .from('site-assets')
+                .getPublicUrl(fileName);
+
+              setSponsorsConfig(prev => {
+                const up = { ...prev };
+                if (!up.sponsors) up.sponsors = [];
+                
+                if (typeof sponsorIndex === 'number' && sponsorIndex >= 0) {
+                  // Update existing
+                  up.sponsors[sponsorIndex].logo_url = publicUrl;
+                } else {
+                  // Add new
+                  up.sponsors.push({
+                    id: Date.now().toString(),
+                    name: 'Novo Patrocinador',
+                    logo_url: publicUrl,
+                    link: ''
+                  });
+                }
+
+                // Auto-save
+                setTimeout(() => {
+                  updateConfig.mutate({ key: "home_sponsors_new", value: up });
+                }, 100);
+
+                return up as any;
+              });
+
+              setIsUploading(false);
+              alert("✓ Logo enviada para o servidor e salva com sucesso!");
+            } catch (err) {
+              console.error(err);
+              setIsUploading(false);
+              alert("Erro no upload da logo para o storage.");
+            }
+          }, 'image/webp', 0.8);
         };
       };
     } catch (error: any) {
@@ -252,18 +299,40 @@ export default function AdminLandingConfig() {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
 
-          // Convert to WEBP agressivo (60%) para manter o banco leve já que a imagem fica embasada atrás
-          const compressedDataUrl = canvas.toDataURL('image/webp', 0.6);
-
-          setFormatConfig(prev => {
-            const up = { ...prev };
-            if (up.race_types) {
-              const newRT = [...up.race_types];
-              newRT[rIdx].stations[sIdx].image_url = compressedDataUrl;
-              up.race_types = newRT;
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              alert("Erro ao converter imagem.");
+              return;
             }
-            return up as any;
-          });
+
+            try {
+              const fileExt = "webp";
+              const fileName = `stations/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+              
+              const { data, error } = await supabase.storage
+                .from('site-assets')
+                .upload(fileName, blob, { contentType: 'image/webp', upsert: true });
+
+              if (error) throw error;
+
+              const { data: { publicUrl } } = supabase.storage
+                .from('site-assets')
+                .getPublicUrl(fileName);
+
+              setFormatConfig(prev => {
+                const up = { ...prev };
+                if (up.race_types) {
+                  const newRT = [...up.race_types];
+                  newRT[rIdx].stations[sIdx].image_url = publicUrl;
+                  up.race_types = newRT;
+                }
+                return up as any;
+              });
+            } catch (err) {
+              console.error(err);
+              alert("Erro no upload da imagem da estação para o storage.");
+            }
+          }, 'image/webp', 0.6);
         };
       };
     } catch {
@@ -472,16 +541,41 @@ export default function AdminLandingConfig() {
                         const ctx = canvas.getContext('2d');
                         ctx?.drawImage(img, 0, 0, width, height);
 
-                        const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
+                        canvas.toBlob(async (blob) => {
+                          if (!blob) {
+                            setIsUploading(false);
+                            alert("Erro ao converter imagem.");
+                            return;
+                          }
 
-                        setExperienceConfig(prev => {
-                          const up = {
-                            ...(prev || {}),
-                            images: [...(prev?.images || []), compressedDataUrl]
-                          } as any;
-                          return up;
-                        });
-                        setIsUploading(false);
+                          try {
+                            const fileExt = "webp";
+                            const fileName = `experience/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                            
+                            const { data, error } = await supabase.storage
+                              .from('site-assets')
+                              .upload(fileName, blob, { contentType: 'image/webp', upsert: true });
+
+                            if (error) throw error;
+
+                            const { data: { publicUrl } } = supabase.storage
+                              .from('site-assets')
+                              .getPublicUrl(fileName);
+
+                            setExperienceConfig(prev => {
+                              const up = {
+                                ...(prev || {}),
+                                images: [...(prev?.images || []), publicUrl]
+                              } as any;
+                              return up;
+                            });
+                            setIsUploading(false);
+                          } catch (err) {
+                            console.error(err);
+                            setIsUploading(false);
+                            alert("Erro no upload da imagem para o storage.");
+                          }
+                        }, 'image/webp', 0.8);
                       };
                     };
                   } catch (error: any) {
