@@ -12,8 +12,8 @@ export default function AdminLandingConfig() {
   const [experienceConfig, setExperienceConfig] = useState(config?.home_experience_new || {
     badge_text: '', title_top: '', title_highlight: '', description: '', btn_primary_text: '', btn_primary_link: '', btn_secondary_text: '', btn_secondary_link: '', images: []
   });
-  const [statsConfig, setStatsConfig] = useState(config?.home_stats_new || {
-    val_1: '', label_1: '', val_2: '', label_2: '', val_3: '', label_3: '', val_4: '', label_4: ''
+  const [sponsorsConfig, setSponsorsConfig] = useState(config?.home_sponsors_new || {
+    title: 'PARCEIROS E PATROCINADORES', sponsors: []
   });
   const [formatConfig, setFormatConfig] = useState(config?.home_format_new || {
     title_prefix: '', title_highlight: '', description: '', stations: [], race_types: []
@@ -58,7 +58,7 @@ export default function AdminLandingConfig() {
   useEffect(() => {
     if (config?.home_hero_new) setHeroConfig(config.home_hero_new);
     if (config?.home_experience_new) setExperienceConfig(config.home_experience_new);
-    if (config?.home_stats_new) setStatsConfig(config.home_stats_new);
+    if (config?.home_sponsors_new) setSponsorsConfig(config.home_sponsors_new);
     if (config?.home_format_new) setFormatConfig(config.home_format_new);
     if (config?.home_events_new) setEventsConfig(config.home_events_new);
     if (config?.home_predictor_new) setPredictorConfig(config.home_predictor_new);
@@ -80,7 +80,7 @@ export default function AdminLandingConfig() {
 
   const handleSaveHero = () => updateConfig.mutate({ key: "home_hero_new", value: heroConfig });
   const handleSaveExperience = () => updateConfig.mutate({ key: "home_experience_new", value: experienceConfig });
-  const handleSaveStats = () => updateConfig.mutate({ key: "home_stats_new", value: statsConfig });
+  const handleSaveSponsors = () => updateConfig.mutate({ key: "home_sponsors_new", value: sponsorsConfig });
   const handleSaveFormat = () => updateConfig.mutate({ key: "home_format_new", value: formatConfig });
   const handleSaveEvents = () => updateConfig.mutate({ key: "home_events_new", value: eventsConfig });
   const handleSavePredictor = () => updateConfig.mutate({ key: "home_predictor_new", value: predictorConfig });
@@ -147,6 +147,70 @@ export default function AdminLandingConfig() {
     }
     
     // resetar input
+    e.target.value = '';
+  };
+
+  const handleSponsorLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, sponsorIndex?: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Constraints for sponsor logos (height is more important for marquee)
+          const MAX_HEIGHT = 400;
+
+          if (height > MAX_HEIGHT) {
+            const ratio = MAX_HEIGHT / height;
+            width = width * ratio;
+            height = MAX_HEIGHT;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // WEBP 80%
+          const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
+
+          setSponsorsConfig(prev => {
+            const up = { ...prev };
+            if (!up.sponsors) up.sponsors = [];
+            
+            if (typeof sponsorIndex === 'number' && sponsorIndex >= 0) {
+              // Update existing
+              up.sponsors[sponsorIndex].logo_url = compressedDataUrl;
+            } else {
+              // Add new
+              up.sponsors.push({
+                id: Date.now().toString(),
+                name: 'Novo Patrocinador',
+                logo_url: compressedDataUrl,
+                link: ''
+              });
+            }
+            return up as any;
+          });
+
+          setIsUploading(false);
+        };
+      };
+    } catch (error: any) {
+      alert("Erro ao processar logo do patrocinador.");
+      setIsUploading(false);
+    }
+    
     e.target.value = '';
   };
 
@@ -308,54 +372,7 @@ export default function AdminLandingConfig() {
         </div>
       </div>
       
-      <div className="bg-[#121212] border border-[#262626] rounded-xl p-6 space-y-6">
-        <h2 className="text-xl font-bold text-brand-500 mb-4">Estatísticas (Resultados)</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Grande Valor 1</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.val_1 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), val_1: e.target.value}) as any)} />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição Curta 1</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.label_1 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), label_1: e.target.value}) as any)} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Grande Valor 2</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.val_2 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), val_2: e.target.value}) as any)} />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição Curta 2</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.label_2 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), label_2: e.target.value}) as any)} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Grande Valor 3</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.val_3 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), val_3: e.target.value}) as any)} />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição Curta 3</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.label_3 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), label_3: e.target.value}) as any)} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Grande Valor 4</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.val_4 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), val_4: e.target.value}) as any)} />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-zinc-400 mb-2">Descrição Curta 4</label>
-              <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={statsConfig?.label_4 || ''} onChange={(e) => setStatsConfig(prev => ({...(prev || {}), label_4: e.target.value}) as any)} />
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <button onClick={handleSaveStats} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar Estatísticas</button>
-        </div>
-      </div>
+
       
       <div className="bg-[#121212] border border-[#262626] rounded-xl p-6 space-y-6">
         <h2 className="text-xl font-bold text-brand-500 mb-4">UAIROX Experience</h2>
@@ -480,6 +497,71 @@ export default function AdminLandingConfig() {
         </div>
         <div className="flex justify-end">
           <button onClick={handleSaveExperience} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar Experience</button>
+        </div>
+      </div>
+
+      <div className="bg-[#121212] border border-[#262626] rounded-xl p-6 space-y-6">
+        <h2 className="text-xl font-bold text-[#EDAC02] mb-4">Parceiros e Patrocinadores (Marquee Animado)</h2>
+        <div>
+          <label className="block text-sm font-bold text-zinc-400 mb-2">Título da Faixa</label>
+          <input type="text" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={sponsorsConfig?.title || ''} onChange={(e) => setSponsorsConfig(prev => ({...(prev || {}), title: e.target.value}) as any)} />
+        </div>
+        
+        <div className="border-t border-dark-border pt-6 mt-6">
+          <h3 className="text-lg font-bold text-white mb-4">Logomarcas (Object Contain e Filtro P&B Automático)</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {sponsorsConfig?.sponsors?.map((sponsor: any, idx: number) => (
+              <div key={sponsor.id || idx} className="bg-dark-card border border-dark-border rounded-lg p-4 flex flex-col gap-3 relative">
+                <div className="bg-[#EDAC02] h-20 rounded p-2 flex items-center justify-center relative overflow-hidden group">
+                   <img src={sponsor.logo_url} alt="Logo" className="w-full h-full object-contain brightness-0" />
+                   <label className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs font-bold text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                      Mudar Logo
+                      <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={(e) => handleSponsorLogoUpload(e, idx)} />
+                   </label>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] text-zinc-500 uppercase">Nome da Empresa</label>
+                  <input type="text" className="w-full bg-dark-bg border border-[#262626] rounded p-1.5 text-sm text-white" value={sponsor.name} onChange={(e) => {
+                    const newSponsors = [...(sponsorsConfig.sponsors || [])];
+                    newSponsors[idx].name = e.target.value;
+                    setSponsorsConfig({...sponsorsConfig, sponsors: newSponsors} as any);
+                  }} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-500 uppercase">Link do Site / Insta (Opcional)</label>
+                  <input type="text" placeholder="https://" className="w-full bg-dark-bg border border-[#262626] rounded p-1.5 text-sm text-white" value={sponsor.link || ''} onChange={(e) => {
+                    const newSponsors = [...(sponsorsConfig.sponsors || [])];
+                    newSponsors[idx].link = e.target.value;
+                    setSponsorsConfig({...sponsorsConfig, sponsors: newSponsors} as any);
+                  }} />
+                </div>
+                
+                <button onClick={() => {
+                  const newSponsors = [...(sponsorsConfig.sponsors || [])];
+                  newSponsors.splice(idx, 1);
+                  setSponsorsConfig({...sponsorsConfig, sponsors: newSponsors} as any);
+                }} className="absolute top-2 right-2 bg-red-500 text-white rounded p-1 opacity-50 hover:opacity-100"><Trash2 size={14}/></button>
+              </div>
+            ))}
+            
+            <label className="bg-dark-card border-2 border-dashed border-dark-border rounded-lg min-h-[160px] flex flex-col items-center justify-center text-zinc-400 hover:text-brand-500 hover:border-brand-500 cursor-pointer transition-colors p-4">
+              <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={(e) => handleSponsorLogoUpload(e)} />
+              {isUploading ? (
+                <Loader2 className="w-8 h-8 animate-spin" />
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 mb-2" />
+                  <span className="font-bold text-sm">Adicionar Logo</span>
+                </>
+              )}
+            </label>
+          </div>
+        </div>
+        
+        <div className="flex justify-end pt-4 border-t border-dark-border">
+          <button onClick={handleSaveSponsors} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar Patrocinadores</button>
         </div>
       </div>
 
