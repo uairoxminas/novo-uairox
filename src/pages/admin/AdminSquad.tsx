@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Crown, MessageCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, X, Crown, MessageCircle, AlertCircle, RefreshCw, Trash2, Pencil } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -40,6 +40,7 @@ export default function AdminSquad() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [members, setMembers] = useState<SquadMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingMember, setEditingMember] = useState<SquadMember | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -112,6 +113,48 @@ export default function AdminSquad() {
       fetchData();
     } catch (err) {
       toast.error("Erro ao recusar.");
+    }
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    if (window.confirm("Tem certeza que deseja deletar este membro do squad? Esta ação não pode ser desfeita.")) {
+      try {
+        const { error } = await (supabase.from('squad_members' as any) as any).delete().eq('id', id);
+        if (error) throw error;
+        toast.success("Membro deletado com sucesso.");
+        fetchData();
+      } catch (err) {
+        toast.error("Erro ao deletar membro.");
+      }
+    }
+  };
+
+  const handleSaveMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    
+    try {
+      const { error } = await (supabase.from('squad_members' as any) as any)
+        .update({
+          full_name: editingMember.full_name,
+          role: editingMember.role,
+          tier: editingMember.tier,
+          location: editingMember.location,
+          bio: editingMember.bio,
+          instagram_handle: editingMember.instagram_handle,
+          avatar_url: editingMember.avatar_url,
+          coupon_code: editingMember.coupon_code,
+          coupon_usage_count: editingMember.coupon_usage_count,
+          is_active: editingMember.is_active
+        })
+        .eq('id', editingMember.id);
+        
+      if (error) throw error;
+      toast.success("Membro atualizado com sucesso!");
+      setEditingMember(null);
+      fetchData();
+    } catch (err) {
+      toast.error("Erro ao atualizar membro.");
     }
   };
 
@@ -248,9 +291,17 @@ export default function AdminSquad() {
                         )}
                       </td>
                       <td className="p-4 text-right">
-                        <button className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Contato via WhatsApp">
-                          <MessageCircle size={18} />
-                        </button>
+                        <div className="flex justify-end gap-1">
+                          <button className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Contato via WhatsApp">
+                            <MessageCircle size={18} />
+                          </button>
+                          <button onClick={() => setEditingMember(member)} className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Editar">
+                            <Pencil size={18} />
+                          </button>
+                          <button onClick={() => handleDeleteMember(member.id)} className="p-2 text-zinc-500 hover:text-red-500 transition-colors" title="Deletar">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -262,6 +313,82 @@ export default function AdminSquad() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0a0a0a] border border-dark-border w-full max-w-2xl p-6 rounded-xl relative my-8">
+            <button onClick={() => setEditingMember(null)} className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white">
+              <X size={20} />
+            </button>
+            <h2 className="text-2xl font-black text-white uppercase italic mb-6">Editar Membro</h2>
+            
+            <form onSubmit={handleSaveMember} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Nome Completo</label>
+                  <input type="text" value={editingMember.full_name} onChange={e => setEditingMember({...editingMember, full_name: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Instagram</label>
+                  <input type="text" value={editingMember.instagram_handle || ''} onChange={e => setEditingMember({...editingMember, instagram_handle: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Role</label>
+                  <select value={editingMember.role} onChange={e => setEditingMember({...editingMember, role: e.target.value as SquadRole})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none">
+                    <option value="coach">Coach</option>
+                    <option value="athlete">Atleta</option>
+                    <option value="influencer">Influencer</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Tier</label>
+                  <select value={editingMember.tier} onChange={e => setEditingMember({...editingMember, tier: e.target.value as SquadTier})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none">
+                    <option value="iniciante">Iniciante</option>
+                    <option value="bronze">Bronze</option>
+                    <option value="prata">Prata</option>
+                    <option value="ouro">Ouro</option>
+                    <option value="elite">Elite</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Localização</label>
+                  <input type="text" value={editingMember.location || ''} onChange={e => setEditingMember({...editingMember, location: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Cupom</label>
+                  <input type="text" value={editingMember.coupon_code || ''} onChange={e => setEditingMember({...editingMember, coupon_code: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Usos do Cupom</label>
+                  <input type="number" value={editingMember.coupon_usage_count} onChange={e => setEditingMember({...editingMember, coupon_usage_count: parseInt(e.target.value) || 0})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Avatar URL</label>
+                  <input type="text" value={editingMember.avatar_url || ''} onChange={e => setEditingMember({...editingMember, avatar_url: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Bio / Por que quer entrar?</label>
+                  <textarea value={editingMember.bio || ''} onChange={e => setEditingMember({...editingMember, bio: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none resize-none" rows={3} />
+                </div>
+                <div className="md:col-span-2 flex items-center gap-2">
+                  <input type="checkbox" id="isActive" checked={editingMember.is_active} onChange={e => setEditingMember({...editingMember, is_active: e.target.checked})} className="w-4 h-4 accent-brand-500" />
+                  <label htmlFor="isActive" className="text-sm font-bold text-white uppercase cursor-pointer">Membro Ativo (Mostra no site)</label>
+                </div>
+              </div>
+              
+              <div className="pt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => setEditingMember(null)} className="px-6 py-3 bg-[#111] text-zinc-400 font-black uppercase text-sm hover:text-white transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" className="px-6 py-3 bg-brand-500 text-black font-black uppercase text-sm hover:bg-brand-400 transition-colors">
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
