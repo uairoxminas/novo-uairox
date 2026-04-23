@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Crown, MessageCircle, AlertCircle, RefreshCw, Trash2, Pencil } from 'lucide-react';
+import { Check, X, Crown, MessageCircle, AlertCircle, RefreshCw, Trash2, Pencil, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -41,6 +41,8 @@ export default function AdminSquad() {
   const [members, setMembers] = useState<SquadMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingMember, setEditingMember] = useState<SquadMember | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -134,6 +136,27 @@ export default function AdminSquad() {
     if (!editingMember) return;
     
     try {
+      let finalAvatarUrl = editingMember.avatar_url;
+
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+        const filePath = `squad_avatars/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('squad-avatars')
+          .upload(filePath, avatarFile);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error("Erro ao fazer upload da imagem");
+          return;
+        } else {
+          const { data } = supabase.storage.from('squad-avatars').getPublicUrl(filePath);
+          finalAvatarUrl = data.publicUrl;
+        }
+      }
+
       const { error } = await (supabase.from('squad_members' as any) as any)
         .update({
           full_name: editingMember.full_name,
@@ -142,7 +165,7 @@ export default function AdminSquad() {
           location: editingMember.location,
           bio: editingMember.bio,
           instagram_handle: editingMember.instagram_handle,
-          avatar_url: editingMember.avatar_url,
+          avatar_url: finalAvatarUrl,
           coupon_code: editingMember.coupon_code,
           coupon_usage_count: editingMember.coupon_usage_count,
           is_active: editingMember.is_active
@@ -152,9 +175,23 @@ export default function AdminSquad() {
       if (error) throw error;
       toast.success("Membro atualizado com sucesso!");
       setEditingMember(null);
+      setAvatarFile(null);
+      setAvatarPreview(null);
       fetchData();
     } catch (err) {
       toast.error("Erro ao atualizar membro.");
+    }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -295,7 +332,11 @@ export default function AdminSquad() {
                           <button className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Contato via WhatsApp">
                             <MessageCircle size={18} />
                           </button>
-                          <button onClick={() => setEditingMember(member)} className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Editar">
+                          <button onClick={() => {
+                            setEditingMember(member);
+                            setAvatarPreview(member.avatar_url);
+                            setAvatarFile(null);
+                          }} className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Editar">
                             <Pencil size={18} />
                           </button>
                           <button onClick={() => handleDeleteMember(member.id)} className="p-2 text-zinc-500 hover:text-red-500 transition-colors" title="Deletar">
@@ -321,7 +362,11 @@ export default function AdminSquad() {
       {editingMember && (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#0a0a0a] border border-dark-border w-full max-w-2xl p-6 rounded-xl relative my-8">
-            <button onClick={() => setEditingMember(null)} className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white">
+            <button onClick={() => {
+              setEditingMember(null);
+              setAvatarFile(null);
+              setAvatarPreview(null);
+            }} className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white">
               <X size={20} />
             </button>
             <h2 className="text-2xl font-black text-white uppercase italic mb-6">Editar Membro</h2>
@@ -367,8 +412,20 @@ export default function AdminSquad() {
                   <input type="number" value={editingMember.coupon_usage_count} onChange={e => setEditingMember({...editingMember, coupon_usage_count: parseInt(e.target.value) || 0})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Avatar URL</label>
-                  <input type="text" value={editingMember.avatar_url || ''} onChange={e => setEditingMember({...editingMember, avatar_url: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Foto / Avatar</label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative group cursor-pointer w-12 h-12 rounded-full overflow-hidden border border-dark-border bg-[#111] flex items-center justify-center shrink-0">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Upload className="text-zinc-500 group-hover:text-brand-500 transition-colors" size={16} />
+                      )}
+                      <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    </div>
+                    <div className="text-xs text-zinc-500 leading-tight">
+                      Clique na imagem para enviar uma nova foto do seu dispositivo.
+                    </div>
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Bio / Por que quer entrar?</label>
@@ -381,7 +438,11 @@ export default function AdminSquad() {
               </div>
               
               <div className="pt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setEditingMember(null)} className="px-6 py-3 bg-[#111] text-zinc-400 font-black uppercase text-sm hover:text-white transition-colors">
+                <button type="button" onClick={() => {
+                  setEditingMember(null);
+                  setAvatarFile(null);
+                  setAvatarPreview(null);
+                }} className="px-6 py-3 bg-[#111] text-zinc-400 font-black uppercase text-sm hover:text-white transition-colors">
                   Cancelar
                 </button>
                 <button type="submit" className="px-6 py-3 bg-brand-500 text-black font-black uppercase text-sm hover:bg-brand-400 transition-colors">
