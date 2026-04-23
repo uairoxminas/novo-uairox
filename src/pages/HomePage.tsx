@@ -84,7 +84,7 @@ export default function HomePage() {
               
               <div className="flex flex-col sm:flex-row gap-6 justify-center">
                   <a href={hero?.cta_primary_link || "#etapas"} className="bg-white text-dark-bg px-10 py-5 font-black text-lg hover:bg-brand-500 hover:text-white transition-colors uppercase tracking-widest skew-x-[-10deg]">
-                      <span className="inline-block skew-x-[10deg]">{hero?.cta_primary_text || "Ver Calendário"}</span>
+                      <span className="inline-block skew-x-[10deg]">{hero?.cta_primary_text && hero.cta_primary_text !== 'Ver Calendário' ? hero.cta_primary_text : "Próximos Eventos"}</span>
                   </a>
               </div>
           </div>

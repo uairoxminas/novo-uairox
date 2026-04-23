@@ -345,7 +345,7 @@ const defaultConfig: SiteConfig = {
     title_highlight: "CORRIDA",
     subtitle: "+ 8 WORKOUTS",
     description: "Combine corrida de média distância com treinos funcionais de alta intensidade. O formato é sempre o mesmo. O seu limite, você quem define.",
-    cta_primary_text: "Ver Calendário",
+    cta_primary_text: "Próximos Eventos",
     cta_primary_link: "#etapas",
     background_images: [],
   },
