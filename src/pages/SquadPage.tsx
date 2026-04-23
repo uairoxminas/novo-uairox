@@ -82,13 +82,13 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
         const filePath = `squad_avatars/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('site-assets')
+          .from('squad-avatars')
           .upload(filePath, avatarFile);
 
         if (uploadError) {
           console.error("Upload error (fallback to no avatar):", uploadError);
         } else {
-          const { data } = supabase.storage.from('site-assets').getPublicUrl(filePath);
+          const { data } = supabase.storage.from('squad-avatars').getPublicUrl(filePath);
           finalAvatarUrl = data.publicUrl;
         }
       }
