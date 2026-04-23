@@ -250,7 +250,7 @@ export default function SquadPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: config } = useSiteConfig();
   
-  const squadConfig = config?.squad_page || {
+  const squadConfig: any = config?.squad_page || {
     badge_text: 'Embaixadores Oficiais',
     title: 'O Motor do UAIROX',
     description: 'Conheça os Coaches, Atletas e Influencers que movimentam a nossa comunidade. O SQUAD é o nosso programa de recompensas para quem ajuda o esporte a crescer.',
