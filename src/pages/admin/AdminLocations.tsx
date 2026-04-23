@@ -26,6 +26,9 @@ export default function AdminLocations() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [editingLocation, setEditingLocation] = useState<TrainingLocation | null>(null);
+  const [newLogoFile, setNewLogoFile] = useState<File | null>(null);
+  const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchLocations();
@@ -80,27 +83,66 @@ export default function AdminLocations() {
 
   const handleSaveEdit = async () => {
     if (!editingLocation) return;
+    setIsSaving(true);
 
-    const { error } = await supabase
-      .from('training_locations')
-      .update({
-        name: editingLocation.name,
-        address: editingLocation.address,
-        city: editingLocation.city,
-        state: editingLocation.state,
-        whatsapp: editingLocation.whatsapp,
-        instagram: editingLocation.instagram,
-        website: editingLocation.website,
-        is_featured: editingLocation.is_featured,
-      } as any)
-      .eq('id', editingLocation.id);
+    try {
+      let finalLogoUrl = editingLocation.logo_url;
+      let finalPhotos = [...editingLocation.photos];
 
-    if (error) {
-      toast.error('Erro ao salvar edições');
-    } else {
+      // Upload new logo if selected
+      if (newLogoFile) {
+        const fileExt = newLogoFile.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+        const { error: uploadError } = await supabase.storage.from('training-locations').upload(filePath, newLogoFile);
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('training-locations').getPublicUrl(filePath);
+        finalLogoUrl = publicUrl;
+      }
+
+      // Upload new photos if selected
+      if (newPhotoFiles.length > 0) {
+        const uploadedUrls = [];
+        for (const file of newPhotoFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `photos/${fileName}`;
+          const { error: uploadError } = await supabase.storage.from('training-locations').upload(filePath, file);
+          if (uploadError) throw uploadError;
+          const { data: { publicUrl } } = supabase.storage.from('training-locations').getPublicUrl(filePath);
+          uploadedUrls.push(publicUrl);
+        }
+        // Override photos array entirely
+        finalPhotos = uploadedUrls;
+      }
+
+      const { error } = await supabase
+        .from('training_locations')
+        .update({
+          name: editingLocation.name,
+          address: editingLocation.address,
+          city: editingLocation.city,
+          state: editingLocation.state,
+          whatsapp: editingLocation.whatsapp,
+          instagram: editingLocation.instagram,
+          website: editingLocation.website,
+          is_featured: editingLocation.is_featured,
+          logo_url: finalLogoUrl,
+          photos: finalPhotos
+        } as any)
+        .eq('id', editingLocation.id);
+
+      if (error) throw error;
+
       toast.success('Alterações salvas com sucesso');
       setEditingLocation(null);
+      setNewLogoFile(null);
+      setNewPhotoFiles([]);
       fetchLocations();
+    } catch (err: any) {
+      toast.error('Erro ao salvar edições: ' + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -202,11 +244,13 @@ export default function AdminLocations() {
                   </>
                 )}
                 
-                {activeTab !== 'pending' && (
-                  <button onClick={() => setEditingLocation(loc)} className="flex items-center gap-1 bg-zinc-800 text-white border border-dark-border px-3 py-2 text-xs font-bold uppercase hover:border-zinc-500 transition-colors">
-                    <Edit size={16} /> Editar
-                  </button>
-                )}
+                <button onClick={() => {
+                  setEditingLocation(loc);
+                  setNewLogoFile(null);
+                  setNewPhotoFiles([]);
+                }} className="flex items-center gap-1 bg-zinc-800 text-white border border-dark-border px-3 py-2 text-xs font-bold uppercase hover:border-zinc-500 transition-colors">
+                  <Edit size={16} /> Editar
+                </button>
 
                 <button onClick={() => handleDelete(loc.id)} className="p-2 text-zinc-500 hover:text-red-500 transition-colors border border-dark-border hover:border-red-500 bg-dark-bg">
                   <Trash2 size={16} />
@@ -242,6 +286,33 @@ export default function AdminLocations() {
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Nome</label>
                 <input type="text" value={editingLocation.name} onChange={e => setEditingLocation({...editingLocation, name: e.target.value})} className="w-full bg-[#111] border border-dark-border p-2.5 text-white focus:border-brand-500 outline-none" />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Logo (Nova Imagem)</label>
+                <div className="flex items-center gap-4">
+                  {editingLocation.logo_url && !newLogoFile && (
+                    <img src={editingLocation.logo_url} alt="Current Logo" className="w-12 h-12 object-contain bg-[#111] border border-dark-border" />
+                  )}
+                  <input type="file" accept="image/*" onChange={e => e.target.files && setNewLogoFile(e.target.files[0])} className="w-full bg-[#111] border border-dark-border p-2 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-500 file:text-black hover:file:bg-brand-400" />
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Fotos do CT (Substituir todas - Max 3)</label>
+                <div className="flex items-center gap-4">
+                  {editingLocation.photos?.length > 0 && newPhotoFiles.length === 0 && (
+                    <div className="flex gap-2">
+                      {editingLocation.photos.map((p, i) => <img key={i} src={p} className="w-12 h-12 object-cover border border-dark-border" />)}
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" multiple onChange={e => {
+                    if (e.target.files) {
+                      const files = Array.from(e.target.files).slice(0, 3);
+                      setNewPhotoFiles(files);
+                    }
+                  }} className="w-full bg-[#111] border border-dark-border p-2 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-700 file:text-white hover:file:bg-zinc-600" />
+                </div>
               </div>
 
               <div className="md:col-span-2">
@@ -284,9 +355,10 @@ export default function AdminLocations() {
               </button>
 
               <div className="flex gap-3">
-                <button onClick={() => setEditingLocation(null)} className="px-6 py-2 text-sm font-bold text-white uppercase hover:bg-zinc-800">Cancelar</button>
-                <button onClick={handleSaveEdit} className="bg-brand-500 text-black px-6 py-2 text-sm font-bold uppercase flex items-center gap-2 hover:bg-brand-400">
-                  <Save size={16} /> Salvar
+                <button onClick={() => setEditingLocation(null)} className="px-6 py-2 text-sm font-bold text-white uppercase hover:bg-zinc-800" disabled={isSaving}>Cancelar</button>
+                <button onClick={handleSaveEdit} disabled={isSaving} className="bg-brand-500 text-black px-6 py-2 text-sm font-bold uppercase flex items-center gap-2 hover:bg-brand-400 disabled:opacity-50">
+                  {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} 
+                  {isSaving ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </div>
