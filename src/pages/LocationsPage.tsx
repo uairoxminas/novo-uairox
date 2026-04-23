@@ -197,11 +197,11 @@ function LocationCard({ location, index, isFeatured }: { location: TrainingLocat
            )}
 
            {/* Logo Overlay Top Left */}
-           <div className="absolute top-4 left-4 w-20 h-20 bg-dark-bg border border-dark-border flex items-center justify-center p-2 shadow-xl">
+           <div className="absolute top-4 left-4 bg-dark-bg/90 backdrop-blur-sm border border-dark-border flex items-center justify-center p-3 shadow-2xl">
              {location.logo_url ? (
-               <img src={location.logo_url} alt="Logo" className="w-full h-full object-contain" />
+               <img src={location.logo_url} alt="Logo" className="max-w-[200px] max-h-[140px] w-auto h-auto object-contain" />
              ) : (
-               <MapPin size={24} className="text-zinc-600" />
+               <MapPin size={40} className="text-zinc-600" />
              )}
            </div>
 
