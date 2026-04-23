@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Search, AtSign, Globe, MessageCircle, X, Upload, Loader2, Star, Image as ImageIcon } from 'lucide-react';
+import { MapPin, Search, AtSign, Globe, MessageCircle, X, Upload, Loader2, Star, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -178,6 +178,22 @@ export default function LocationsPage() {
 // --- SUBCOMPONENTS ---
 
 function LocationCard({ location, index, isFeatured }: { location: TrainingLocation, index: number, isFeatured?: boolean }) {
+  const [photoIndex, setPhotoIndex] = useState(0);
+
+  const nextPhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (location.photos && location.photos.length > 0) {
+      setPhotoIndex((prev) => (prev + 1) % location.photos.length);
+    }
+  };
+
+  const prevPhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (location.photos && location.photos.length > 0) {
+      setPhotoIndex((prev) => (prev - 1 + location.photos.length) % location.photos.length);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -189,7 +205,22 @@ function LocationCard({ location, index, isFeatured }: { location: TrainingLocat
         {/* Photo Square */}
         <div className="w-full aspect-square bg-dark-bg relative overflow-hidden border-b border-dark-border">
            {location.photos && location.photos.length > 0 ? (
-             <img src={location.photos[0]} alt={location.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+             <>
+               <img src={location.photos[photoIndex]} alt={location.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+               {location.photos.length > 1 && (
+                 <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                   <button onClick={prevPhoto} className="bg-dark-bg/80 hover:bg-brand-500 hover:text-black text-white p-1.5 transition-colors shadow-lg">
+                     <ChevronLeft size={16} />
+                   </button>
+                   <div className="bg-dark-bg/80 text-white text-xs font-bold px-2 py-1 shadow-lg">
+                     {photoIndex + 1} / {location.photos.length}
+                   </div>
+                   <button onClick={nextPhoto} className="bg-dark-bg/80 hover:bg-brand-500 hover:text-black text-white p-1.5 transition-colors shadow-lg">
+                     <ChevronRight size={16} />
+                   </button>
+                 </div>
+               )}
+             </>
            ) : (
              <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
                <ImageIcon size={48} className="text-zinc-800" />
