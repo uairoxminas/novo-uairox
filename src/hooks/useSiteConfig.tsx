@@ -188,6 +188,18 @@ export interface HomeStatsNewConfig {
   val_4: string; label_4: string;
 }
 
+export interface HomeSponsorConfig {
+  id: string;
+  name: string;
+  logo_url: string;
+  link?: string;
+}
+
+export interface HomeSponsorsNewConfig {
+  title: string;
+  sponsors: HomeSponsorConfig[];
+}
+
 export interface SquadPageConfig {
   badge_text: string;
   title: string;
@@ -322,6 +334,7 @@ export interface SiteConfig {
   home_footer?: HomeFooterConfig;
   squad_page?: SquadPageConfig;
   experience_page?: ExperiencePageConfig;
+  home_sponsors_new?: HomeSponsorsNewConfig;
 }
 
 const defaultConfig: SiteConfig = {
@@ -459,8 +472,8 @@ const defaultConfig: SiteConfig = {
   home_stats_new: {
     val_1: "8.0", label_1: "KM Total de Corrida",
     val_2: "8", label_2: "Estações Funcionais",
-    val_3: "100%", label_3: "Taxa de Conclusão",
-    val_4: "1.2k", label_4: "Atletas por Edição",
+    val_3: "1200", label_3: "ATLETAS PARTICIPANTES",
+    val_4: "95%", label_4: "SATISFAÇÃO",
   },
   home_predictor_new: {
     badge_text: 'Desafio Estratégico',

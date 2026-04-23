@@ -279,28 +279,74 @@ export default function HomePage() {
       {/* UAIROX PREDICTOR */}
       <UairoxPredictor config={predictor} />
 
-      {/* Estatísticas Rápidas */}
-      <section className="py-10 md:py-20 bg-[#EDAC02] px-4 border-y border-[#EDAC02] relative z-10">
-          <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 text-center md:divide-x divide-white/20">
-                  <div>
-                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_1}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_1}</p>
-                  </div>
-                  <div>
-                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_2}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_2}</p>
-                  </div>
-                  <div>
-                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_3}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_3}</p>
-                  </div>
-                  <div>
-                      <h3 className="text-2xl md:text-4xl lg:text-6xl font-black text-white mb-1 md:mb-2 italic tracking-tighter">{stats?.val_4}</h3>
-                      <p className="text-black font-black uppercase tracking-widest text-[10px] md:text-xs lg:text-sm">{stats?.label_4}</p>
-                  </div>
+      {/* Parceiros e Patrocinadores */}
+      <section className="py-10 md:py-16 bg-[#EDAC02] px-4 border-y border-[#EDAC02] relative z-10 overflow-hidden">
+          <div className="max-w-7xl mx-auto flex flex-col items-center">
+              <p className="text-black font-black uppercase tracking-widest text-xs md:text-sm mb-8">
+                {config?.home_sponsors_new?.title || 'PARCEIROS E PATROCINADORES'}
+              </p>
+              
+              {/* Marquee Container */}
+              <div className="w-full inline-flex flex-nowrap overflow-hidden [mask-image:_linear-gradient(to_right,transparent_0,_black_128px,_black_calc(100%-128px),transparent_100%)]">
+                {/* 
+                  O truque para animação infinita perfeita: duas listas idênticas deslizando.
+                */}
+                <ul className="flex items-center justify-center md:justify-start [&_li]:mx-8 [&_img]:max-w-none animate-marquee">
+                  {(config?.home_sponsors_new?.sponsors?.length ? config.home_sponsors_new.sponsors : [1, 2, 3, 4, 5, 6]).map((sponsor: any, idx: number) => (
+                    <li key={sponsor?.id || idx} className="flex-shrink-0">
+                      {sponsor?.link ? (
+                        <a href={sponsor.link} target="_blank" rel="noopener noreferrer">
+                          <img 
+                            src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                            alt={sponsor?.name || `Sponsor ${idx}`} 
+                            className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                          />
+                        </a>
+                      ) : (
+                        <img 
+                          src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                          alt={sponsor?.name || `Sponsor ${idx}`} 
+                          className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                        />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <ul className="flex items-center justify-center md:justify-start [&_li]:mx-8 [&_img]:max-w-none animate-marquee" aria-hidden="true">
+                  {(config?.home_sponsors_new?.sponsors?.length ? config.home_sponsors_new.sponsors : [1, 2, 3, 4, 5, 6]).map((sponsor: any, idx: number) => (
+                    <li key={`clone-${sponsor?.id || idx}`} className="flex-shrink-0">
+                      {sponsor?.link ? (
+                        <a href={sponsor.link} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
+                          <img 
+                            src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                            alt={sponsor?.name || `Sponsor ${idx}`} 
+                            className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                          />
+                        </a>
+                      ) : (
+                        <img 
+                          src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                          alt={sponsor?.name || `Sponsor ${idx}`} 
+                          className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                        />
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
           </div>
+          <style>{`
+            @keyframes marquee {
+              from { transform: translateX(0); }
+              to { transform: translateX(-100%); }
+            }
+            .animate-marquee {
+              animation: marquee 25s linear infinite;
+            }
+            .animate-marquee:hover {
+              animation-play-state: paused;
+            }
+          `}</style>
       </section>
     </div>
   );
