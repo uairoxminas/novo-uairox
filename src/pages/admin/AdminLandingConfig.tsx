@@ -32,6 +32,9 @@ export default function AdminLandingConfig() {
     yt_link: '#',
     copyright: '© 2026 UAIROX Hybrid Racing. Todos os direitos reservados.'
   });
+  const [whatsappConfig, setWhatsappConfig] = useState(config?.whatsapp_support || {
+    whatsapp_link: "https://wa.me/5531999999999"
+  });
   const [squadPageConfig, setSquadPageConfig] = useState(config?.squad_page || {
     badge_text: 'Embaixadores Oficiais',
     title: 'O Motor do UAIROX',
@@ -61,6 +64,7 @@ export default function AdminLandingConfig() {
     if (config?.home_predictor_new) setPredictorConfig(config.home_predictor_new);
     if (config?.home_footer) setFooterConfig(config.home_footer);
     if (config?.squad_page) setSquadPageConfig(config.squad_page);
+    if (config?.whatsapp_support) setWhatsappConfig(config.whatsapp_support);
     
     // Migração em tempo de execução para os 3 tipos de prova (Race Types legados)
     if (config?.home_format_new) {
@@ -82,6 +86,7 @@ export default function AdminLandingConfig() {
   const handleSavePredictor = () => updateConfig.mutate({ key: "home_predictor_new", value: predictorConfig });
   const handleSaveFooter = () => updateConfig.mutate({ key: "home_footer", value: footerConfig });
   const handleSaveSquad = () => updateConfig.mutate({ key: "squad_page", value: squadPageConfig });
+  const handleSaveWhatsapp = () => updateConfig.mutate({ key: "whatsapp_support", value: whatsappConfig });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -808,6 +813,17 @@ export default function AdminLandingConfig() {
 
         <div className="flex justify-end pt-4 border-t border-dark-border mt-4">
           <button onClick={handleSaveSquad} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar SQUAD</button>
+        </div>
+      </div>
+
+      <div className="bg-[#121212] border border-[#262626] rounded-xl p-6 space-y-6">
+        <h2 className="text-xl font-bold text-brand-500 mb-4">Contato & WhatsApp</h2>
+        <div>
+          <label className="block text-sm font-bold text-zinc-400 mb-2">Link do WhatsApp (Menu Superior)</label>
+          <input type="text" placeholder="https://wa.me/5531999999999" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2 text-white" value={whatsappConfig?.whatsapp_link || ''} onChange={(e) => setWhatsappConfig(prev => ({...(prev || {}), whatsapp_link: e.target.value}) as any)} />
+        </div>
+        <div className="flex justify-end">
+          <button onClick={handleSaveWhatsapp} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar WhatsApp</button>
         </div>
       </div>
 
