@@ -135,6 +135,11 @@ export default function HomePage() {
                       </div>
                   </div>
 
+                  {/* Mobile-only banner */}
+                  <div className="lg:hidden mb-4 p-4 border border-brand-500/20 bg-brand-500/5 text-center font-bold text-brand-400 tracking-widest uppercase italic text-sm">
+                      {currentRaceType?.banner_text || '🔄 Sempre inicie com 1km de Corrida'}
+                  </div>
+
                   {currentStation && (
                       <div className="w-full lg:w-2/3">
                           <div className="bg-dark-card border border-dark-border p-5 md:p-8 lg:p-12 h-full flex flex-col justify-center relative overflow-hidden group">
