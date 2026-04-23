@@ -67,6 +67,12 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     setLoading(true);
     
+    if (!avatarFile) {
+      alert('Por favor, envie uma foto (avatar) para sua candidatura.');
+      setLoading(false);
+      return;
+    }
+    
     try {
       let finalAvatarUrl = '';
 
@@ -75,8 +81,6 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
         const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
         const filePath = `squad_avatars/${fileName}`;
 
-        // Using the same bucket structure as site-assets or a generic public one. We'll use 'kits' or 'site-assets'
-        // Trying site-assets since it's the default for site configs
         const { error: uploadError } = await supabase.storage
           .from('site-assets')
           .upload(filePath, avatarFile);
@@ -159,7 +163,7 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
                     </div>
                     <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </div>
-                  <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Sua Foto (Opcional)</p>
+                  <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Sua Foto (Obrigatória)</p>
                 </div>
 
                 <input
@@ -218,7 +222,8 @@ function ApplicationModal({ onClose }: { onClose: () => void }) {
                 <textarea
                   required
                   rows={4}
-                  placeholder="Por que você quer ser um embaixador UAIROX? Como você pode ajudar a comunidade a crescer?"
+                  maxLength={250}
+                  placeholder="Por que você quer ser um embaixador UAIROX? (Máx. 250 caracteres)"
                   value={formData.why_join}
                   onChange={(e) => setFormData({ ...formData, why_join: e.target.value })}
                   className="w-full bg-[#050505] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none resize-none"
@@ -303,44 +308,9 @@ export default function SquadPage() {
         </div>
       </section>
 
-      {/* Como Funciona */}
-      <section className="py-16 md:py-24 border-b border-dark-border bg-dark-bg/50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-black text-white uppercase italic">{squadConfig.benefits_title || 'Benefícios & Níveis'}</h2>
-            <p className="text-zinc-500 mt-2">{squadConfig.benefits_subtitle || 'Como funciona a mecânica do programa'}</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[
-              { id: 'bronze', label: squadConfig.tier_bronze_label || 'Bronze', desc: squadConfig.tier_bronze_desc || 'Acesso VIP + Descontos em Loja.', color: TIER_COLORS.bronze },
-              { id: 'prata', label: squadConfig.tier_prata_label || 'Prata', desc: squadConfig.tier_prata_desc || 'Isenção de inscrição em 1 evento.', color: TIER_COLORS.prata },
-              { id: 'ouro', label: squadConfig.tier_ouro_label || 'Ouro', desc: squadConfig.tier_ouro_desc || 'Kits exclusivos e Isenção Total.', color: TIER_COLORS.ouro },
-              { id: 'elite', label: squadConfig.tier_elite_label || 'Elite', desc: squadConfig.tier_elite_desc || 'Patrocínio Oficial UAIROX e Vagas.', color: TIER_COLORS.elite },
-            ].map((tier) => (
-              <div key={tier.id} className="bg-[#050505] border border-dark-border p-6 text-center hover:border-brand-500 transition-colors">
-                <div 
-                  className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 border-2"
-                  style={{ borderColor: tier.color, backgroundColor: `${tier.color}10`, color: tier.color }}
-                >
-                  <Award size={28} />
-                </div>
-                <h3 className="text-white font-black uppercase text-xl mb-2" style={{ color: tier.color }}>{tier.label}</h3>
-                <p className="text-zinc-400 text-sm font-inter">{tier.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Roster Grid */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-black text-white uppercase italic">O Esquadrão</h2>
-            <p className="text-zinc-500 mt-2">Nossos parceiros oficiais divididos por nível</p>
-          </div>
-
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[1, 2, 3, 4].map((i) => (
@@ -440,6 +410,36 @@ export default function SquadPage() {
               })}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Como Funciona */}
+      <section className="py-16 md:py-24 border-b border-dark-border bg-dark-bg/50">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black text-white uppercase italic">{squadConfig.benefits_title || 'Benefícios & Níveis'}</h2>
+            <p className="text-zinc-500 mt-2">{squadConfig.benefits_subtitle || 'Como funciona a mecânica do programa'}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[
+              { id: 'bronze', label: squadConfig.tier_bronze_label || 'Bronze', desc: squadConfig.tier_bronze_desc || 'Acesso VIP + Descontos em Loja.', color: TIER_COLORS.bronze },
+              { id: 'prata', label: squadConfig.tier_prata_label || 'Prata', desc: squadConfig.tier_prata_desc || 'Isenção de inscrição em 1 evento.', color: TIER_COLORS.prata },
+              { id: 'ouro', label: squadConfig.tier_ouro_label || 'Ouro', desc: squadConfig.tier_ouro_desc || 'Kits exclusivos e Isenção Total.', color: TIER_COLORS.ouro },
+              { id: 'elite', label: squadConfig.tier_elite_label || 'Elite', desc: squadConfig.tier_elite_desc || 'Patrocínio Oficial UAIROX e Vagas.', color: TIER_COLORS.elite },
+            ].map((tier) => (
+              <div key={tier.id} className="bg-[#050505] border border-dark-border p-6 text-center hover:border-brand-500 transition-colors">
+                <div 
+                  className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 border-2"
+                  style={{ borderColor: tier.color, backgroundColor: `${tier.color}10`, color: tier.color }}
+                >
+                  <Award size={28} />
+                </div>
+                <h3 className="text-white font-black uppercase text-xl mb-2" style={{ color: tier.color }}>{tier.label}</h3>
+                <p className="text-zinc-400 text-sm font-inter">{tier.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

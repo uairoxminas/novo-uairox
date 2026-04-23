@@ -18,6 +18,7 @@ interface Application {
   location: string;
   why_join: string;
   status: string;
+  avatar_url?: string;
 }
 
 interface SquadMember {
@@ -84,7 +85,8 @@ export default function AdminSquad() {
           bio: app.why_join.substring(0, 100),
           coupon_code: generatedCoupon,
           coupon_usage_count: 0,
-          is_active: true
+          is_active: true,
+          avatar_url: app.avatar_url || null
         }]);
 
       // 3. (Optional but recommended) Create the actual discount coupon if the table exists
