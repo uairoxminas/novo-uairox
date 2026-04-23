@@ -9,9 +9,14 @@ export interface PhotoGallery {
   title: string;
   description: string | null;
   cover_image_url: string | null;
-  price_single: number;
-  price_pack_5: number;
-  price_all: number;
+  price_single?: number;
+  price_pack_5?: number;
+  price_all?: number;
+  price_tier_1_4: number;
+  price_tier_5_9: number;
+  price_tier_10_19: number;
+  price_tier_20_29: number;
+  price_tier_30_plus: number;
   pix_key: string | null;
   payment_link: string | null;
   is_active: boolean;

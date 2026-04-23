@@ -19,25 +19,15 @@ function formatPrice(v: number) {
 }
 
 // ============ PRICE CALCULATOR ============
-function calculateCustomPrice(count: number): number {
-  const getExactPrice = (n: number) => {
-    let rem = n;
-    let t = 0;
-    t += Math.floor(rem / 30) * 250; rem %= 30;
-    t += Math.floor(rem / 20) * 200; rem %= 20;
-    t += Math.floor(rem / 10) * 120; rem %= 10;
-    t += Math.floor(rem / 5) * 80; rem %= 5;
-    t += rem * 20;
-    return t;
-  };
-
-  return Math.min(
-    getExactPrice(count),
-    getExactPrice(Math.ceil(count / 5) * 5),
-    getExactPrice(Math.ceil(count / 10) * 10),
-    getExactPrice(Math.ceil(count / 20) * 20),
-    getExactPrice(Math.ceil(count / 30) * 30)
-  );
+function calculateCustomPrice(gallery: PhotoGallery, count: number): number {
+  if (count === 0) return 0;
+  
+  // Use unit prices per tier based on volume
+  if (count >= 30) return count * (gallery.price_tier_30_plus || 9.90);
+  if (count >= 20) return count * (gallery.price_tier_20_29 || 14.90);
+  if (count >= 10) return count * (gallery.price_tier_10_19 || 19.90);
+  if (count >= 5) return count * (gallery.price_tier_5_9 || 25.90);
+  return count * (gallery.price_tier_1_4 || 29.90);
 }
 
 // ============ WATERMARKED PHOTO ============
@@ -290,7 +280,9 @@ function GalleryView({ gallery, onBack }: { gallery: PhotoGallery; onBack: () =>
     setSelectedPhotos(newSet);
   };
 
-  const currentTotal = useMemo(() => calculateCustomPrice(selectedPhotos.size), [selectedPhotos.size]);
+  const currentTotal = useMemo(() => {
+    return calculateCustomPrice(gallery, selectedPhotos.size);
+  }, [gallery, selectedPhotos.size]);
 
   return (
     <>
@@ -305,6 +297,30 @@ function GalleryView({ gallery, onBack }: { gallery: PhotoGallery; onBack: () =>
               {gallery.title}
             </h1>
             {gallery.description && <p className="text-dark-muted max-w-xl font-inter mb-6">{gallery.description}</p>}
+            
+            <div className="flex flex-wrap gap-2 mb-6">
+              <div className="flex flex-col bg-[#050505] border border-dark-border px-4 py-2 min-w-[100px] text-center">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">1-4 Fotos</span>
+                <span className="text-sm text-white font-black">{formatPrice(gallery.price_tier_1_4 || 29.9)}</span>
+              </div>
+              <div className="flex flex-col bg-[#050505] border border-dark-border px-4 py-2 min-w-[100px] text-center">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">5-9 Fotos</span>
+                <span className="text-sm text-white font-black">{formatPrice(gallery.price_tier_5_9 || 25.9)}</span>
+              </div>
+              <div className="flex flex-col bg-[#050505] border border-dark-border px-4 py-2 min-w-[100px] text-center">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">10-19 Fotos</span>
+                <span className="text-sm text-white font-black">{formatPrice(gallery.price_tier_10_19 || 19.9)}</span>
+              </div>
+              <div className="flex flex-col bg-[#050505] border border-dark-border px-4 py-2 min-w-[100px] text-center">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-0.5">20-29 Fotos</span>
+                <span className="text-sm text-white font-black">{formatPrice(gallery.price_tier_20_29 || 14.9)}</span>
+              </div>
+              <div className="flex flex-col bg-brand-500/10 border border-brand-500/50 px-4 py-2 min-w-[100px] text-center">
+                <span className="text-[10px] text-brand-500 font-bold uppercase tracking-widest mb-0.5">30 Fotos +</span>
+                <span className="text-sm text-brand-400 font-black">{formatPrice(gallery.price_tier_30_plus || 9.9)}</span>
+              </div>
+            </div>
+            
           </motion.div>
         </div>
       </section>
@@ -465,14 +481,27 @@ export default function GalleryPage() {
                         <Camera className="w-16 h-16 text-zinc-800" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h3 className="text-white font-black text-xl uppercase italic leading-tight mb-1">{gallery.title}</h3>
-                      <div className="flex items-center gap-3 text-xs text-zinc-400">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4">
+                      <h3 className="text-white font-black text-xl uppercase italic leading-tight mb-2">{gallery.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-zinc-400 mb-3">
                         <span className="flex items-center gap-1">
                           <Camera size={12} /> {gallery.photo_count || 0} fotos
                         </span>
-                        <span className="text-brand-400 font-bold">a partir de {formatPrice(gallery.price_single)}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        <span className="px-2 py-1 bg-[#111] border border-[#262626] text-[10px] text-zinc-400 uppercase font-bold tracking-wider rounded">
+                          1-4: {formatPrice(gallery.price_tier_1_4 || 29.9)}
+                        </span>
+                        <span className="px-2 py-1 bg-[#111] border border-[#262626] text-[10px] text-zinc-400 uppercase font-bold tracking-wider rounded">
+                          5-9: {formatPrice(gallery.price_tier_5_9 || 25.9)}
+                        </span>
+                        <span className="px-2 py-1 bg-[#111] border border-[#262626] text-[10px] text-zinc-400 uppercase font-bold tracking-wider rounded">
+                          10-19: {formatPrice(gallery.price_tier_10_19 || 19.9)}
+                        </span>
+                        <span className="px-2 py-1 bg-[#111] border border-[#262626] text-[10px] text-brand-400 uppercase font-bold tracking-wider rounded border-brand-500/30">
+                          30+: {formatPrice(gallery.price_tier_30_plus || 9.9)}/cada
+                        </span>
                       </div>
                     </div>
                   </div>

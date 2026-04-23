@@ -31,9 +31,11 @@ function GalleryForm({ gallery, onClose }: { gallery?: PhotoGallery | null; onCl
   const [description, setDescription] = useState(gallery?.description || '');
   const [eventId, setEventId] = useState(gallery?.event_id || '');
   const [coverUrl, setCoverUrl] = useState(gallery?.cover_image_url || '');
-  const [priceSingle, setPriceSingle] = useState(gallery?.price_single?.toString() || '29.90');
-  const [pricePack5, setPricePack5] = useState(gallery?.price_pack_5?.toString() || '99.90');
-  const [priceAll, setPriceAll] = useState(gallery?.price_all?.toString() || '149.90');
+  const [priceTier1_4, setPriceTier1_4] = useState(gallery?.price_tier_1_4?.toString() || '29.90');
+  const [priceTier5_9, setPriceTier5_9] = useState(gallery?.price_tier_5_9?.toString() || '25.90');
+  const [priceTier10_19, setPriceTier10_19] = useState(gallery?.price_tier_10_19?.toString() || '19.90');
+  const [priceTier20_29, setPriceTier20_29] = useState(gallery?.price_tier_20_29?.toString() || '14.90');
+  const [priceTier30Plus, setPriceTier30Plus] = useState(gallery?.price_tier_30_plus?.toString() || '9.90');
   const [pixKey, setPixKey] = useState(gallery?.pix_key || '');
   const [paymentLink, setPaymentLink] = useState(gallery?.payment_link || '');
   const [isActive, setIsActive] = useState(gallery?.is_active ?? true);
@@ -46,9 +48,11 @@ function GalleryForm({ gallery, onClose }: { gallery?: PhotoGallery | null; onCl
       description: description.trim() || null,
       event_id: eventId || null,
       cover_image_url: coverUrl.trim() ? extractDriveFileId(coverUrl.trim()) : null,
-      price_single: parseFloat(priceSingle) || 29.90,
-      price_pack_5: parseFloat(pricePack5) || 99.90,
-      price_all: parseFloat(priceAll) || 149.90,
+      price_tier_1_4: parseFloat(priceTier1_4) || 29.90,
+      price_tier_5_9: parseFloat(priceTier5_9) || 25.90,
+      price_tier_10_19: parseFloat(priceTier10_19) || 19.90,
+      price_tier_20_29: parseFloat(priceTier20_29) || 14.90,
+      price_tier_30_plus: parseFloat(priceTier30Plus) || 9.90,
       pix_key: pixKey.trim() || null,
       payment_link: paymentLink.trim() || null,
       is_active: isActive,
@@ -95,18 +99,26 @@ function GalleryForm({ gallery, onClose }: { gallery?: PhotoGallery | null; onCl
 
           <div className="border-t border-[#262626] pt-5">
             <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">💰 Preços</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">1 Foto (R$)</label>
-                <input type="number" step="0.01" value={priceSingle} onChange={(e) => setPriceSingle(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2" title="1-4 Fotos">1-4 FOTOS</label>
+                <input type="number" step="0.01" value={priceTier1_4} onChange={(e) => setPriceTier1_4(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">5 Fotos (R$)</label>
-                <input type="number" step="0.01" value={pricePack5} onChange={(e) => setPricePack5(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2" title="5-9 Fotos">5-9 FOTOS</label>
+                <input type="number" step="0.01" value={priceTier5_9} onChange={(e) => setPriceTier5_9(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Todas (R$)</label>
-                <input type="number" step="0.01" value={priceAll} onChange={(e) => setPriceAll(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2" title="10-19 Fotos">10-19 FOTOS</label>
+                <input type="number" step="0.01" value={priceTier10_19} onChange={(e) => setPriceTier10_19(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2" title="20-29 Fotos">20-29 FOTOS</label>
+                <input type="number" step="0.01" value={priceTier20_29} onChange={(e) => setPriceTier20_29(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2" title="30 Fotos +">30 FOTOS +</label>
+                <input type="number" step="0.01" value={priceTier30Plus} onChange={(e) => setPriceTier30Plus(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white text-sm focus:border-[#EDAC02] outline-none" />
               </div>
             </div>
           </div>
