@@ -200,10 +200,17 @@ export default function AdminLandingConfig() {
                 link: ''
               });
             }
+
+            // Auto-save
+            setTimeout(() => {
+              updateConfig.mutate({ key: "home_sponsors_new", value: up });
+            }, 100);
+
             return up as any;
           });
 
           setIsUploading(false);
+          alert("✓ Logo processada e salva com sucesso!");
         };
       };
     } catch (error: any) {

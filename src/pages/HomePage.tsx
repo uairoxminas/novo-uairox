@@ -290,49 +290,66 @@ export default function HomePage() {
               <div className="w-full inline-flex flex-nowrap overflow-hidden [mask-image:_linear-gradient(to_right,transparent_0,_black_128px,_black_calc(100%-128px),transparent_100%)]">
                 {/* 
                   O truque para animação infinita perfeita: duas listas idênticas deslizando.
+                  Se houver poucos patrocinadores, precisamos duplicar para preencher a tela.
                 */}
-                <ul className="flex items-center justify-center md:justify-start [&_li]:mx-8 [&_img]:max-w-none animate-marquee">
-                  {(config?.home_sponsors_new?.sponsors?.length ? config.home_sponsors_new.sponsors : [1, 2, 3, 4, 5, 6]).map((sponsor: any, idx: number) => (
-                    <li key={sponsor?.id || idx} className="flex-shrink-0">
-                      {sponsor?.link ? (
-                        <a href={sponsor.link} target="_blank" rel="noopener noreferrer">
-                          <img 
-                            src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
-                            alt={sponsor?.name || `Sponsor ${idx}`} 
-                            className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
-                          />
-                        </a>
-                      ) : (
-                        <img 
-                          src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
-                          alt={sponsor?.name || `Sponsor ${idx}`} 
-                          className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <ul className="flex items-center justify-center md:justify-start [&_li]:mx-8 [&_img]:max-w-none animate-marquee" aria-hidden="true">
-                  {(config?.home_sponsors_new?.sponsors?.length ? config.home_sponsors_new.sponsors : [1, 2, 3, 4, 5, 6]).map((sponsor: any, idx: number) => (
-                    <li key={`clone-${sponsor?.id || idx}`} className="flex-shrink-0">
-                      {sponsor?.link ? (
-                        <a href={sponsor.link} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
-                          <img 
-                            src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
-                            alt={sponsor?.name || `Sponsor ${idx}`} 
-                            className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
-                          />
-                        </a>
-                      ) : (
-                        <img 
-                          src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
-                          alt={sponsor?.name || `Sponsor ${idx}`} 
-                          className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                {(() => {
+                  const baseSponsors = config?.home_sponsors_new?.sponsors?.length 
+                    ? config.home_sponsors_new.sponsors 
+                    : [1, 2, 3, 4, 5, 6];
+                  
+                  // Multiplicar o array se for muito pequeno para o marquee não quebrar
+                  let displaySponsors = [...baseSponsors];
+                  while (displaySponsors.length < 8) {
+                    displaySponsors = [...displaySponsors, ...baseSponsors];
+                  }
+
+                  return (
+                    <>
+                      <ul className="flex items-center justify-center md:justify-start [&_li]:mx-8 [&_img]:max-w-none animate-marquee">
+                        {displaySponsors.map((sponsor: any, idx: number) => (
+                          <li key={`a-${sponsor?.id || idx}-${idx}`} className="flex-shrink-0">
+                            {sponsor?.link ? (
+                              <a href={sponsor.link} target="_blank" rel="noopener noreferrer">
+                                <img 
+                                  src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                                  alt={sponsor?.name || `Sponsor ${idx}`} 
+                                  className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                                />
+                              </a>
+                            ) : (
+                              <img 
+                                src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                                alt={sponsor?.name || `Sponsor ${idx}`} 
+                                className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                              />
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      <ul className="flex items-center justify-center md:justify-start [&_li]:mx-8 [&_img]:max-w-none animate-marquee" aria-hidden="true">
+                        {displaySponsors.map((sponsor: any, idx: number) => (
+                          <li key={`b-${sponsor?.id || idx}-${idx}`} className="flex-shrink-0">
+                            {sponsor?.link ? (
+                              <a href={sponsor.link} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
+                                <img 
+                                  src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                                  alt={sponsor?.name || `Sponsor ${idx}`} 
+                                  className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                                />
+                              </a>
+                            ) : (
+                              <img 
+                                src={sponsor?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'%3E%3Crect width='120' height='40' fill='rgba(0,0,0,0.1)' rx='4'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23000' font-family='sans-serif' font-weight='bold' font-size='12'%3ELOGO%3C/text%3E%3C/svg%3E"} 
+                                alt={sponsor?.name || `Sponsor ${idx}`} 
+                                className="h-12 md:h-16 object-contain brightness-0 hover:brightness-100 transition-all duration-300" 
+                              />
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  );
+                })()}
               </div>
           </div>
           <style>{`
