@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
 import { usePublicEvents } from '@/hooks/useEvents';
-import { Play } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function HomePage() {
   const { data: config, isLoading } = useSiteConfig();
@@ -116,7 +116,8 @@ export default function HomePage() {
               </div>
 
               <div className="flex flex-col lg:flex-row gap-12">
-                  <div className="w-full lg:w-1/3 flex flex-col">
+                  {/* Station List - Hidden on mobile, visible on desktop */}
+                  <div className="hidden lg:flex w-full lg:w-1/3 flex-col">
                       <div className="mb-6 p-4 border border-brand-500/20 bg-brand-500/5 text-center font-bold text-brand-400 tracking-widest uppercase italic">
                           {currentRaceType?.banner_text || '🔄 Sempre inicie com 1km de Corrida'}
                       </div>
@@ -125,7 +126,7 @@ export default function HomePage() {
                               <button 
                                 key={station.id}
                                 onClick={() => setActiveStation(station.id)}
-                                className={`station-btn text-left p-3 md:p-4 border-l-4 text-dark-muted hover:bg-dark-card transition-all flex items-center gap-3 md:gap-4 uppercase font-bold tracking-widest text-xs md:text-sm ${activeStation === station.id ? 'active border-brand-500' : 'border-dark-border'}`}
+                                className={`station-btn text-left p-4 border-l-4 text-dark-muted hover:bg-dark-card transition-all flex items-center gap-4 uppercase font-bold tracking-widest text-sm ${activeStation === station.id ? 'active border-brand-500' : 'border-dark-border'}`}
                               >
                                   <span className="station-number w-8 h-8 flex items-center justify-center bg-dark-bg border border-dark-border text-xs font-black rounded-sm transition-colors">{station.id}</span>
                                   {station.name}
@@ -166,7 +167,7 @@ export default function HomePage() {
                                       <div className="flex items-center">
                                           {currentStation.rules_link ? (
                                               <a href={currentStation.rules_link} target="_blank" rel="noopener noreferrer" className="bg-brand-500 hover:bg-brand-400 text-dark-bg w-full py-4 px-4 rounded font-black uppercase tracking-widest text-center transition-colors shadow-lg flex items-center justify-center gap-2 italic skew-x-[-10deg]">
-                                                  <span className="skew-x-[10deg] text-sm truncate">▶ Ver Regras / Vídeo</span>
+                                                  <span className="skew-x-[10deg] text-sm truncate">▶ Vídeo</span>
                                               </a>
                                           ) : (
                                               <div className="border-l-2 border-zinc-700 pl-4 bg-dark-bg/30 backdrop-blur-sm p-3 rounded-r-lg w-full">
@@ -180,6 +181,33 @@ export default function HomePage() {
                                   <p className="text-zinc-300 text-lg md:text-xl leading-relaxed font-inter font-medium bg-dark-bg/40 backdrop-blur-md p-4 rounded-lg border border-white/5 shadow-2xl">
                                       {currentStation.desc}
                                   </p>
+                              </div>
+
+                              {/* Mobile Carousel Arrows */}
+                              <div className="flex lg:hidden items-center justify-between absolute bottom-4 left-4 right-4 z-20">
+                                <button
+                                  onClick={() => {
+                                    const idx = stations.findIndex(s => s.id === activeStation);
+                                    const prev = idx > 0 ? stations[idx - 1].id : stations[stations.length - 1].id;
+                                    setActiveStation(prev);
+                                  }}
+                                  className="bg-dark-bg/80 hover:bg-brand-500 hover:text-black text-white p-2 border border-dark-border transition-colors shadow-lg"
+                                >
+                                  <ChevronLeft size={20} />
+                                </button>
+                                <div className="bg-dark-bg/80 text-white text-xs font-black px-3 py-1.5 border border-dark-border shadow-lg uppercase tracking-widest">
+                                  {stations.findIndex(s => s.id === activeStation) + 1} / {stations.length}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const idx = stations.findIndex(s => s.id === activeStation);
+                                    const next = idx < stations.length - 1 ? stations[idx + 1].id : stations[0].id;
+                                    setActiveStation(next);
+                                  }}
+                                  className="bg-dark-bg/80 hover:bg-brand-500 hover:text-black text-white p-2 border border-dark-border transition-colors shadow-lg"
+                                >
+                                  <ChevronRight size={20} />
+                                </button>
                               </div>
                           </div>
                       </div>
