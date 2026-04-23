@@ -39,8 +39,10 @@ export default function AdminLocations() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      toast.error('Erro ao buscar parceiros');
+      console.error("Fetch Locations Error:", error);
+      toast.error('Erro ao buscar parceiros: ' + error.message);
     } else {
+      console.log("Fetched locations from DB:", data);
       setLocations((data as any) || []);
     }
     setLoading(false);

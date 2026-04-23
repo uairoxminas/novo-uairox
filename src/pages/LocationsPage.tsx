@@ -140,9 +140,9 @@ export default function LocationsPage() {
                     <Star className="text-brand-500 fill-brand-500" size={24} />
                     UAIROX Experience
                   </h2>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {featuredLocations.map((loc, idx) => (
-                      <FeaturedLocationCard key={loc.id} location={loc} index={idx} />
+                      <LocationCard key={loc.id} location={loc} index={idx} isFeatured={true} />
                     ))}
                   </div>
                 </div>
@@ -157,7 +157,7 @@ export default function LocationsPage() {
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {regularLocations.map((loc, idx) => (
-                      <RegularLocationCard key={loc.id} location={loc} index={idx} />
+                      <LocationCard key={loc.id} location={loc} index={idx} />
                     ))}
                   </div>
                 </div>
@@ -177,106 +177,67 @@ export default function LocationsPage() {
 
 // --- SUBCOMPONENTS ---
 
-function FeaturedLocationCard({ location, index }: { location: TrainingLocation, index: number }) {
+function LocationCard({ location, index, isFeatured }: { location: TrainingLocation, index: number, isFeatured?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className="bg-[#111] border border-brand-500/30 p-6 flex flex-col group relative overflow-hidden skew-x-[-2deg]"
+      className={`bg-[#111] flex flex-col group relative overflow-hidden skew-x-[-2deg] transition-all hover:border-zinc-500 ${isFeatured ? 'border border-brand-500/50 shadow-[0_0_30px_-10px_rgba(237,172,2,0.2)]' : 'border border-dark-border'}`}
     >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-150" />
       <div className="skew-x-[2deg] relative z-10 flex flex-col h-full">
-        
-        {/* Top Info */}
-        <div className="flex items-start gap-4 mb-6">
-          <div className="w-20 h-20 bg-dark-bg border border-dark-border flex items-center justify-center shrink-0">
-            {location.logo_url ? (
-              <img src={location.logo_url} alt={location.name} className="w-full h-full object-contain p-2" />
-            ) : (
-              <MapPin size={32} className="text-zinc-600" />
+        {/* Photo Square */}
+        <div className="w-full aspect-square bg-dark-bg relative overflow-hidden border-b border-dark-border">
+           {location.photos && location.photos.length > 0 ? (
+             <img src={location.photos[0]} alt={location.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+           ) : (
+             <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
+               <ImageIcon size={48} className="text-zinc-800" />
+             </div>
+           )}
+
+           {/* Logo Overlay Top Left */}
+           <div className="absolute top-4 left-4 w-20 h-20 bg-dark-bg border border-dark-border flex items-center justify-center p-2 shadow-xl">
+             {location.logo_url ? (
+               <img src={location.logo_url} alt="Logo" className="w-full h-full object-contain" />
+             ) : (
+               <MapPin size={24} className="text-zinc-600" />
+             )}
+           </div>
+
+           {/* Feature Badge if isFeatured */}
+           {isFeatured && (
+             <div className="absolute top-4 right-4 bg-brand-500 text-black text-xs font-black uppercase italic px-3 py-1.5 skew-x-[-10deg]">
+               <span className="skew-x-[10deg] block flex items-center gap-1"><Star size={12} className="fill-black" /> Experience</span>
+             </div>
+           )}
+        </div>
+
+        {/* Info Area */}
+        <div className="p-5 flex flex-col flex-1">
+          <h3 className="font-black text-xl text-white uppercase italic leading-tight mb-1 truncate">{location.name}</h3>
+          <p className="text-xs font-bold text-brand-500 uppercase tracking-widest flex items-center gap-1 mb-2">
+            <MapPin size={12} /> {location.city} - {location.state}
+          </p>
+          <p className="text-sm text-zinc-400 line-clamp-2 flex-1">{location.address}</p>
+
+          <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-dark-border">
+            {location.whatsapp && (
+              <a href={`https://wa.me/55${location.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-white hover:text-brand-500 transition-colors">
+                <MessageCircle size={14} /> WhatsApp
+              </a>
+            )}
+            {location.instagram && (
+              <a href={`https://instagram.com/${location.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-white hover:text-brand-500 transition-colors">
+                <AtSign size={14} /> Insta
+              </a>
+            )}
+            {location.website && (
+              <a href={location.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs font-bold text-white hover:text-brand-500 transition-colors">
+                <Globe size={14} /> Site
+              </a>
             )}
           </div>
-          <div>
-            <h3 className="font-black text-2xl text-white uppercase italic leading-tight mb-1">{location.name}</h3>
-            <p className="text-sm font-bold text-brand-500 uppercase tracking-widest flex items-center gap-1">
-              <MapPin size={14} /> {location.city} - {location.state}
-            </p>
-            <p className="text-sm text-zinc-400 mt-1">{location.address}</p>
-          </div>
-        </div>
-
-        {/* Photos Grid */}
-        {location.photos && location.photos.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 mb-6 mt-auto">
-            {location.photos.map((photo, i) => (
-              <div key={i} className="aspect-square bg-dark-bg border border-dark-border overflow-hidden">
-                <img src={photo} alt={`${location.name} ${i}`} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-300" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Links */}
-        <div className="flex flex-wrap gap-3 mt-auto pt-4 border-t border-dark-border">
-          {location.whatsapp && (
-            <a href={`https://wa.me/55${location.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-bold text-white hover:text-brand-500 transition-colors">
-              <MessageCircle size={16} /> WhatsApp
-            </a>
-          )}
-          {location.instagram && (
-            <a href={`https://instagram.com/${location.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-bold text-white hover:text-brand-500 transition-colors">
-              <AtSign size={16} /> Instagram
-            </a>
-          )}
-          {location.website && (
-            <a href={location.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-bold text-white hover:text-brand-500 transition-colors">
-              <Globe size={16} /> Site
-            </a>
-          )}
-        </div>
-
-      </div>
-    </motion.div>
-  );
-}
-
-function RegularLocationCard({ location, index }: { location: TrainingLocation, index: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className="bg-[#111] border border-dark-border p-5 flex flex-col group hover:border-zinc-500 transition-colors skew-x-[-2deg]"
-    >
-      <div className="skew-x-[2deg] flex flex-col h-full">
-        <div className="flex items-start gap-4 mb-4">
-          <div className="w-14 h-14 bg-dark-bg border border-dark-border flex items-center justify-center shrink-0">
-            {location.logo_url ? (
-              <img src={location.logo_url} alt={location.name} className="w-full h-full object-contain p-1 grayscale group-hover:grayscale-0 transition-all" />
-            ) : (
-              <MapPin size={24} className="text-zinc-600" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-black text-lg text-white uppercase italic leading-tight truncate">{location.name}</h3>
-            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest truncate">
-              {location.city} - {location.state}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex gap-4 mt-auto pt-4 border-t border-dark-border">
-          {location.whatsapp && (
-            <a href={`https://wa.me/55${location.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-brand-500 transition-colors">
-              <MessageCircle size={18} />
-            </a>
-          )}
-          {location.instagram && (
-            <a href={`https://instagram.com/${location.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-brand-500 transition-colors">
-              <AtSign size={18} />
-            </a>
-          )}
         </div>
       </div>
     </motion.div>
