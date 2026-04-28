@@ -645,7 +645,7 @@ export function useEventExpenseCategories(eventId?: string) {
   return useQuery({
     queryKey: ["event-expense-categories", eventId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("event_expense_categories")
         .select("*")
         .eq("event_id", eventId!)
@@ -661,7 +661,7 @@ export function useCreateExpenseCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cat: { event_id: string; name: string; planned_amount: number }) => {
-      const { data, error } = await supabase.from("event_expense_categories").insert(cat).select().single();
+      const { data, error } = await (supabase as any).from("event_expense_categories").insert(cat).select().single();
       if (error) throw error;
       return data;
     },
@@ -677,7 +677,7 @@ export function useDeleteExpenseCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, event_id }: { id: string; event_id: string }) => {
-      const { error } = await supabase.from("event_expense_categories").delete().eq("id", id);
+      const { error } = await (supabase as any).from("event_expense_categories").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {
@@ -693,7 +693,7 @@ export function useEventExpenses(eventId?: string) {
   return useQuery({
     queryKey: ["event-expenses", eventId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("event_expenses")
         .select("*, event_expense_categories(name)")
         .eq("event_id", eventId!)
@@ -709,7 +709,7 @@ export function useCreateEventExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (expense: { event_id: string; category_id?: string | null; description: string; amount: number; expense_date: string; status: string }) => {
-      const { data, error } = await supabase.from("event_expenses").insert(expense).select().single();
+      const { data, error } = await (supabase as any).from("event_expenses").insert(expense).select().single();
       if (error) throw error;
       return data;
     },
@@ -725,7 +725,7 @@ export function useUpdateEventExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, event_id, ...updates }: { id: string; event_id: string; [key: string]: any }) => {
-      const { error } = await supabase.from("event_expenses").update(updates as any).eq("id", id);
+      const { error } = await (supabase as any).from("event_expenses").update(updates as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {
@@ -740,7 +740,7 @@ export function useDeleteEventExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, event_id }: { id: string; event_id: string }) => {
-      const { error } = await supabase.from("event_expenses").delete().eq("id", id);
+      const { error } = await (supabase as any).from("event_expenses").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {

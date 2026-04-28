@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { useEventExpenseCategories, useCreateExpenseCategory, useDeleteExpenseCategory, useEventExpenses, useCreateEventExpense, useDeleteEventExpense, useEventStats } from '@/hooks/useEventConfig';
 
 const cardClass = "bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl";
@@ -25,15 +26,15 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
   const revenue = eventStats?.revenue || 0;
   
   // Calcula o executado por categoria
-  const catExecution = categories.map(cat => {
-    const executed = expenses.filter(e => e.category_id === cat.id).reduce((sum, e) => sum + Number(e.amount), 0);
+  const catExecution = categories.map((cat: any) => {
+    const executed = expenses.filter((e: any) => e.category_id === cat.id).reduce((sum: number, e: any) => sum + Number(e.amount), 0);
     const progress = cat.planned_amount > 0 ? (executed / Number(cat.planned_amount)) * 100 : 0;
     return { ...cat, executed, progress };
   });
 
-  const totalPlanned = categories.reduce((sum, cat) => sum + Number(cat.planned_amount), 0);
-  const totalExecuted = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const totalPaid = expenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalPlanned = categories.reduce((sum: number, cat: any) => sum + Number(cat.planned_amount), 0);
+  const totalExecuted = expenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+  const totalPaid = expenses.filter((e: any) => e.status === 'paid').reduce((sum: number, e: any) => sum + Number(e.amount), 0);
   const netProfit = revenue - totalPaid;
 
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -102,7 +103,7 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
           <div className="space-y-4">
             {catExecution.length === 0 ? (
               <p className="text-zinc-500 text-sm text-center py-4">Nenhuma área de orçamento cadastrada.</p>
-            ) : catExecution.map(cat => (
+            ) : catExecution.map((cat: any) => (
               <div key={cat.id} className="bg-[#111] border border-[#262626] rounded-lg p-4 group relative">
                 <button 
                   onClick={() => deleteCategory.mutate({ id: cat.id, event_id: eventId })}
@@ -221,7 +222,7 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
                 <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Área (Categoria)</label>
                 <select required className={inputClass} value={newExp.category_id} onChange={e => setNewExp({ ...newExp, category_id: e.target.value })}>
                   <option value="">Selecione...</option>
-                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  {categories.map((cat: any) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
               </div>
               <div>
