@@ -60,6 +60,7 @@ function EventFormDialog({
   const [imagePreview, setImagePreview] = useState<string | null>(event?.image_url || null);
   const [uploading, setUploading] = useState(false);
   const [whatsappLink, setWhatsappLink] = useState(event?.whatsapp_group_link || '');
+  const [slug, setSlug] = useState((event as any)?.slug || '');
   const [requireShirtSize, setRequireShirtSize] = useState((event as any)?.require_shirt_size || false);
   const [eventType, setEventType] = useState<EventType>((event?.event_type as EventType) || 'oficial');
 
@@ -102,6 +103,7 @@ function EventFormDialog({
       event_type: eventType,
       image_url: finalImageUrl.trim() || null,
       whatsapp_group_link: whatsappLink.trim() || null,
+      slug: slug.trim() || null,
       require_shirt_size: requireShirtSize,
     };
     if (endDate) payload.end_date = new Date(endDate).toISOString();
@@ -274,6 +276,22 @@ function EventFormDialog({
               placeholder="https://chat.whatsapp.com/..."
               className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors"
             />
+          </div>
+
+          {/* Slug */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Slug da URL (Link Amigável)</label>
+            <div className="flex items-center gap-0">
+              <span className="bg-[#111] border border-r-0 border-[#262626] rounded-l-lg px-3 py-3 text-sm text-zinc-500 whitespace-nowrap select-none">uairox.com.br/evento/</span>
+              <input
+                type="text"
+                value={slug}
+                onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="ex: cfit"
+                className="flex-1 bg-[#050505] border border-[#262626] rounded-r-lg p-3 text-white text-sm font-mono placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors"
+              />
+            </div>
+            <p className="text-[10px] text-zinc-500 mt-1.5">Opcional. Apenas letras minúsculas, números e hífens. Ex: <span className="text-zinc-400 font-mono">cfit</span>, <span className="text-zinc-400 font-mono">uairox-7-edicao</span></p>
           </div>
 
           {/* Shirt Size Toggle */}

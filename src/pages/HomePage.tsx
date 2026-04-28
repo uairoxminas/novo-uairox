@@ -685,7 +685,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
       badge_text: isOpen ? (batchName || 'Inscrições Abertas') : isPlanning ? planningBadge : isClosed ? 'Encerrado' : 'Em Breve',
       is_disabled: isClosed,
       btn_text: isOpen ? 'Garantir Vaga' : isPlanning ? 'Em Breve' : 'Aguarde',
-      btn_link: isOpen ? `/evento/${ev.id}` : isPlanning ? `/evento/${ev.id}` : null,
+      btn_link: isOpen ? `/evento/${ev.slug || ev.id}` : isPlanning ? `/evento/${ev.slug || ev.id}` : null,
     };
   };
 

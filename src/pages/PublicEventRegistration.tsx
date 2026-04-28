@@ -4,36 +4,60 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 // ============ DATA HOOK ============
-function usePublicEvent(eventId?: string) {
+function usePublicEvent(idOrSlug?: string) {
   const [event, setEvent] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [kits, setKits] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resolvedId, setResolvedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!eventId) return;
-    async function load() {
+    if (!idOrSlug) return;
+    async function resolveEvent() {
       setLoading(true);
-      const [evRes, catRes, batchRes, kitRes, stgRes] = await Promise.all([
-        supabase.from('events').select('*').eq('id', eventId as string).single(),
-        supabase.from('categories').select('*').eq('event_id', eventId as string).order('created_at'),
-        supabase.from('price_batches').select('*').eq('event_id', eventId as string).eq('active', true).order('order_index'),
-        supabase.from('athlete_kits').select('*').eq('event_id', eventId as string).eq('active', true).order('created_at'),
-        supabase.from('event_stages').select('*').eq('event_id', eventId as string).order('order_index'),
+      // Check if it looks like a UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug!);
+      
+      let evData: any = null;
+      
+      if (isUUID) {
+        // Direct UUID lookup
+        const { data } = await supabase.from('events').select('*').eq('id', idOrSlug!).single();
+        evData = data;
+      } else {
+        // Try slug lookup first
+        const { data } = await (supabase as any).from('events').select('*').eq('slug', idOrSlug!).single();
+        evData = data;
+      }
+      
+      if (!evData) {
+        setEvent(null);
+        setLoading(false);
+        return;
+      }
+      
+      setEvent(evData);
+      setResolvedId(evData.id);
+      
+      const eid = evData.id;
+      const [catRes, batchRes, kitRes, stgRes] = await Promise.all([
+        supabase.from('categories').select('*').eq('event_id', eid).order('created_at'),
+        supabase.from('price_batches').select('*').eq('event_id', eid).eq('active', true).order('order_index'),
+        supabase.from('athlete_kits').select('*').eq('event_id', eid).eq('active', true).order('created_at'),
+        supabase.from('event_stages').select('*').eq('event_id', eid).order('order_index'),
       ]);
-      setEvent(evRes.data);
       setCategories(catRes.data || []);
       setBatches(batchRes.data || []);
       setKits(kitRes.data || []);
       setStages(stgRes.data || []);
       setLoading(false);
     }
-    load();
-  }, [eventId]);
+    resolveEvent();
+  }, [idOrSlug]);
 
-  return { event, categories, batches, kits, stages, loading };
+  return { event, categories, batches, kits, stages, loading, resolvedId };
 }
 
 // ============ HELPERS ============
@@ -90,7 +114,7 @@ function getDaysUntil(dateStr: string) {
 // ============ MAIN PAGE ============
 export default function PublicEventRegistration() {
   const { id } = useParams<{ id: string }>();
-  const { event, categories, batches, kits, stages, loading } = usePublicEvent(id);
+  const { event, categories, batches, kits, stages, loading, resolvedId } = usePublicEvent(id);
   const [showRegistration, setShowRegistration] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const registrationRef = useRef<HTMLDivElement>(null);
@@ -427,7 +451,7 @@ export default function PublicEventRegistration() {
       {(showRegistration || event.status !== 'open') && (
         <div ref={registrationRef}>
           <RegistrationForm
-            eventId={id!}
+            eventId={resolvedId!}
             event={event}
             categories={categories}
             batches={batches}

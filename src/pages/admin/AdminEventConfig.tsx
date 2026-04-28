@@ -2271,6 +2271,19 @@ export default function AdminEventConfig() {
                 <span>📍 {event.location}</span>
                 <span>{daysUntil > 0 ? `⏱️ ${daysUntil} dias` : daysUntil === 0 ? '🔥 HOJE!' : '✅ Encerrado'}</span>
               </div>
+              {((event as any).slug || event.id) && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[10px] text-zinc-600 font-mono">🔗 uairox.com.br/evento/{(event as any).slug || event.id}</span>
+                  <button
+                    onClick={() => {
+                      const url = `https://www.uairox.com.br/evento/${(event as any).slug || event.id}`;
+                      navigator.clipboard.writeText(url);
+                      toast.success('Link copiado!');
+                    }}
+                    className="text-[10px] text-[#EDAC02] hover:underline font-bold"
+                  >Copiar</button>
+                </div>
+              )}
             </div>
           </div>
         </div>
