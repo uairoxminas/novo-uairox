@@ -1060,6 +1060,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const [editStatus, setEditStatus] = useState('');
   const [editTeamName, setEditTeamName] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
+  const [editTotalPaid, setEditTotalPaid] = useState<number>(0);
   type AthEdit = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; gym: string; photo_url: string; };
   const [editAthletes, setEditAthletes] = useState<AthEdit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -1229,6 +1230,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     setEditStatus(reg.status);
     setEditTeamName(reg.team_name||'');
     setEditCategoryId(reg.category_id||'');
+    setEditTotalPaid(reg.total_paid || 0);
     setEditingReg(reg);
   };
   const updateEditAthlete = (i: number, field: keyof AthEdit, val: string) => { setEditAthletes(prev => { const a=[...prev]; a[i]={...a[i],[field]:val}; return a; }); };
@@ -1257,6 +1259,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     setEditStatus('pending');
     setEditTeamName('');
     setEditCategoryId('');
+    setEditTotalPaid(0);
     setEditingReg({ id: 'new' });
   };
 
@@ -1317,6 +1320,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
       athlete_instagram: a1.instagram||null, athlete_birth_date: a1.birth_date||null,
       athlete_gender: a1.gender||null, athlete_gym: a1.gym||null, athlete_photo_url: a1.photo_url||null,
       status: editStatus || 'pending', bib_number: editBibNumber ? parseInt(editBibNumber) : null,
+      total_paid: editTotalPaid,
       team_name: editTeamName||null, team_members: teamMembers,
       category_id: editCategoryId,
     } as any;
@@ -1407,8 +1411,8 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               const st = statusConfig[reg.status] || statusConfig.pending;
               const isTeamCat = ((reg.categories as any)?.team_size || 1) > 1;
               const displayName = isTeamCat ? (reg.team_name || reg.athlete_name || '—') : (reg.athlete_name || '—');
-              const photoUrl = reg.athlete_photo_url || null;
               const receiptUrl = reg.pix_receipt_url || null;
+              const allPhotos = [reg.athlete_photo_url, ...(reg.team_members?.map((m: any) => m.photo_url) || [])].filter(Boolean);
               
               return (
                 <tr key={reg.id} onClick={() => openEditModal(reg)} className="border-b border-[#0f0f0f] hover:bg-[#0a0a0a] transition-colors cursor-pointer">
@@ -1421,7 +1425,15 @@ function InscricoesTab({ eventId }: { eventId: string }) {
                   <td className="py-3 px-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${st.color}`}>{st.label}</span></td>
                   <td className="py-3 px-3 text-right text-[#EDAC02] font-bold">R$ {(reg.total_paid || 0).toFixed(2)}</td>
                   <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
-                    {photoUrl ? <a href={photoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 rounded transition-colors" title="Baixar Foto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></a> : <span className="text-zinc-700">—</span>}
+                    {allPhotos.length > 0 ? (
+                      <div className="flex items-center justify-center gap-1 flex-wrap">
+                        {allPhotos.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 rounded transition-colors" title={`Baixar Foto ${i + 1}`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                          </a>
+                        ))}
+                      </div>
+                    ) : <span className="text-zinc-700">—</span>}
                   </td>
                   <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
                     {receiptUrl ? <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded transition-colors" title="Ver Comprovante"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></a> : <span className="text-zinc-700">—</span>}
@@ -1450,10 +1462,13 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none">
               <option value="pending">Pendente</option><option value="confirmed">Confirmado</option><option value="cancelled">Cancelado</option>
             </select></div>
-            <div className="col-span-2"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Categoria</label>
+            <div className="col-span-1"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Categoria</label>
             <select value={editCategoryId} onChange={e => handleCategoryChange(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none">
+              <option value="">Selecione...</option>
               {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select></div>
+            <div className="col-span-1"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Valor (R$)</label>
+            <input type="number" step="0.01" value={editTotalPaid} onChange={e => setEditTotalPaid(parseFloat(e.target.value) || 0)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none font-mono" /></div>
             {editAthletes.length > 1 && <div className="col-span-4"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nome da Equipe</label>
             <input value={editTeamName} onChange={e => setEditTeamName(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none" /></div>}
           </div>
