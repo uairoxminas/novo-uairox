@@ -1316,10 +1316,10 @@ function InscricoesTab({ eventId }: { eventId: string }) {
       athlete_name: a1.name, athlete_email: a1.email, athlete_phone: a1.phone,
       athlete_instagram: a1.instagram||null, athlete_birth_date: a1.birth_date||null,
       athlete_gender: a1.gender||null, athlete_gym: a1.gym||null, athlete_photo_url: a1.photo_url||null,
-      status: editStatus || 'pending', bib_number: editBibNumber||null,
+      status: editStatus || 'pending', bib_number: editBibNumber ? parseInt(editBibNumber) : null,
       team_name: editTeamName||null, team_members: teamMembers,
-      category_id: editCategoryId || undefined,
-    };
+      category_id: editCategoryId,
+    } as any;
 
     let error;
     if (editingReg.id === 'new') {
