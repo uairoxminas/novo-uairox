@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Trophy, Medal, AlertOctagon, Edit3, Save, X, Upload, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
-import { useCategories } from '@/hooks/useEventConfig';
+import { useCategories, useEventRegistrations } from '@/hooks/useEventConfig';
 
 export default function AdminResultsManagerPage() {
   const { id: eventId } = useParams<{ id: string }>();
@@ -22,6 +22,7 @@ export default function AdminResultsManagerPage() {
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const [importData, setImportData] = useState<any[]>([]);
   const [importMapping, setImportMapping] = useState<Record<string,string>>({});
+  const [mappedRows, setMappedRows] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
   // Manual add states
@@ -36,6 +37,7 @@ export default function AdminResultsManagerPage() {
   const [isManualSaving, setIsManualSaving] = useState(false);
 
   const { data: categories } = useCategories(eventId);
+  const { data: existingRegs } = useEventRegistrations(eventId);
 
   // Busca Tabela Oficial de Resultados combinada com Registrations e Heats
   const { data: results, isLoading, error: queryError } = useQuery({
@@ -185,32 +187,101 @@ export default function AdminResultsManagerPage() {
     reader.readAsBinaryString(file);
   };
 
-  const handleConfirmImport = async () => {
+  const handleMapResults = () => {
     if (!importMapping['category']) return toast.error('Mapeie a coluna de Categoria!');
     if (!importMapping['name']) return toast.error('Mapeie a coluna de Nome!');
-    setIsImporting(true);
-    let count = 0;
+    
+    const newMappedRows = [];
+
     for (const row of importData) {
       const catName = String(row[importMapping['category']] || '').trim().toLowerCase();
       const cat = categories?.find((c: any) => c.name.trim().toLowerCase() === catName);
       if (!cat) continue;
-      const name = String(row[importMapping['name']] || 'Sem Nome');
-      const team = importMapping['team'] ? String(row[importMapping['team']] || '') : null;
-      const bib = importMapping['bib'] ? String(row[importMapping['bib']] || '') : '';
-      const timeStr = importMapping['time'] ? String(row[importMapping['time']] || '') : '';
+
+      const name = String(row[importMapping['name']] || 'Sem Nome').trim();
+      const team = importMapping['team'] ? String(row[importMapping['team']] || '').trim() : null;
+      const bib = importMapping['bib'] ? String(row[importMapping['bib']] || '').trim() : '';
+      const timeStr = importMapping['time'] ? String(row[importMapping['time']] || '').trim() : '';
       const penalty = importMapping['penalty'] ? Number(row[importMapping['penalty']] || 0) : 0;
+      
       const rawMs = parseTimeToMs(timeStr);
       const finalMs = rawMs + penalty * 1000;
-      const { data: reg } = await supabase.from('registrations').insert({ event_id: eventId, category_id: cat.id, athlete_name: name, team_name: team, status: 'confirmed', payment_method: 'import', total_paid: 0, bib_number: bib || null } as any).select('id').single();
-      if (reg) {
-        await supabase.from('race_results' as any).insert({ event_id: eventId, registration_id: reg.id, bib_number: bib || '', raw_time_ms: rawMs, total_penalties_seconds: penalty, final_adjusted_time_ms: finalMs, status: rawMs > 0 ? 'validated' : 'dnf' });
-        count++;
+      
+      let matchedRegId = '';
+      if (existingRegs) {
+        const catRegs = existingRegs.filter((r: any) => r.category_id === cat.id);
+        
+        // 1. Try Exact BIB Match
+        if (bib) {
+           const exactBib = catRegs.find((r: any) => String(r.bib_number) === String(bib));
+           if (exactBib) matchedRegId = exactBib.id;
+        }
+        
+        // 2. Try Exact Name Match
+        if (!matchedRegId) {
+           const nameMatch = catRegs.find((r: any) => 
+              (r.athlete_name || '').toLowerCase().trim() === name.toLowerCase() ||
+              (r.team_name || '').toLowerCase().trim() === name.toLowerCase() ||
+              (team && (r.team_name || '').toLowerCase().trim() === team.toLowerCase())
+           );
+           if (nameMatch) matchedRegId = nameMatch.id;
+        }
+        
+        // 3. Try Partial Name Match
+        if (!matchedRegId) {
+           const partialMatch = catRegs.find((r: any) => 
+              (r.athlete_name || '').toLowerCase().includes(name.toLowerCase()) ||
+              (r.team_name || '').toLowerCase().includes(name.toLowerCase())
+           );
+           if (partialMatch) matchedRegId = partialMatch.id;
+        }
       }
+
+      newMappedRows.push({
+        _original: row,
+        category: cat,
+        name,
+        team,
+        bib,
+        timeStr,
+        rawMs,
+        penalty,
+        finalMs,
+        matchedRegId
+      });
     }
+
+    setMappedRows(newMappedRows);
+    setImportStep(3);
+  };
+
+  const handleFinalSave = async () => {
+    setIsImporting(true);
+    let count = 0;
+    
+    for (const row of mappedRows) {
+      if (!row.matchedRegId) continue;
+      
+      await supabase.from('race_results' as any).insert({ 
+         event_id: eventId, 
+         registration_id: row.matchedRegId, 
+         bib_number: row.bib || '', 
+         raw_time_ms: row.rawMs, 
+         total_penalties_seconds: row.penalty, 
+         final_adjusted_time_ms: row.finalMs, 
+         status: row.rawMs > 0 ? 'validated' : 'dnf' 
+      });
+      count++;
+    }
+    
     setIsImporting(false);
-    if (count === 0) return toast.error('Nenhum resultado importado. Verifique os nomes das categorias.');
-    toast.success(`${count} resultados importados!`);
-    setShowImport(false); setImportStep(1); setImportData([]); setImportHeaders([]); setImportMapping({});
+    toast.success(`${count} resultados importados e atrelados aos inscritos com sucesso!`);
+    setShowImport(false); 
+    setImportStep(1); 
+    setImportData([]); 
+    setImportHeaders([]); 
+    setImportMapping({});
+    setMappedRows([]);
     qc.invalidateQueries({ queryKey: ['race_results_complete', eventId] });
   };
 
@@ -330,7 +401,66 @@ export default function AdminResultsManagerPage() {
               </div>
               <div className="flex gap-3 pt-3 border-t border-[#1a1a1a]">
                 <button onClick={() => setImportStep(1)} className="flex-1 py-2.5 border border-[#262626] rounded-lg text-zinc-400 font-bold">Voltar</button>
-                <button onClick={handleConfirmImport} disabled={isImporting} className="flex-1 py-2.5 bg-[#10b981] text-white font-black rounded-lg">{isImporting ? 'Importando...' : 'Confirmar'}</button>
+                <button onClick={handleMapResults} className="flex-1 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg">Gerar "De Para" →</button>
+              </div>
+            </>)}
+
+            {importStep === 3 && (<>
+              <div className="bg-[#111] border border-blue-500/30 p-4 rounded-xl">
+                <h3 className="text-sm font-bold text-blue-400 mb-1 flex items-center gap-2">🔄 Mapeamento Inteligente</h3>
+                <p className="text-xs text-zinc-400">
+                  O sistema tentou ligar os resultados da planilha com os inscritos que já estão no sistema. 
+                  Verifique se o "Atleta da Planilha" (coluna esquerda) bate com o "Inscrito do Sistema" (coluna direita).
+                </p>
+              </div>
+
+              <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                {mappedRows.map((row: any, idx: number) => {
+                  const availableRegs = existingRegs?.filter((r: any) => r.category_id === row.category.id) || [];
+                  const isMapped = !!row.matchedRegId;
+                  
+                  return (
+                    <div key={idx} className={`p-3 rounded-lg border flex flex-col md:flex-row gap-3 ${isMapped ? 'border-green-500/30 bg-green-900/10' : 'border-red-500/30 bg-red-900/10'}`}>
+                      <div className="flex-1">
+                        <span className="text-[10px] uppercase text-zinc-500 font-bold">Na Planilha ({row.category.name})</span>
+                        <p className="text-sm font-black text-white">{row.name} {row.team && <span className="text-zinc-400">({row.team})</span>}</p>
+                        <p className="text-xs text-zinc-400">Tempo: {row.timeStr || '--'} | BIB: {row.bib || '--'}</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-center hidden md:flex text-zinc-600">
+                        →
+                      </div>
+
+                      <div className="flex-1">
+                        <span className="text-[10px] uppercase text-zinc-500 font-bold">No Sistema</span>
+                        <select 
+                          value={row.matchedRegId} 
+                          onChange={e => {
+                            const newRows = [...mappedRows];
+                            newRows[idx].matchedRegId = e.target.value;
+                            setMappedRows(newRows);
+                          }}
+                          className={`w-full mt-1 bg-[#050505] border rounded-lg px-2 py-1.5 text-xs font-bold ${isMapped ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'}`}
+                        >
+                          <option value="">-- Selecione o Inscrito Manualmente --</option>
+                          {availableRegs.map((r: any) => (
+                            <option key={r.id} value={r.id}>
+                              {r.athlete_name} {r.team_name ? `(${r.team_name})` : ''} - BIB {r.bib_number || 'S/N'}
+                            </option>
+                          ))}
+                        </select>
+                        {!isMapped && <p className="text-[10px] text-red-400 mt-1">⚠️ Atleta não encontrado. Selecione na lista.</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-[#1a1a1a]">
+                <button onClick={() => setImportStep(2)} className="flex-1 py-2.5 border border-[#262626] rounded-lg text-zinc-400 font-bold">Voltar</button>
+                <button onClick={handleFinalSave} disabled={isImporting} className="flex-[2] py-2.5 bg-[#10b981] text-white font-black rounded-lg">
+                  {isImporting ? 'Salvando...' : `Salvar e Lançar ${mappedRows.filter(r => r.matchedRegId).length} Resultados`}
+                </button>
               </div>
             </>)}
           </div>
