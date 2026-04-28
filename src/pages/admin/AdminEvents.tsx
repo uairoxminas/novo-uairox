@@ -9,6 +9,7 @@ import {
   useUpdateEvent,
   useDeleteEvent,
   useUpdateEventStatus,
+  useDuplicateEvent,
   EVENT_STATUS_MAP,
   type EventWithStats,
   type EventStatus,
@@ -26,6 +27,14 @@ function StatusBadge({ status }: { status: string | null }) {
   );
 }
 
+const toLocalDatetimeLocal = (isoString?: string | null) => {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 // ============ EVENT FORM DIALOG ============
 function EventFormDialog({
   event,
@@ -41,8 +50,8 @@ function EventFormDialog({
   const isEdit = !!event;
 
   const [title, setTitle] = useState(event?.title || '');
-  const [date, setDate] = useState(event?.date ? event.date.slice(0, 16) : '');
-  const [endDate, setEndDate] = useState(event?.end_date ? event.end_date.slice(0, 16) : '');
+  const [date, setDate] = useState(toLocalDatetimeLocal(event?.date));
+  const [endDate, setEndDate] = useState(toLocalDatetimeLocal(event?.end_date));
   const [location, setLocation] = useState(event?.location || '');
   const [description, setDescription] = useState(event?.description || '');
   const [status, setStatus] = useState<EventStatus>((event?.status as EventStatus) || 'planning');
@@ -222,16 +231,17 @@ function EventFormDialog({
           {/* Image Upload */}
           <div>
             <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Imagem de Capa do Evento</label>
+            <p className="text-[10px] text-zinc-500 mb-2">Tamanho recomendado: 1920x1080 pixels (Formato Horizontal 16:9).</p>
             <div className="flex items-center gap-4">
               {imagePreview ? (
-                <div className="relative w-full h-32 rounded-lg overflow-hidden border border-[#262626]">
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-[#262626]">
                   <img src={imagePreview} className="w-full h-full object-cover" alt="Preview da Capa" />
                   <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); setImageUrl(''); }} className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white rounded-full p-2 hover:bg-red-500 transition-colors shadow">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"></path></svg>
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-[#262626] hover:border-[#EDAC02] rounded-lg cursor-pointer bg-[#050505] transition-colors group">
+                <label className="flex flex-col items-center justify-center w-full aspect-video border-2 border-dashed border-[#262626] hover:border-[#EDAC02] rounded-lg cursor-pointer bg-[#050505] transition-colors group">
                   <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600 mb-2 group-hover:text-[#EDAC02] transition-colors"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                     <p className="text-sm text-zinc-400 font-bold">Clique para enviar a foto (Upload)</p>
@@ -363,12 +373,14 @@ function EventCard({
   onConfig,
   onEditDetails,
   onDelete,
+  onDuplicate,
   onStatusChange,
 }: {
   event: EventWithStats;
   onConfig: () => void;
   onEditDetails: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   onStatusChange: (status: EventStatus) => void;
 }) {
   const eventDate = new Date(event.date);
@@ -385,7 +397,7 @@ function EventCard({
   return (
     <div className="group bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden hover:border-[#EDAC02]/30 transition-all duration-300">
       {/* Cover Image */}
-      <div className="h-40 relative overflow-hidden">
+      <div className="aspect-video relative overflow-hidden">
         {event.image_url ? (
           <img src={event.image_url} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
@@ -489,6 +501,15 @@ function EventCard({
                   <div className="border-t border-[#262626] my-1" />
                   <button
                     onClick={() => {
+                      onDuplicate();
+                      setShowStatusMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-[#EDAC02] hover:bg-[#EDAC02]/10 transition-colors"
+                  >
+                    📋 Duplicar Evento
+                  </button>
+                  <button
+                    onClick={() => {
                       onDelete();
                       setShowStatusMenu(false);
                     }}
@@ -510,6 +531,7 @@ function EventCard({
 export default function AdminEvents() {
   const { data: events, isLoading } = useEvents();
   const updateStatus = useUpdateEventStatus();
+  const duplicateEvent = useDuplicateEvent();
   const navigate = useNavigate();
 
   const [showForm, setShowForm] = useState(false);
@@ -604,6 +626,11 @@ export default function AdminEvents() {
               onConfig={() => navigate(`/admin/events/${event.id}`)}
               onEditDetails={() => { setEditingEvent(event); setShowForm(true); }}
               onDelete={() => setDeletingEvent(event)}
+              onDuplicate={() => {
+                if (confirm('Deseja duplicar este evento? (As categorias e lotes também serão copiados)')) {
+                  duplicateEvent.mutate(event);
+                }
+              }}
               onStatusChange={(status) => updateStatus.mutate({ id: event.id, status })}
             />
           ))}

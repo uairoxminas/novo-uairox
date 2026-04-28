@@ -605,6 +605,64 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     return parts.length > 1 ? parts[parts.length - 1].trim() : location;
   };
 
+  // ===== URGENCY BADGE SYSTEM =====
+  const getUrgencyBadge = (ev: any) => {
+    if (ev.status !== 'open') return null;
+    const now = new Date();
+    const eventDate = new Date(ev.date);
+    const daysUntil = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntil < 0) return null;
+
+    // Small per-event variation so cards look different (±3%)
+    const hash = ev.id.charCodeAt(0) + ev.id.charCodeAt(ev.id.length - 1);
+    const variation = (hash % 7) - 3; // -3 to +3
+
+    let basePercent: number;
+    let label: string;
+    let color: string; // bg color
+    let textColor: string;
+    let barColor: string;
+    let pulse = false;
+
+    if (daysUntil > 45) {
+      basePercent = 50;
+      label = 'Vagas disponíveis';
+      color = 'bg-green-500/10';
+      textColor = 'text-green-400';
+      barColor = 'bg-green-500';
+    } else if (daysUntil > 30) {
+      basePercent = 60;
+      label = 'Vagas limitadas';
+      color = 'bg-yellow-500/10';
+      textColor = 'text-yellow-400';
+      barColor = 'bg-yellow-500';
+    } else if (daysUntil > 20) {
+      basePercent = 75;
+      label = 'Últimas vagas!';
+      color = 'bg-orange-500/10';
+      textColor = 'text-orange-400';
+      barColor = 'bg-orange-500';
+    } else if (daysUntil > 15) {
+      basePercent = 85;
+      label = 'Quase esgotado!';
+      color = 'bg-red-500/10';
+      textColor = 'text-red-400';
+      barColor = 'bg-red-500';
+      pulse = true;
+    } else {
+      basePercent = 95;
+      label = 'Últimas unidades!';
+      color = 'bg-red-500/15';
+      textColor = 'text-red-400';
+      barColor = 'bg-red-500';
+      pulse = true;
+    }
+
+    const percent = Math.min(99, Math.max(45, basePercent + variation));
+
+    return { percent, label, color, textColor, barColor, pulse };
+  };
+
   // Map event status to card style
   const getCardProps = (ev: any) => {
     const isOpen = ev.status === 'open';
@@ -612,11 +670,21 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     const isClosed = ev.status === 'closed';
     const batchName = ev._active_batch?.name;
 
+    let planningBadge = 'Em Breve';
+    if (isPlanning && ev._next_batch?.start_date) {
+      const startDate = new Date(ev._next_batch.start_date);
+      if (!isNaN(startDate.getTime())) {
+        planningBadge = `A partir de ${startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`; // Usually start_date comes in UTC format like 2026-05-01T00:00:00Z
+        // wait actually if they put the date in their local timezone, we just format it simply
+        planningBadge = `A partir de ${startDate.toLocaleDateString('pt-BR')}`;
+      }
+    }
+
     return {
       is_badge_active: isOpen,
-      badge_text: isOpen ? (batchName || 'Inscrições Abertas') : isPlanning ? 'Pré-Venda' : isClosed ? 'Encerrado' : 'Em Breve',
+      badge_text: isOpen ? (batchName || 'Inscrições Abertas') : isPlanning ? planningBadge : isClosed ? 'Encerrado' : 'Em Breve',
       is_disabled: isClosed,
-      btn_text: isOpen ? 'Garantir Vaga' : isPlanning ? 'Lista VIP' : 'Aguarde',
+      btn_text: isOpen ? 'Garantir Vaga' : isPlanning ? 'Em Breve' : 'Aguarde',
       btn_link: isOpen ? `/evento/${ev.id}` : isPlanning ? `/evento/${ev.id}` : null,
     };
   };
@@ -634,68 +702,115 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     return (
       <div
         key={ev.id}
-        className={`event-card relative bg-dark-card border ${card.is_badge_active ? 'border-brand-500' : 'border-dark-border'} ${card.is_disabled ? 'border-dark-border/50 opacity-70 hover:opacity-100' : 'hover:border-brand-500 cursor-pointer'} p-5 md:p-8 flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-2 group h-[360px] md:h-[450px]`}
+        className={`event-card relative bg-dark-card border ${card.is_badge_active ? 'border-brand-500' : 'border-dark-border'} ${card.is_disabled ? 'border-dark-border/50 opacity-70 hover:opacity-100' : 'hover:border-brand-500 cursor-pointer'} flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-2 group h-full`}
       >
-        {ev.image_url ? (
-          <>
-            <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-110 opacity-60" style={{ backgroundImage: `url(${ev.image_url})` }} />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent z-0" />
-          </>
-        ) : (
-          <div className="event-bg-text absolute -right-6 -top-12 text-[12rem] font-black text-white/5 leading-none italic pointer-events-none transition-all duration-500 z-0">
-            {acronym}
-          </div>
-        )}
+        {/* Cover Image (16:9) */}
+        <div className="relative w-full aspect-video overflow-hidden bg-[#050505]">
+          {ev.image_url ? (
+            <>
+              <img src={ev.image_url} alt={city} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-80 group-hover:opacity-100" />
+              <div className="absolute inset-0 bg-gradient-to-t from-dark-card via-transparent to-transparent z-0 pointer-events-none" />
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-6xl font-black text-white/5 italic">{acronym}</span>
+            </div>
+          )}
 
-        <div className="relative z-10">
-          <div className="flex justify-between items-start mb-6">
+          {/* Badge overlays on image */}
+          <div className="absolute top-4 left-4 z-10">
             {card.is_badge_active ? (
-              <span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500 text-white font-black uppercase tracking-widest text-xs">
+              <span className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500 text-white font-black uppercase tracking-widest text-xs shadow-lg">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                 {card.badge_text}
               </span>
             ) : (
-              <span className={`inline-block px-3 py-1 ${card.is_disabled ? 'bg-dark-border text-dark-muted' : 'bg-white text-black'} font-black uppercase tracking-widest text-xs`}>
+              <span className={`inline-block px-3 py-1 ${card.is_disabled ? 'bg-dark-border/90 text-dark-muted backdrop-blur-sm' : 'bg-white/90 text-black backdrop-blur-sm'} font-black uppercase tracking-widest text-xs shadow-lg`}>
                 {card.badge_text}
               </span>
             )}
           </div>
-          <h3 className={`text-2xl md:text-4xl font-black uppercase italic mb-1 ${card.is_disabled ? 'text-dark-muted' : 'text-white'}`}>
-            {city}
-          </h3>
-          <p className={`${card.is_disabled ? 'text-dark-muted/60' : card.is_badge_active ? 'text-brand-400' : 'text-white/60'} font-black tracking-widest uppercase text-sm mb-6`}>
-            {dateLabel}
-          </p>
-          <p className="text-dark-muted text-sm mb-6 line-clamp-3 font-inter">
-            {ev.description}
-          </p>
         </div>
 
-        <div className="relative z-10 mt-auto">
-          {card.btn_link && !card.is_disabled ? (
-            <a
-              href={card.btn_link}
-              className={`block w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors text-center ${
-                card.is_badge_active
-                  ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
-                  : 'border-2 border-dark-border text-white group-hover:border-white'
-              }`}
-            >
-              <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
-            </a>
-          ) : (
-            <button
-              className={`w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors ${
-                card.is_disabled
-                  ? 'bg-dark-bg border border-dark-border text-dark-muted'
-                  : card.is_badge_active
+        {/* Content Section */}
+        <div className="p-6 md:p-8 flex flex-col flex-grow relative z-10 bg-dark-card">
+          <div className="flex flex-col gap-3 mb-6">
+            <div>
+              <span className="text-[10px] font-black text-brand-500 uppercase tracking-widest block mb-0.5">NOME:</span>
+              <h3 className={`text-xl md:text-2xl font-black uppercase italic leading-tight ${card.is_disabled ? 'text-dark-muted' : 'text-white'}`}>
+                {ev.title}
+              </h3>
+            </div>
+            
+            <div>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">LOCAL:</span>
+              <p className={`text-sm font-bold leading-snug ${card.is_disabled ? 'text-dark-muted/60' : 'text-white/80'}`}>
+                {ev.location || city}
+              </p>
+            </div>
+            
+            <div>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">DATA:</span>
+              <p className={`text-sm font-black uppercase tracking-widest ${card.is_disabled ? 'text-dark-muted/60' : card.is_badge_active ? 'text-brand-400' : 'text-white/90'}`}>
+                {dateLabel}
+              </p>
+            </div>
+          </div>
+          
+          <p className="text-dark-muted text-sm mb-4 font-inter flex-grow whitespace-pre-line">
+            {ev.description}
+          </p>
+
+          {/* Urgency Badge */}
+          {(() => {
+            const urgency = getUrgencyBadge(ev);
+            if (!urgency) return null;
+            return (
+              <div className={`${urgency.color} rounded-lg p-3 mb-4`} style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-xs font-black uppercase tracking-wider ${urgency.textColor} flex items-center gap-1.5`}>
+                    {urgency.pulse && <span className="w-2 h-2 rounded-full bg-current animate-pulse" />}
+                    {urgency.label}
+                  </span>
+                  <span className={`text-xs font-black ${urgency.textColor}`}>{urgency.percent}%</span>
+                </div>
+                <div className="w-full h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${urgency.barColor} transition-all duration-1000`}
+                    style={{ width: `${urgency.percent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Buttons */}
+          <div className="mt-auto">
+            {card.btn_link && !card.is_disabled ? (
+              <a
+                href={card.btn_link}
+                className={`block w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors text-center ${
+                  card.is_badge_active
                     ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
                     : 'border-2 border-dark-border text-white group-hover:border-white'
-              }`}
-            >
-              <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
-            </button>
-          )}
+                }`}
+              >
+                <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
+              </a>
+            ) : (
+              <button
+                className={`w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors ${
+                  card.is_disabled
+                    ? 'bg-dark-bg border border-dark-border text-dark-muted'
+                    : card.is_badge_active
+                      ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
+                      : 'border-2 border-dark-border text-white group-hover:border-white'
+                }`}
+              >
+                <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

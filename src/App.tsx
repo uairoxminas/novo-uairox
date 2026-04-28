@@ -2,11 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
-// Layouts Principais (As 4 Áreas da Aplicação)
+// Layouts Principais
 import Layout from './components/layout/Layout'; // Visitantes
-import AthleteLayout from './components/layout/AthleteLayout';
 import AdminLayout from './components/layout/AdminLayout';
 import JudgeLayout from './components/layout/JudgeLayout';
+
+// Auth Gate — Autenticação por senha nos painéis
+import PanelGate from './components/auth/PanelGate';
 
 // Páginas Públicas (Visitantes)
 import HomePage from './pages/HomePage';
@@ -17,12 +19,6 @@ import GalleryPage from './pages/GalleryPage';
 import LocationsPage from './pages/LocationsPage';
 import StorePage from './pages/StorePage';
 import NotFoundPage from './pages/NotFoundPage';
-
-// Páginas Auth
-import LoginPage from './pages/auth/LoginPage';
-
-// Páginas Atletas
-import AthleteDashboard from './pages/athlete/AthleteDashboard';
 
 // Páginas Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -42,11 +38,11 @@ import AdminLocations from './pages/admin/AdminLocations';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 
 // Páginas Juiz
-import JudgeDashboard from './pages/judge/JudgeDashboard';
+import JudgePassagesPanel from './pages/judge/JudgePassagesPanel';
+import HeadJudgePenaltyPanel from './pages/judge/HeadJudgePenaltyPanel';
+import FinalJudgePanel from './pages/judge/FinalJudgePanel';
 
-// Auth
-import { AuthProvider } from './hooks/useAuth';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+// Utils
 import ScrollToHash from './components/utils/ScrollToHash';
 
 const queryClient = new QueryClient({
@@ -61,7 +57,6 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
         <BrowserRouter>
           <ScrollToHash />
         <Toaster
@@ -86,27 +81,14 @@ export default function App() {
             <Route path="/store" element={<StorePage />} />
           </Route>
 
-          {/* Área de Autenticação */}
-          <Route path="/login" element={<LoginPage />} />
-
           {/* Inscrição Pública em Eventos */}
           <Route path="/evento/:id" element={<PublicEventRegistration />} />
 
-          {/* 2. Área do Atleta Cadastrado */}
-          <Route path="/athlete" element={
-            <ProtectedRoute allowedRoles={['athlete']}>
-              <AthleteLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<AthleteDashboard />} />
-            {/* <Route path="events/:id" element={<AthleteEventDetails />} /> */}
-          </Route>
-
-          {/* 3. Área do Admin */}
+          {/* 2. Área do Admin — Acesso total com senha */}
           <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <PanelGate panel="admin" title="Admin" subtitle="Acesso restrito ao organizador" accentColor="#EDAC02">
               <AdminLayout />
-            </ProtectedRoute>
+            </PanelGate>
           }>
             <Route index element={<AdminDashboard />} />
             <Route path="landing" element={<AdminLandingConfig />} />
@@ -124,20 +106,37 @@ export default function App() {
             <Route path="locations" element={<AdminLocations />} />
           </Route>
 
-          {/* 4. Área do Juiz */}
+          {/* 3. Judge — Marcação de Passagens */}
           <Route path="/judge" element={
-            <ProtectedRoute allowedRoles={['judge']}>
+            <PanelGate panel="judge" title="Judge" subtitle="Painel de marcação de passagens" accentColor="#22c55e">
               <JudgeLayout />
-            </ProtectedRoute>
+            </PanelGate>
           }>
-            <Route index element={<JudgeDashboard />} />
+            <Route index element={<JudgePassagesPanel />} />
+          </Route>
+
+          {/* 4. Head Judge — Penalidades */}
+          <Route path="/headjudge" element={
+            <PanelGate panel="headjudge" title="Head Judge" subtitle="Painel de penalidades" accentColor="#ef4444">
+              <JudgeLayout />
+            </PanelGate>
+          }>
+            <Route index element={<HeadJudgePenaltyPanel />} />
+          </Route>
+
+          {/* 5. Final Judge — Validação de chegada */}
+          <Route path="/finaljudge" element={
+            <PanelGate panel="finaljudge" title="Final Judge" subtitle="Validação de tempo final" accentColor="#3b82f6">
+              <JudgeLayout />
+            </PanelGate>
+          }>
+            <Route index element={<FinalJudgePanel />} />
           </Route>
 
           {/* 404 Formato Geral */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
-      </AuthProvider>
     </QueryClientProvider>
   );
 }

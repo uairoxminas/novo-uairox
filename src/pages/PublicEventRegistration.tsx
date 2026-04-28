@@ -175,7 +175,7 @@ export default function PublicEventRegistration() {
             </div>
 
             {event.description && (
-              <p className="text-lg text-white/50 max-w-xl leading-relaxed mb-10">{event.description}</p>
+              <p className="text-lg text-white/50 max-w-xl leading-relaxed mb-10 whitespace-pre-line">{event.description}</p>
             )}
 
           </div>
@@ -359,7 +359,7 @@ export default function PublicEventRegistration() {
                 const localActiveBatch = getActiveBatch(batches, cat.id);
                 const relevantBatches = batches.filter(b => !b.category_id || b.category_id === cat.id);
                 const localIsSoldOut = relevantBatches.length > 0 && !localActiveBatch;
-                const price = (localActiveBatch ? Number(localActiveBatch.price) : Number(cat.price)) * teamSize;
+                const price = localActiveBatch ? Number(localActiveBatch.price) : 0;
                 return (
                   <div key={cat.id} className="bg-[#0a0a0a] border border-[#1a1a1a] p-8 hover:border-[#EDAC02]/30 transition-all duration-300 group flex flex-col">
                     <div className="flex-1">
@@ -487,14 +487,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       }
     }
   }, [kits, kitId]);
-  const [athleteName, setAthleteName] = useState('');
-  const [athleteEmail, setAthleteEmail] = useState('');
-  const [athletePhone, setAthletePhone] = useState('');
-  const [athleteBirthDate, setAthleteBirthDate] = useState('');
-  const [athleteGender, setAthleteGender] = useState('');
-  const [athleteShirtSize, setAthleteShirtSize] = useState('');
+  // Athlete data structure - index 0 = main athlete, 1+ = team members
+  type AthleteData = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; gym: string; photo_url: string; };
+  const emptyAthlete = (): AthleteData => ({ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', gym: '', photo_url: '' });
+  const [athletes, setAthletes] = useState<AthleteData[]>([emptyAthlete()]);
   const [teamName, setTeamName] = useState('');
-  const [teamMembers, setTeamMembers] = useState<{ name: string }[]>([]);
+  const [photoUploading, setPhotoUploading] = useState<number | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState<any>(null);
 
@@ -507,7 +505,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const formActiveBatch = getActiveBatch(batches, categoryId);
   const teamSize = selectedCategory?.team_size || 1;
   const isTeam = teamSize > 1;
-  const basePrice = (formActiveBatch ? Number(formActiveBatch.price) : (selectedCategory ? Number(selectedCategory.price) : 0)) * teamSize;
+  const basePrice = formActiveBatch ? Number(formActiveBatch.price) : 0;
   const kitPrice = selectedKit ? Number(selectedKit.price) : 0;
   let discount = 0;
   if (couponDiscount) {
@@ -517,13 +515,42 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   }
   const totalPrice = Math.max(0, basePrice + kitPrice - discount);
 
+  // Helper to update a specific athlete field
+  const updateAthlete = (index: number, field: keyof AthleteData, value: string) => {
+    setAthletes(prev => {
+      const arr = [...prev];
+      arr[index] = { ...arr[index], [field]: value };
+      return arr;
+    });
+  };
+
+  // Handle training photo upload
+  const handlePhotoUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(index);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `athlete-photos/${eventId}/${Date.now()}-${index}.${fileExt}`;
+      const { error } = await supabase.storage.from('receipts').upload(fileName, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from('receipts').getPublicUrl(fileName);
+      updateAthlete(index, 'photo_url', data.publicUrl);
+      toast.success('Foto enviada!');
+    } catch (err: any) {
+      toast.error('Erro no upload: ' + err.message);
+    } finally {
+      setPhotoUploading(null);
+    }
+  };
+
   useEffect(() => {
-    if (isTeam && selectedCategory) {
-      const size = selectedCategory.team_size - 1;
-      setTeamMembers(prev => {
+    if (selectedCategory) {
+      const total = selectedCategory.team_size || 1;
+      setAthletes(prev => {
         const arr = [...prev];
-        while (arr.length < size) arr.push({ name: '' });
-        return arr.slice(0, size);
+        while (arr.length < total) arr.push(emptyAthlete());
+        return arr.slice(0, total);
       });
     }
     
@@ -549,18 +576,37 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   };
 
   const handleSubmit = async () => {
-    if (!categoryId || !athleteName.trim() || !athleteEmail.trim() || !athletePhone.trim() || !athleteBirthDate || !athleteGender || (event?.require_shirt_size && !athleteShirtSize)) { toast.error('Preencha os campos obrigatórios primeiro.'); return; }
+    const a1 = athletes[0];
+    if (!categoryId || !a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.gym.trim()) { toast.error('Preencha os campos obrigatórios do Atleta 1.'); return; }
+    if (isTeam) {
+      if (!teamName.trim()) { toast.error('Informe o nome da equipe.'); return; }
+      for (let i = 1; i < athletes.length; i++) {
+        const m = athletes[i];
+        if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.gym.trim()) {
+          toast.error(`Preencha os campos obrigatórios do Atleta ${i + 1}.`); return;
+        }
+      }
+    }
     setSubmitting(true);
     try {
+      const teamMembersData = isTeam ? athletes.slice(1).map(m => ({
+        name: m.name.trim(), email: m.email.trim(), phone: m.phone.trim(),
+        instagram: m.instagram.trim(), birth_date: m.birth_date, gender: m.gender,
+        gym: m.gym.trim(), photo_url: m.photo_url || null,
+      })) : null;
+
       const { data, error } = await supabase.from('registrations').insert({
         event_id: eventId, category_id: categoryId, kit_id: kitId || null,
         batch_id: formActiveBatch?.id || null, coupon_id: couponDiscount?.id || null,
         status: 'pending', total_paid: totalPrice,
         payment_method: formActiveBatch?.payment_link ? 'link' : 'pix',
-        athlete_name: athleteName.trim(), athlete_email: athleteEmail.trim(),
-        athlete_phone: athletePhone.trim() || null, athlete_birth_date: athleteBirthDate || null,
-        athlete_gender: athleteGender || null, athlete_shirt_size: athleteShirtSize || null,
-        team_name: isTeam ? teamName.trim() : null, team_members: isTeam ? teamMembers : null,
+        athlete_name: a1.name.trim(), athlete_email: a1.email.trim(),
+        athlete_phone: a1.phone.trim(), athlete_birth_date: a1.birth_date || null,
+        athlete_gender: a1.gender || null, athlete_shirt_size: null,
+        athlete_instagram: a1.instagram.trim() || null,
+        athlete_gym: a1.gym.trim() || null,
+        athlete_photo_url: a1.photo_url || null,
+        team_name: isTeam ? teamName.trim() : null, team_members: teamMembersData,
       } as any).select().single();
       if (error) throw error;
       if (couponDiscount) {
@@ -571,8 +617,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       // Disparo automático do Email Via Edge Function (Fire and Forget)
       supabase.functions.invoke('send-registration-email', {
         body: { 
-          athlete_name: athleteName.trim(), 
-          athlete_email: athleteEmail.trim(), 
+          athlete_name: a1.name.trim(), 
+          athlete_email: a1.email.trim(), 
           event_name: event?.title || 'UAIROX Evento',
           whatsapp_link: event?.whatsapp_group_link || null
         }
@@ -822,12 +868,14 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const canAdvance = () => {
     if (step === 0) return !!categoryId;
     if (step === 1) {
-      if (!athleteName.trim() || !athleteEmail.trim() || !athletePhone.trim() || !athleteBirthDate || !athleteGender) return false;
-      if (event?.require_shirt_size && !athleteShirtSize) return false;
-      
+      const a1 = athletes[0];
+      if (!a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.gym.trim()) return false;
       if (isTeam) {
         if (!teamName.trim()) return false;
-        if (teamMembers.some(m => !m.name.trim())) return false;
+        for (let i = 1; i < athletes.length; i++) {
+          const m = athletes[i];
+          if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.gym.trim()) return false;
+        }
       }
       return true;
     }
@@ -860,7 +908,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                 const localBatch = getActiveBatch(batches, cat.id);
                 const relevantBatches = batches.filter(b => !b.category_id || b.category_id === cat.id);
                 const soldOut = relevantBatches.length > 0 && !localBatch;
-                const price = (localBatch ? Number(localBatch.price) : Number(cat.price)) * (cat.team_size || 1);
+                const price = localBatch ? Number(localBatch.price) : 0;
                 
                 return (
                   <button key={cat.id} onClick={() => !soldOut && setCategoryId(cat.id)} disabled={soldOut}
@@ -922,26 +970,57 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         {/* STEP 1: Athlete Data */}
         {step === 1 && (
           <div className="space-y-4">
-            <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-4">
-              <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">Dados Pessoais</p>
-              <div><label className={labelClass}>Nome Completo *</label><input value={athleteName} onChange={e => setAthleteName(e.target.value)} placeholder="Seu nome completo" className={inputClass} /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className={labelClass}>Email *</label><input type="email" value={athleteEmail} onChange={e => setAthleteEmail(e.target.value)} placeholder="seu@email.com" className={inputClass} /></div>
-                <div><label className={labelClass}>Telefone / WhatsApp *</label><input value={athletePhone} onChange={e => setAthletePhone(e.target.value)} placeholder="(31) 99999-9999" className={inputClass} /></div>
-              </div>
-              <div className={`grid ${event?.require_shirt_size ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
-                <div><label className={labelClass}>Data de Nascimento *</label><input type="date" value={athleteBirthDate} onChange={e => setAthleteBirthDate(e.target.value)} className={inputClass} /></div>
-                <div><label className={labelClass}>Gênero *</label><select value={athleteGender} onChange={e => setAthleteGender(e.target.value)} className={inputClass}><option value="">Selecione</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
-                {event?.require_shirt_size && <div><label className={labelClass}>Tam. Camisa *</label><select value={athleteShirtSize} onChange={e => setAthleteShirtSize(e.target.value)} className={inputClass}><option value="">Selecione</option>{['PP','P','M','G','GG','XGG'].map(s=><option key={s} value={s}>{s}</option>)}</select></div>}
-              </div>
-            </div>
+            {/* Team name (only for teams) */}
             {isTeam && (
-              <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-4">
-                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">👥 Equipe ({selectedCategory?.team_size} participantes)</p>
+              <div className="bg-[#0a0a0a] border border-[#EDAC02]/20 rounded-xl p-5">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">👥 Equipe ({selectedCategory?.team_size} participantes)</p>
                 <div><label className={labelClass}>Nome da Equipe *</label><input value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Nome do time" className={inputClass} /></div>
-                {teamMembers.map((member, i) => <div key={i}><label className={labelClass}>Membro {i+2} - Nome Completo *</label><input value={member.name} onChange={e => { const arr=[...teamMembers]; arr[i].name=e.target.value; setTeamMembers(arr); }} placeholder="Nome completo" className={inputClass} /></div>)}
               </div>
             )}
+
+            {/* Athlete blocks */}
+            {athletes.map((athlete, idx) => (
+              <div key={idx} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-4">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">
+                  {isTeam ? `🏃 Atleta ${idx + 1}` : 'Dados Pessoais'}
+                </p>
+                <div><label className={labelClass}>Nome Completo *</label><input value={athlete.name} onChange={e => updateAthlete(idx, 'name', e.target.value)} placeholder="Nome completo" className={inputClass} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={labelClass}>E-mail *</label><input type="email" value={athlete.email} onChange={e => updateAthlete(idx, 'email', e.target.value)} placeholder="seu@email.com" className={inputClass} /></div>
+                  <div><label className={labelClass}>WhatsApp *</label><input value={athlete.phone} onChange={e => updateAthlete(idx, 'phone', e.target.value)} placeholder="(31) 99999-9999" className={inputClass} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={labelClass}>Instagram</label><input value={athlete.instagram} onChange={e => updateAthlete(idx, 'instagram', e.target.value)} placeholder="@seuinsta" className={inputClass} /></div>
+                  <div><label className={labelClass}>Local de Treino *</label><input value={athlete.gym} onChange={e => updateAthlete(idx, 'gym', e.target.value)} placeholder="Nome do Box / Academia" className={inputClass} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={labelClass}>Data de Nascimento *</label><input type="date" value={athlete.birth_date} onChange={e => updateAthlete(idx, 'birth_date', e.target.value)} className={inputClass} /></div>
+                  <div><label className={labelClass}>Gênero *</label><select value={athlete.gender} onChange={e => updateAthlete(idx, 'gender', e.target.value)} className={inputClass}><option value="">Selecione</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
+                </div>
+                {/* Training Photo Upload */}
+                <div>
+                  <label className={labelClass}>Foto Treinando <span className="text-zinc-600 normal-case">(para post CONFIRMED — opcional)</span></label>
+                  {athlete.photo_url ? (
+                    <div className="relative w-full h-32 rounded-xl overflow-hidden border border-[#262626] group mt-1">
+                      <img src={athlete.photo_url} alt="Foto treinando" className="w-full h-full object-cover" />
+                      <button onClick={() => updateAthlete(idx, 'photo_url', '')} className="absolute top-2 right-2 p-2 bg-black/80 hover:bg-red-500 text-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 text-xs font-bold">Trocar</button>
+                    </div>
+                  ) : (
+                    <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed ${photoUploading === idx ? 'border-[#EDAC02] opacity-70' : 'border-[#262626] hover:border-[#EDAC02]'} rounded-xl cursor-pointer bg-[#050505] transition-colors mt-1`}>
+                      {photoUploading === idx ? (
+                        <span className="text-sm font-bold text-[#EDAC02] animate-pulse">Enviando foto...</span>
+                      ) : (
+                        <>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600 mb-2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                          <span className="text-xs font-bold text-zinc-500">Enviar foto JPG/PNG</span>
+                        </>
+                      )}
+                      <input type="file" className="hidden" accept="image/*" onChange={e => handlePhotoUpload(idx, e)} disabled={photoUploading !== null} />
+                    </label>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -951,13 +1030,21 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5 space-y-3">
               <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">Resumo</p>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-zinc-400">Atleta</span><span className="text-white font-bold">{athleteName}</span></div>
-                <div className="flex justify-between"><span className="text-zinc-400">Email</span><span className="text-white">{athleteEmail}</span></div>
-                {athletePhone && <div className="flex justify-between"><span className="text-zinc-400">Telefone</span><span className="text-white">{athletePhone}</span></div>}
-                <div className="border-t border-[#1a1a1a] my-2" />
                 <div className="flex justify-between"><span className="text-zinc-400">Categoria</span><span className="text-white font-bold">{selectedCategory?.name}</span></div>
-                {isTeam && <div className="flex justify-between"><span className="text-zinc-400">Equipe</span><span className="text-white">{teamName||'—'}</span></div>}
+                {isTeam && <div className="flex justify-between"><span className="text-zinc-400">Equipe</span><span className="text-white font-bold">{teamName||'—'}</span></div>}
                 {selectedKit && <div className="flex justify-between"><span className="text-zinc-400">Kit</span><span className="text-white">{selectedKit.name}</span></div>}
+                <div className="border-t border-[#1a1a1a] my-2" />
+                {athletes.map((a, i) => (
+                  <div key={i} className="space-y-1">
+                    {isTeam && <p className="text-[10px] font-black text-[#EDAC02] uppercase tracking-widest mt-2">Atleta {i + 1}</p>}
+                    <div className="flex justify-between"><span className="text-zinc-400">Nome</span><span className="text-white font-bold truncate ml-4">{a.name}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Email</span><span className="text-white truncate ml-4">{a.email}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">WhatsApp</span><span className="text-white">{a.phone}</span></div>
+                    {a.instagram && <div className="flex justify-between"><span className="text-zinc-400">Instagram</span><span className="text-white">{a.instagram}</span></div>}
+                    <div className="flex justify-between"><span className="text-zinc-400">Local de Treino</span><span className="text-white truncate ml-4">{a.gym}</span></div>
+                    {a.photo_url && <div className="flex justify-between items-center"><span className="text-zinc-400">Foto</span><span className="text-green-400 text-xs">✅ Enviada</span></div>}
+                  </div>
+                ))}
               </div>
             </div>
             <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5">

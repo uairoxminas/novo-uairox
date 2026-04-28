@@ -15,6 +15,7 @@ import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
 
 // ============ Shared Components / Styles ============
 const GOLD = '#EDAC02';
@@ -28,6 +29,14 @@ const emptyState = (text: string) => (
     <p className="text-sm">{text}</p>
   </div>
 );
+
+const toLocalDatetimeLocal = (isoString?: string | null) => {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 // ============ Generic Modal ============
 function Modal({ open, onClose, title, subtitle, children }: {
@@ -464,7 +473,7 @@ function CategoriasTab({ eventId }: { eventId: string }) {
   const [ageType, setAgeType] = useState('livre');
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
-  const [price, setPrice] = useState('0');
+
 
   const genderLabels: Record<string, string> = {
     any: 'Qualquer',
@@ -483,7 +492,7 @@ function CategoriasTab({ eventId }: { eventId: string }) {
       setAgeType(cat.age_type || 'livre');
       setMinAge(String(cat.min_age || ''));
       setMaxAge(String(cat.max_age || ''));
-      setPrice(String(cat.price || 0));
+
     } else {
       setEditing(null);
       setName('');
@@ -492,7 +501,7 @@ function CategoriasTab({ eventId }: { eventId: string }) {
       setAgeType('livre');
       setMinAge('');
       setMaxAge('');
-      setPrice('0');
+
     }
     setShowForm(true);
   };
@@ -507,7 +516,7 @@ function CategoriasTab({ eventId }: { eventId: string }) {
       age_type: ageType,
       min_age: ageType === 'custom' ? parseInt(minAge) || null : null,
       max_age: ageType === 'custom' ? parseInt(maxAge) || null : null,
-      price: parseFloat(price) || 0,
+      price: 0,
     };
     if (editing) {
       await updateCategory.mutateAsync({ id: editing.id, ...data });
@@ -544,9 +553,7 @@ function CategoriasTab({ eventId }: { eventId: string }) {
                     {cat.age_type === 'livre' ? 'Idade Livre' : `${cat.min_age || 0}-${cat.max_age || '+'} anos`}
                   </span>
                 </div>
-                {cat.price > 0 && (
-                  <p className="text-xs text-[#EDAC02] font-bold mt-2">R$ {Number(cat.price).toFixed(2)}</p>
-                )}
+
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => openForm(cat)} className="p-1.5 rounded hover:bg-[#111] text-zinc-500 text-xs">✏️</button>
@@ -594,10 +601,7 @@ function CategoriasTab({ eventId }: { eventId: string }) {
               <div><label className={labelClass}>Idade Máx.</label><input type="number" value={maxAge} onChange={e => setMaxAge(e.target.value)} placeholder="35" className={inputClass} /></div>
             </div>
           )}
-          <div>
-            <label className={labelClass}>Preço Base (R$)</label>
-            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className={inputClass} />
-          </div>
+
           <div className="flex gap-3 pt-3 border-t border-[#1a1a1a]">
             <button onClick={() => setShowForm(false)} className={`flex-1 ${btnOutline}`}>Cancelar</button>
             <button onClick={handleSave} disabled={createCategory.isPending || updateCategory.isPending} className={`flex-1 ${btnGold}`}>
@@ -630,19 +634,21 @@ function LotesTab({ eventId }: { eventId: string }) {
   const [paymentLink, setPaymentLink] = useState('');
   const [orderIndex, setOrderIndex] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [active, setActive] = useState(true);
 
   const openForm = (b?: any) => {
     if (b) {
       setEditing(b);
       setName(b.name);
       setPrice(String(b.price));
-      setStartDate(b.start_date ? b.start_date.slice(0, 16) : '');
-      setEndDate(b.end_date ? b.end_date.slice(0, 16) : '');
+      setStartDate(toLocalDatetimeLocal(b.start_date));
+      setEndDate(toLocalDatetimeLocal(b.end_date));
       setMaxRegs(String(b.max_registrations || ''));
       setPixKey(b.pix_key || '');
       setPaymentLink(b.payment_link || '');
       setOrderIndex(String(b.order_index || ''));
       setCategoryId(b.category_id || '');
+      setActive(b.active !== false);
     } else {
       setEditing(null);
       setName('');
@@ -654,6 +660,7 @@ function LotesTab({ eventId }: { eventId: string }) {
       setPaymentLink('');
       setOrderIndex(String((batches?.length || 0) + 1));
       setCategoryId('');
+      setActive(true);
     }
     setShowForm(true);
   };
@@ -671,6 +678,7 @@ function LotesTab({ eventId }: { eventId: string }) {
       payment_link: paymentLink.trim() || null,
       order_index: orderIndex ? parseInt(orderIndex) : 1,
       category_id: categoryId || null,
+      active,
     };
     if (editing) {
       await updateBatch.mutateAsync({ id: editing.id, ...data });
@@ -741,7 +749,11 @@ function LotesTab({ eventId }: { eventId: string }) {
             <div className="col-span-3"><label className={labelClass}>Nome *</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: 1º Lote - Earlybird" className={inputClass} /></div>
             <div className="col-span-1"><label className={labelClass}>Ordem</label><input type="number" value={orderIndex} onChange={e => setOrderIndex(e.target.value)} placeholder="1" className={inputClass} /></div>
           </div>
-          <div><label className={labelClass}>Preço (R$) *</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="150.00" className={inputClass} /></div>
+          <div className="flex items-center gap-3 bg-[#111] border border-[#262626] p-3 rounded-lg">
+             <input type="checkbox" id="activeBatch" checked={active} onChange={e => setActive(e.target.checked)} className="w-5 h-5 accent-[#EDAC02] cursor-pointer" />
+             <label htmlFor="activeBatch" className="text-sm font-bold text-white cursor-pointer select-none">Lote Ativo (Disponível para inscrições)</label>
+          </div>
+          <div><label className={labelClass}>Valor Total da Inscrição (R$) *</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="150.00" className={inputClass} /><p className="text-[10px] text-zinc-500 mt-1">Este é o valor total que o atleta paga pela inscrição, independente do número de participantes na categoria (individual, dupla, trio...).</p></div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelClass}>Início</label><input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputClass} /></div>
             <div><label className={labelClass}>Término</label><input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputClass} /></div>
@@ -1044,10 +1056,12 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const [filter, setFilter] = useState<string | null>(null);
   
   const [editingReg, setEditingReg] = useState<any>(null);
-  const [editName, setEditName] = useState('');
   const [editBibNumber, setEditBibNumber] = useState('');
-  const [editPhone, setEditPhone] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [editTeamName, setEditTeamName] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  type AthEdit = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; gym: string; photo_url: string; };
+  const [editAthletes, setEditAthletes] = useState<AthEdit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -1056,7 +1070,15 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const [bulkStartNumber, setBulkStartNumber] = useState<number>(1);
   const [isBulkSaving, setIsBulkSaving] = useState(false);
 
-  useEffect(() => {
+  // Import feature states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importMapping, setImportMapping] = useState<Record<string, string>>({});
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStep, setImportStep] = useState(1);
+  const maxTeamSize = Math.max(...(categories?.map((c: any) => c.team_size || 1) || [1]));  useEffect(() => {
     if (!bulkCategory || !registrations || !showBulkModal) return;
     const initial: Record<string, string> = {};
     registrations.filter((r: any) => r.category_id === bulkCategory).forEach((r: any) => {
@@ -1076,6 +1098,114 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     refetch();
   };
 
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+      if (data.length > 0) {
+        const headers = data[0].map(h => String(h || '').trim());
+        setImportHeaders(headers);
+        const rows = data.slice(1).filter(r => r.some(cell => !!cell));
+        const jsonData = rows.map(r => {
+          const obj: any = {};
+          headers.forEach((h, i) => { obj[h] = r[i] || ''; });
+          return obj;
+        });
+        setImportData(jsonData);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importMapping['category_name']) return toast.error('É obrigatório mapear a coluna de Categoria!');
+    setIsImporting(true);
+    
+    const registrationsToInsert: any[] = [];
+    
+    for (const row of importData) {
+      const catName = String(row[importMapping['category_name']] || '').trim().toLowerCase();
+      const cat = categories?.find((c: any) => c.name.trim().toLowerCase() === catName);
+      if (!cat) continue;
+      
+      const teamSize = cat.team_size || 1;
+      
+      const a1 = {
+        name: String(row[importMapping['a1_name']] || 'Sem Nome'),
+        email: String(row[importMapping['a1_email']] || ''),
+        phone: String(row[importMapping['a1_phone']] || ''),
+        instagram: String(row[importMapping['a1_instagram']] || ''),
+        birth_date: String(row[importMapping['a1_birth']] || ''),
+        gender: String(row[importMapping['a1_gender']] || ''),
+        gym: String(row[importMapping['a1_gym']] || ''),
+      };
+      
+      const teamName = teamSize > 1 ? String(row[importMapping['team_name']] || a1.name) : null;
+      const teamMembers = [];
+      if (teamSize > 1) {
+        for (let i = 2; i <= teamSize; i++) {
+          teamMembers.push({
+            name: String(row[importMapping[`a${i}_name`]] || ''),
+            email: String(row[importMapping[`a${i}_email`]] || ''),
+            phone: String(row[importMapping[`a${i}_phone`]] || ''),
+            instagram: String(row[importMapping[`a${i}_instagram`]] || ''),
+            birth_date: String(row[importMapping[`a${i}_birth`]] || ''),
+            gender: String(row[importMapping[`a${i}_gender`]] || ''),
+            gym: String(row[importMapping[`a${i}_gym`]] || ''),
+            photo_url: null
+          });
+        }
+      }
+
+      registrationsToInsert.push({
+        event_id: eventId,
+        category_id: cat.id,
+        status: 'confirmed',
+        payment_method: 'import',
+        total_paid: 0,
+        athlete_name: a1.name,
+        athlete_email: a1.email,
+        athlete_phone: a1.phone,
+        athlete_instagram: a1.instagram || null,
+        athlete_birth_date: a1.birth_date || null,
+        athlete_gender: a1.gender || null,
+        athlete_gym: a1.gym || null,
+        team_name: teamName,
+        team_members: teamSize > 1 ? teamMembers : null,
+      });
+    }
+
+    if (registrationsToInsert.length === 0) {
+      setIsImporting(false);
+      return toast.error('Nenhuma inscrição válida encontrada. Verifique se o nome das categorias na planilha correspondem exatamente aos nomes cadastrados.');
+    }
+
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase.from('registrations').insert(registrationsToInsert as any);
+      if (error) throw error;
+      toast.success(`${registrationsToInsert.length} inscrições importadas!`);
+      setShowImportModal(false);
+      setImportStep(1);
+      setImportFile(null);
+      setImportData([]);
+      setImportHeaders([]);
+      setImportMapping({});
+      refetch();
+    } catch (err: any) {
+      toast.error('Erro ao importar: ' + err.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const filtered = filter
     ? registrations?.filter((r: any) => r.status === filter)
     : registrations;
@@ -1086,22 +1216,138 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     cancelled: { label: 'Cancelado', color: 'bg-red-500/20 text-red-400' },
   };
 
+  const openEditModal = (reg: any) => {
+    const teamSize = (reg.categories as any)?.team_size || 1;
+    const a1: AthEdit = { name: reg.athlete_name||'', email: reg.athlete_email||'', phone: reg.athlete_phone||'', instagram: reg.athlete_instagram||'', birth_date: reg.athlete_birth_date||'', gender: reg.athlete_gender||'', gym: reg.athlete_gym||'', photo_url: reg.athlete_photo_url||'' };
+    const members: AthEdit[] = [a1];
+    if (teamSize > 1 && reg.team_members) {
+      (reg.team_members as any[]).forEach(m => members.push({ name: m.name||'', email: m.email||'', phone: m.phone||'', instagram: m.instagram||'', birth_date: m.birth_date||'', gender: m.gender||'', gym: m.gym||'', photo_url: m.photo_url||'' }));
+    }
+    while (members.length < teamSize) members.push({ name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', gym:'', photo_url:'' });
+    setEditAthletes(members);
+    setEditBibNumber(reg.bib_number||'');
+    setEditStatus(reg.status);
+    setEditTeamName(reg.team_name||'');
+    setEditCategoryId(reg.category_id||'');
+    setEditingReg(reg);
+  };
+  const updateEditAthlete = (i: number, field: keyof AthEdit, val: string) => { setEditAthletes(prev => { const a=[...prev]; a[i]={...a[i],[field]:val}; return a; }); };
+
+  const handleCategoryChange = (newCatId: string) => {
+    setEditCategoryId(newCatId);
+    const newCat = categories?.find((c: any) => c.id === newCatId);
+    if (newCat) {
+      const newTeamSize = newCat.team_size || 1;
+      setEditAthletes(prev => {
+        const arr = [...prev];
+        if (arr.length < newTeamSize) {
+          while (arr.length < newTeamSize) arr.push({ name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', gym:'', photo_url:'' });
+          return arr;
+        } else if (arr.length > newTeamSize) {
+          return arr.slice(0, newTeamSize);
+        }
+        return arr;
+      });
+    }
+  };
+
+  const openNewRegModal = () => {
+    setEditAthletes([{ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', gym: '', photo_url: '' }]);
+    setEditBibNumber('');
+    setEditStatus('pending');
+    setEditTeamName('');
+    setEditCategoryId('');
+    setEditingReg({ id: 'new' });
+  };
+
+  const handleExport = () => {
+    if (!registrations || registrations.length === 0) return toast.error('Não há inscrições para exportar.');
+    
+    const exportData = registrations.map((r: any) => {
+      const isTeamCat = ((r.categories as any)?.team_size || 1) > 1;
+      let base: any = {
+        ID: r.id,
+        Data_Inscricao: r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '',
+        Categoria: (r.categories as any)?.name || '',
+        Status: r.status,
+        Valor: r.total_paid || 0,
+        Numero_Peito: r.bib_number || '',
+        Nome_Equipe: isTeamCat ? r.team_name : '',
+        Nome_Atleta_1: r.athlete_name || '',
+        Email_Atleta_1: r.athlete_email || '',
+        Telefone_Atleta_1: r.athlete_phone || '',
+        Instagram_Atleta_1: r.athlete_instagram || '',
+        Data_Nasc_Atleta_1: r.athlete_birth_date || '',
+        Genero_Atleta_1: r.athlete_gender || '',
+        Local_Treino_Atleta_1: r.athlete_gym || ''
+      };
+      
+      if (isTeamCat && r.team_members && Array.isArray(r.team_members)) {
+        r.team_members.forEach((m: any, idx: number) => {
+          base[`Nome_Atleta_${idx+2}`] = m.name || '';
+          base[`Email_Atleta_${idx+2}`] = m.email || '';
+          base[`Telefone_Atleta_${idx+2}`] = m.phone || '';
+          base[`Instagram_Atleta_${idx+2}`] = m.instagram || '';
+          base[`Data_Nasc_Atleta_${idx+2}`] = m.birth_date || '';
+          base[`Genero_Atleta_${idx+2}`] = m.gender || '';
+          base[`Local_Treino_Atleta_${idx+2}`] = m.gym || '';
+        });
+      }
+      
+      return base;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inscricoes");
+    XLSX.writeFile(wb, `Inscricoes_Evento_${eventId}.xlsx`);
+  };
+
   const handleSaveEdit = async () => {
     if (!editingReg) return;
+    if (!editCategoryId) return toast.error('Selecione a categoria para continuar.');
     setIsSaving(true);
-    // Dinamicamente importar o supabase para evitar problemas se não estiver no topo
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase
-      .from('registrations')
-      .update({ athlete_name: editName, athlete_phone: editPhone, status: editStatus, bib_number: editBibNumber || null } as any)
-      .eq('id', editingReg.id);
-      
+    const a1 = editAthletes[0] || { name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', gym:'' };
+    const teamMembers = editAthletes.length > 1 ? editAthletes.slice(1).map(m => ({ name:m.name, email:m.email, phone:m.phone, instagram:m.instagram, birth_date:m.birth_date, gender:m.gender, gym:m.gym, photo_url:m.photo_url||null })) : null;
+    
+    const payload = {
+      event_id: eventId,
+      athlete_name: a1.name, athlete_email: a1.email, athlete_phone: a1.phone,
+      athlete_instagram: a1.instagram||null, athlete_birth_date: a1.birth_date||null,
+      athlete_gender: a1.gender||null, athlete_gym: a1.gym||null, athlete_photo_url: a1.photo_url||null,
+      status: editStatus || 'pending', bib_number: editBibNumber||null,
+      team_name: editTeamName||null, team_members: teamMembers,
+      category_id: editCategoryId || undefined,
+    };
+
+    let error;
+    if (editingReg.id === 'new') {
+      const res = await supabase.from('registrations').insert([payload]);
+      error = res.error;
+    } else {
+      const res = await supabase.from('registrations').update(payload).eq('id', editingReg.id);
+      error = res.error;
+    }
+    
     setIsSaving(false);
+    if (!error) { setEditingReg(null); refetch(); toast.success(editingReg.id === 'new' ? 'Inscrição criada!' : 'Inscrição atualizada!'); }
+    else { toast.error("Erro: " + error.message); }
+  };
+
+  const handleDeleteReg = async (e: React.MouseEvent, regId: string) => {
+    e.stopPropagation();
+    if (!confirm('Tem certeza que deseja excluir esta inscrição? Esta ação é irreversível.')) return;
+    
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase.from('registrations').delete().eq('id', regId);
+    
     if (!error) {
-      setEditingReg(null);
+      toast.success('Inscrição excluída!');
+      if (editingReg?.id === regId) setEditingReg(null);
       refetch();
     } else {
-      alert("Erro ao salvar: " + error.message);
+      toast.error('Erro ao excluir: ' + error.message);
     }
   };
 
@@ -1127,6 +1373,15 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         ))}
         
         <div className="flex-1" />
+        <button onClick={handleExport} className="px-4 py-1.5 bg-[#111] border border-[#262626] text-zinc-300 text-xs font-bold rounded-lg hover:border-green-500 hover:text-green-500 transition-all flex items-center gap-2 shadow-sm mr-2">
+          📊 Exportar
+        </button>
+        <button onClick={openNewRegModal} className="px-4 py-1.5 bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-bold rounded-lg hover:bg-[#EDAC02] hover:text-black transition-all flex items-center gap-2 shadow-sm mr-2">
+          + Nova Inscrição
+        </button>
+        <button onClick={() => setShowImportModal(true)} className="px-4 py-1.5 bg-[#111] border border-[#262626] text-zinc-300 text-xs font-bold rounded-lg hover:border-[#EDAC02] hover:text-[#EDAC02] transition-all flex items-center gap-2 shadow-sm mr-2">
+          📥 Importar Planilha
+        </button>
         <button onClick={() => setShowBulkModal(true)} className="px-4 py-1.5 bg-[#111] border border-[#262626] text-zinc-300 text-xs font-bold rounded-lg hover:border-[#EDAC02] hover:text-[#EDAC02] transition-all flex items-center gap-2 shadow-sm">
           🔢 Lote de Numeração
         </button>
@@ -1137,80 +1392,105 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           <thead>
             <tr className="border-b border-[#1a1a1a]">
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Nº</th>
-              <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Atleta</th>
+              <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Equipe / Atleta</th>
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Categoria</th>
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Bateria</th>
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Status</th>
               <th className="text-right py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Valor</th>
-              <th className="text-right py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold flex-1">Ações</th>
+              <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">📸</th>
+              <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">📄</th>
+              <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">🗑️</th>
             </tr>
           </thead>
           <tbody>
             {filtered?.map((reg: any) => {
               const st = statusConfig[reg.status] || statusConfig.pending;
-              const waLink = reg.athlete_phone ? `https://wa.me/55${reg.athlete_phone.replace(/\D/g, '')}` : null;
+              const isTeamCat = ((reg.categories as any)?.team_size || 1) > 1;
+              const displayName = isTeamCat ? (reg.team_name || reg.athlete_name || '—') : (reg.athlete_name || '—');
+              const photoUrl = reg.athlete_photo_url || null;
+              const receiptUrl = reg.pix_receipt_url || null;
               
               return (
-                <tr key={reg.id} className="border-b border-[#0f0f0f] hover:bg-[#0a0a0a] transition-colors">
+                <tr key={reg.id} onClick={() => openEditModal(reg)} className="border-b border-[#0f0f0f] hover:bg-[#0a0a0a] transition-colors cursor-pointer">
                   <td className="py-3 px-3 font-mono text-zinc-400">{reg.bib_number || '—'}</td>
                   <td className="py-3 px-3">
-                    <div className="font-medium text-white">{reg.athlete_name || reg.user_id?.slice(0, 8) || 'Anônimo'}</div>
-                    {reg.athlete_phone && <div className="text-[10px] text-zinc-500 mt-0.5">{reg.athlete_phone}</div>}
+                    <div className="font-medium text-white">{displayName}</div>
                   </td>
                   <td className="py-3 px-3 text-zinc-400">{(reg.categories as any)?.name || '—'}</td>
                   <td className="py-3 px-3 text-zinc-400">{(reg.heats as any)?.title || '—'}</td>
                   <td className="py-3 px-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${st.color}`}>{st.label}</span></td>
                   <td className="py-3 px-3 text-right text-[#EDAC02] font-bold">R$ {(reg.total_paid || 0).toFixed(2)}</td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                       {waLink && (
-                         <a href={waLink} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 rounded transition-colors" title="Chamar no WhatsApp">
-                           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                         </a>
-                       )}
-                       {reg.pix_receipt_url && (
-                         <a href={reg.pix_receipt_url} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded transition-colors" title="Ver Comprovante">
-                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                         </a>
-                       )}
-                       <button onClick={() => { setEditingReg(reg); setEditName(reg.athlete_name || ''); setEditPhone(reg.athlete_phone || ''); setEditBibNumber(reg.bib_number || ''); setEditStatus(reg.status); }} className="p-1.5 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white rounded transition-colors" title="Editar">
-                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                       </button>
-                    </div>
+                  <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
+                    {photoUrl ? <a href={photoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 rounded transition-colors" title="Baixar Foto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></a> : <span className="text-zinc-700">—</span>}
+                  </td>
+                  <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
+                    {receiptUrl ? <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded transition-colors" title="Ver Comprovante"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></a> : <span className="text-zinc-700">—</span>}
+                  </td>
+                  <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
+                    <button onClick={(e) => handleDeleteReg(e, reg.id)} className="inline-flex p-1.5 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded transition-colors" title="Excluir Inscrição">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
                   </td>
                 </tr>
               );
             })}
             {(!filtered || filtered.length === 0) && (
-              <tr><td colSpan={7} className="text-center py-12 text-zinc-600 text-sm">Nenhuma inscrição encontrada</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-zinc-600 text-sm">Nenhuma inscrição encontrada</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <Modal open={!!editingReg} onClose={() => setEditingReg(null)} title="Editar Inscrição">
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nome do Atleta</label>
-            <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none" /></div>
-
-            <div className="col-span-1"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nº (Peito)</label>
+      <Modal open={!!editingReg} onClose={() => setEditingReg(null)} title={editingReg?.id === 'new' ? "Nova Inscrição" : "Detalhes da Inscrição"}>
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-4 gap-3">
+            <div><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nº (Peito)</label>
             <input value={editBibNumber} onChange={e => setEditBibNumber(e.target.value)} placeholder="001" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none font-mono" /></div>
+            <div><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Status</label>
+            <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none">
+              <option value="pending">Pendente</option><option value="confirmed">Confirmado</option><option value="cancelled">Cancelado</option>
+            </select></div>
+            <div className="col-span-2"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Categoria</label>
+            <select value={editCategoryId} onChange={e => handleCategoryChange(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none">
+              {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select></div>
+            {editAthletes.length > 1 && <div className="col-span-4"><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nome da Equipe</label>
+            <input value={editTeamName} onChange={e => setEditTeamName(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none" /></div>}
           </div>
 
-          <div><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">WhatsApp</label>
-          <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="(31) 99999-9999" className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none" /></div>
-          
-          <div><label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Status da Inscrição</label>
-          <select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white focus:border-[#EDAC02] outline-none">
-            <option value="pending">Pendente (Aguardando Pagamento)</option>
-            <option value="confirmed">Confirmado (Aprovado)</option>
-            <option value="cancelled">Cancelado</option>
-          </select></div>
+          {editAthletes.map((ath, idx) => {
+            const iC = "w-full bg-[#050505] border border-[#262626] rounded-lg p-2.5 text-white text-sm focus:border-[#EDAC02] outline-none";
+            const lC = "block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1";
+            const waLink = ath.phone ? `https://wa.me/55${ath.phone.replace(/\D/g, '')}` : null;
+            return (
+              <div key={idx} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-4 space-y-3">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider flex items-center gap-2">🏃 Atleta {idx + 1} {waLink && <a href={waLink} target="_blank" rel="noopener noreferrer" className="ml-auto text-[#25D366] hover:underline text-[10px] normal-case">WhatsApp →</a>}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={lC}>Nome Completo</label><input value={ath.name} onChange={e => updateEditAthlete(idx,'name',e.target.value)} className={iC} /></div>
+                  <div><label className={lC}>E-mail</label><input value={ath.email} onChange={e => updateEditAthlete(idx,'email',e.target.value)} className={iC} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={lC}>WhatsApp</label><input value={ath.phone} onChange={e => updateEditAthlete(idx,'phone',e.target.value)} className={iC} /></div>
+                  <div><label className={lC}>Instagram</label><input value={ath.instagram} onChange={e => updateEditAthlete(idx,'instagram',e.target.value)} className={iC} /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div><label className={lC}>Data Nasc.</label><input type="date" value={ath.birth_date} onChange={e => updateEditAthlete(idx,'birth_date',e.target.value)} className={iC} /></div>
+                  <div><label className={lC}>Gênero</label><select value={ath.gender} onChange={e => updateEditAthlete(idx,'gender',e.target.value)} className={iC}><option value="">—</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
+                  <div><label className={lC}>Local de Treino</label><input value={ath.gym} onChange={e => updateEditAthlete(idx,'gym',e.target.value)} className={iC} /></div>
+                </div>
+                {ath.photo_url && <div className="flex items-center gap-3 pt-2 border-t border-[#1a1a1a]"><a href={ath.photo_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#EDAC02] hover:underline font-bold">📸 Ver Foto Treinando →</a></div>}
+              </div>
+            );
+          })}
 
-          <div className="flex gap-3 pt-3 border-t border-[#1a1a1a]">
-            <button onClick={() => setEditingReg(null)} className="flex-1 px-4 py-2.5 border border-[#262626] rounded-lg text-zinc-400 font-bold hover:bg-[#111]">Cancelar</button>
-            <button onClick={handleSaveEdit} disabled={isSaving} className="flex-1 px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg hover:bg-[#d49b02]">{isSaving ? 'Salvando...' : 'Salvar Alterações'}</button>
+          <div className="flex flex-col gap-3 pt-3 border-t border-[#1a1a1a]">
+            <div className="flex gap-3">
+              <button onClick={() => setEditingReg(null)} className="flex-1 px-4 py-2.5 border border-[#262626] rounded-lg text-zinc-400 font-bold hover:bg-[#111]">Cancelar</button>
+              <button onClick={handleSaveEdit} disabled={isSaving} className="flex-1 px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg hover:bg-[#d49b02]">{isSaving ? 'Salvando...' : (editingReg?.id === 'new' ? 'Criar Inscrição' : 'Salvar Alterações')}</button>
+            </div>
+            {editingReg?.id !== 'new' && (
+              <button onClick={(e) => handleDeleteReg(e, editingReg.id)} className="w-full px-4 py-2 border border-red-500/20 text-red-500 font-bold rounded-lg hover:bg-red-500/10 transition-colors">Excluir Inscrição Permanentemente</button>
+            )}
           </div>
         </div>
       </Modal>
@@ -1253,10 +1533,13 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               </div>
               
               <div className="max-h-[45vh] overflow-y-auto pr-2 space-y-2">
-              {registrations?.filter((r: any) => r.category_id === bulkCategory).map((r: any) => (
+              {registrations?.filter((r: any) => r.category_id === bulkCategory).map((r: any) => {
+                const isTeamCat = ((r.categories as any)?.team_size || 1) > 1;
+                const displayName = isTeamCat ? (r.team_name || r.athlete_name || '—') : (r.athlete_name || r.user_id?.slice(0, 8) || 'Anônimo');
+                return (
                 <div key={r.id} className="flex items-center justify-between bg-[#111] border border-[#262626] rounded-lg p-3 hover:border-zinc-700 transition-colors">
                   <div className="w-[65%] truncate pr-2">
-                    <p className="text-sm text-white font-bold truncate">{r.athlete_name || r.user_id?.slice(0, 8) || 'Anônimo'}</p>
+                    <p className="text-sm text-white font-bold truncate">{displayName}</p>
                     {r.athlete_phone && <p className="text-[10px] text-zinc-500 truncate">{r.athlete_phone}</p>}
                   </div>
                   <div className="w-[35%] shrink-0">
@@ -1268,7 +1551,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
                     />
                   </div>
                 </div>
-              ))}
+              )})}
               {registrations?.filter((r: any) => r.category_id === bulkCategory).length === 0 && (
                 <p className="text-center text-sm text-zinc-500 py-6 border border-dashed border-[#262626] rounded-lg">Nenhum atleta listado nesta categoria.</p>
               )}
@@ -1280,6 +1563,111 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             <button onClick={() => setShowBulkModal(false)} className="flex-1 px-4 py-2.5 border border-[#262626] rounded-lg text-zinc-400 font-bold hover:bg-[#111]">Sair</button>
             <button onClick={handleSaveBulk} disabled={!bulkCategory || isBulkSaving} className="flex-1 px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg hover:bg-[#d49b02] disabled:opacity-30 transition-all">{isBulkSaving ? 'Salvando...' : 'Salvar Todos'}</button>
           </div>
+        </div>
+      </Modal>
+      <Modal open={showImportModal} onClose={() => { setShowImportModal(false); setImportStep(1); setImportData([]); setImportHeaders([]); setImportMapping({}); setImportFile(null); }} title="Importar Inscrições (Excel/CSV)">
+        <div className="space-y-4">
+          {importStep === 1 && (
+            <>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Selecione o Arquivo</label>
+                <input type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleImportFile} className="w-full text-sm text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-[#EDAC02] file:text-black hover:file:bg-[#d49b02] cursor-pointer" />
+                <p className="text-[10px] text-zinc-500 mt-2">Formatos suportados: .xlsx, .xls, .csv</p>
+              </div>
+
+              {importData.length > 0 && (
+                <div className="pt-4 border-t border-[#1a1a1a]">
+                  <p className="text-sm text-white font-bold mb-4">Planilha lida com sucesso! ({importData.length} linhas de dados)</p>
+                  <button onClick={() => setImportStep(2)} className="w-full px-4 py-3 bg-[#EDAC02] text-black font-black rounded-lg hover:bg-[#d49b02]">Continuar para Mapeamento →</button>
+                </div>
+              )}
+            </>
+          )}
+
+          {importStep === 2 && (
+            <>
+              <p className="text-xs text-zinc-400 mb-4">Mapeie as colunas da sua planilha para os campos do sistema. Campos não mapeados ficarão vazios.</p>
+              
+              <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-4">
+                <div className="bg-[#111] p-3 rounded-lg border border-[#EDAC02]/50">
+                  <label className="block text-xs font-bold text-[#EDAC02] mb-2">Categoria <span className="text-white font-normal text-[10px] ml-1">(O nome na planilha deve ser igual ao do sistema)</span></label>
+                  <select value={importMapping['category_name'] || ''} onChange={e => setImportMapping(p => ({...p, category_name: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-3 py-2 text-white text-xs focus:border-[#EDAC02] outline-none">
+                    <option value="">Selecione a coluna de Categoria...</option>
+                    {importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+
+                {maxTeamSize > 1 && (
+                  <div className="bg-[#111] p-3 rounded-lg border border-[#262626]">
+                    <label className="block text-xs font-bold text-[#EDAC02] mb-2">Nome da Equipe</label>
+                    <select value={importMapping['team_name'] || ''} onChange={e => setImportMapping(p => ({...p, team_name: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-3 py-2 text-white text-xs">
+                      <option value="">Não importar (ignorar)</option>
+                      {importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {Array.from({ length: maxTeamSize }).map((_, idx) => {
+                  const num = idx + 1;
+                  return (
+                    <div key={num} className="bg-[#111] p-3 rounded-lg border border-[#262626] space-y-3">
+                      <p className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#262626] pb-2 mb-2">🏃 Atleta {num}</p>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] text-zinc-500 mb-1">Nome Completo</label>
+                          <select value={importMapping[`a${num}_name`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_name`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-zinc-500 mb-1">E-mail</label>
+                          <select value={importMapping[`a${num}_email`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_email`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-zinc-500 mb-1">WhatsApp</label>
+                          <select value={importMapping[`a${num}_phone`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_phone`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-zinc-500 mb-1">Instagram</label>
+                          <select value={importMapping[`a${num}_instagram`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_instagram`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-zinc-500 mb-1">Data Nasc.</label>
+                          <select value={importMapping[`a${num}_birth`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_birth`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-zinc-500 mb-1">Gênero</label>
+                          <select value={importMapping[`a${num}_gender`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_gender`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[10px] text-zinc-500 mb-1">Local de Treino</label>
+                          <select value={importMapping[`a${num}_gym`] || ''} onChange={e => setImportMapping(p => ({...p, [`a${num}_gym`]: e.target.value}))} className="w-full bg-[#050505] border border-[#333] rounded px-2 py-1.5 text-white text-[10px]">
+                            <option value="">Ignorar</option>{importHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-[#1a1a1a]">
+                <button onClick={() => setImportStep(1)} className="flex-1 px-4 py-2.5 border border-[#262626] rounded-lg text-zinc-400 font-bold hover:bg-[#111]">Voltar</button>
+                <button onClick={handleConfirmImport} disabled={isImporting} className="flex-1 px-4 py-2.5 bg-[#10b981] text-white font-black rounded-lg hover:bg-[#059669]">{isImporting ? 'Importando...' : 'Confirmar Importação'}</button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

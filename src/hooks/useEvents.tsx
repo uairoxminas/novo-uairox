@@ -186,6 +186,63 @@ export function useDeleteEvent() {
   });
 }
 
+// ============ DUPLICATE EVENT ============
+export function useDuplicateEvent() {
+  const queryClient = useQueryClient();
+  const createEvent = useCreateEvent();
+
+  return useMutation({
+    mutationFn: async (event: EventRow) => {
+      // 1. Create new event
+      const newEvent = await createEvent.mutateAsync({
+        title: `${event.title} (Cópia)`,
+        date: event.date,
+        end_date: event.end_date || undefined,
+        location: event.location,
+        description: event.description || undefined,
+        image_url: event.image_url || undefined,
+        status: 'planning', // Always start as planning
+        event_type: event.event_type,
+        // @ts-ignore
+        whatsapp_group_link: event.whatsapp_group_link,
+        // @ts-ignore
+        require_shirt_size: (event as any).require_shirt_size,
+      });
+
+      if (!newEvent?.id) throw new Error("Falha ao criar o evento base.");
+
+      // 2. Duplicate Categories
+      const { data: categories } = await supabase.from('categories').select('*').eq('event_id', event.id);
+      if (categories && categories.length > 0) {
+        const newCategories = categories.map(c => {
+          const { id, created_at, ...rest } = c;
+          return { ...rest, event_id: newEvent.id };
+        });
+        await supabase.from('categories').insert(newCategories);
+      }
+
+      // 3. Duplicate Price Batches
+      const { data: batches } = await supabase.from('price_batches').select('*').eq('event_id', event.id);
+      if (batches && batches.length > 0) {
+        const newBatches = batches.map(b => {
+          const { id, created_at, ...rest } = b;
+          return { ...rest, event_id: newEvent.id, active: false }; // Disable active on copies just to be safe
+        });
+        await supabase.from('price_batches').insert(newBatches);
+      }
+
+      return newEvent;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-events"] });
+      toast.success("Evento duplicado com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao duplicar evento: " + error.message);
+    },
+  });
+}
+
 // ============ PUBLIC: UPCOMING EVENTS (for homepage) ============
 export function usePublicEvents() {
   return useQuery({
@@ -199,23 +256,33 @@ export function usePublicEvents() {
 
       if (error) throw error;
       
-      // Also fetch active price batches for each event
+      // Also fetch active and future price batches for each event
       if (data?.length) {
         const eventIds = data.map(e => e.id);
         const { data: batches } = await supabase
           .from("price_batches")
           .select("event_id, name, price, start_date, end_date, active")
           .in("event_id", eventIds)
-          .eq("active", true)
           .order("order_index");
         
-        // Find active batch for each event
         const now = new Date();
         const batchMap: Record<string, any> = {};
+        const nextBatchMap: Record<string, any> = {};
+
         (batches || []).forEach(b => {
-          if (batchMap[b.event_id]) return; // first active wins
           const start = b.start_date ? new Date(b.start_date) : null;
           const end = b.end_date ? new Date(b.end_date) : null;
+
+          // Catch the first future batch
+          if (start && now < start) {
+            if (!nextBatchMap[b.event_id]) {
+              nextBatchMap[b.event_id] = b;
+            }
+          }
+
+          // Active batch logic
+          if (!b.active) return;
+          if (batchMap[b.event_id]) return; // first active wins
           if (start && now < start) return;
           if (end && now > end) return;
           batchMap[b.event_id] = b;
@@ -224,6 +291,7 @@ export function usePublicEvents() {
         return data.map(ev => ({
           ...ev,
           _active_batch: batchMap[ev.id] || null,
+          _next_batch: nextBatchMap[ev.id] || null,
         }));
       }
       
