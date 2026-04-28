@@ -2212,6 +2212,8 @@ function CronogramaTab({ eventId }: { eventId: string }) {
   );
 }
 
+import AdminEventExpensesTab from './AdminEventExpensesTab';
+
 // ============ MAIN PAGE ============
 const TABS = [
   { key: 'overview', label: '📊 Visão Geral' },
@@ -2223,6 +2225,7 @@ const TABS = [
   { key: 'lotes', label: '🎫 Lotes' },
   { key: 'cupons', label: '🏷️ Cupons' },
   { key: 'kits', label: '🎽 Kits' },
+  { key: 'despesas', label: '💸 Despesas' },
 ];
 
 export default function AdminEventConfig() {
@@ -2317,6 +2320,7 @@ export default function AdminEventConfig() {
         {activeTab === 'lotes' && <LotesTab eventId={id!} />}
         {activeTab === 'cupons' && <CuponsTab eventId={id!} />}
         {activeTab === 'kits' && <KitsTab eventId={id!} />}
+        {activeTab === 'despesas' && <AdminEventExpensesTab eventId={id!} />}
       </div>
     </div>
   );

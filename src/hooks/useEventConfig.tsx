@@ -635,8 +635,118 @@ export function useCategoryRegCounts(eventId?: string) {
       (data || []).forEach(r => {
         counts[r.category_id] = (counts[r.category_id] || 0) + 1;
       });
-      return counts;
     },
     enabled: !!eventId,
+  });
+}
+
+// ============ EXPENSE CATEGORIES (BUDGETS) ============
+export function useEventExpenseCategories(eventId?: string) {
+  return useQuery({
+    queryKey: ["event-expense-categories", eventId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("event_expense_categories")
+        .select("*")
+        .eq("event_id", eventId!)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useCreateExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (cat: { event_id: string; name: string; planned_amount: number }) => {
+      const { data, error } = await supabase.from("event_expense_categories").insert(cat).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["event-expense-categories", vars.event_id] });
+      toast.success("Categoria de despesa criada!");
+    },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
+}
+
+export function useDeleteExpenseCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, event_id }: { id: string; event_id: string }) => {
+      const { error } = await supabase.from("event_expense_categories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["event-expense-categories", vars.event_id] });
+      toast.success("Categoria excluída!");
+    },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
+}
+
+// ============ EXPENSES ============
+export function useEventExpenses(eventId?: string) {
+  return useQuery({
+    queryKey: ["event-expenses", eventId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("event_expenses")
+        .select("*, event_expense_categories(name)")
+        .eq("event_id", eventId!)
+        .order("expense_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useCreateEventExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (expense: { event_id: string; category_id?: string | null; description: string; amount: number; expense_date: string; status: string }) => {
+      const { data, error } = await supabase.from("event_expenses").insert(expense).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["event-expenses", vars.event_id] });
+      toast.success("Despesa lançada!");
+    },
+    onError: (e) => toast.error("Erro ao lançar despesa: " + e.message),
+  });
+}
+
+export function useUpdateEventExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, event_id, ...updates }: { id: string; event_id: string; [key: string]: any }) => {
+      const { error } = await supabase.from("event_expenses").update(updates as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["event-expenses", vars.event_id] });
+      toast.success("Despesa atualizada!");
+    },
+    onError: (e) => toast.error("Erro ao atualizar despesa: " + e.message),
+  });
+}
+
+export function useDeleteEventExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, event_id }: { id: string; event_id: string }) => {
+      const { error } = await supabase.from("event_expenses").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["event-expenses", vars.event_id] });
+      toast.success("Despesa excluída!");
+    },
+    onError: (e) => toast.error("Erro: " + e.message),
   });
 }
