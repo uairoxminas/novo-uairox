@@ -430,9 +430,9 @@ function EventCard({
           <StatusBadge status={event.status} />
         </div>
 
-        {/* Days counter */}
-        <div className="absolute top-3 right-3">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+        {/* Days counter & Link */}
+        <div className="absolute top-3 right-3 flex flex-col items-end gap-2">
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold shadow-lg ${
             isEventPast ? 'bg-zinc-800 text-zinc-500' :
             daysUntil <= 7 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
             daysUntil <= 30 ? 'bg-[#EDAC02]/20 text-[#EDAC02] border border-[#EDAC02]/30' :
@@ -440,6 +440,21 @@ function EventCard({
           }`}>
             {daysLabel}
           </span>
+          {((event as any).slug || event.id) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const url = `https://www.uairox.com.br/evento/${(event as any).slug || event.id}`;
+                navigator.clipboard.writeText(url);
+                toast.success('Link do evento copiado!');
+              }}
+              className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-white border border-[#262626] hover:border-[#EDAC02] hover:text-[#EDAC02] transition-colors shadow-lg flex items-center gap-1.5"
+              title="Copiar link público"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              Copiar Link
+            </button>
+          )}
         </div>
       </div>
 
