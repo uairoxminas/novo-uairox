@@ -633,7 +633,7 @@ function LotesTab({ eventId }: { eventId: string }) {
   const [pixKey, setPixKey] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
   const [orderIndex, setOrderIndex] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [selectedCatIds, setSelectedCatIds] = useState<string[]>([]);
   const [active, setActive] = useState(true);
 
   const openForm = (b?: any) => {
@@ -647,7 +647,7 @@ function LotesTab({ eventId }: { eventId: string }) {
       setPixKey(b.pix_key || '');
       setPaymentLink(b.payment_link || '');
       setOrderIndex(String(b.order_index || ''));
-      setCategoryId(b.category_id || '');
+      setSelectedCatIds(b.category_id ? [b.category_id] : []);
       setActive(b.active !== false);
     } else {
       setEditing(null);
@@ -659,7 +659,7 @@ function LotesTab({ eventId }: { eventId: string }) {
       setPixKey('');
       setPaymentLink('');
       setOrderIndex(String((batches?.length || 0) + 1));
-      setCategoryId('');
+      setSelectedCatIds([]);
       setActive(true);
     }
     setShowForm(true);
@@ -675,14 +675,14 @@ function LotesTab({ eventId }: { eventId: string }) {
     setPixKey(b.pix_key || '');
     setPaymentLink(b.payment_link || '');
     setOrderIndex(String((batches?.length || 0) + 1));
-    setCategoryId(b.category_id || '');
+    setSelectedCatIds(b.category_id ? [b.category_id] : []);
     setActive(false);
     setShowForm(true);
   };
 
   const handleSave = async () => {
     if (!name.trim() || !price) return;
-    const data: any = {
+    const baseData: any = {
       event_id: eventId,
       name: name.trim(),
       price: parseFloat(price),
@@ -692,13 +692,20 @@ function LotesTab({ eventId }: { eventId: string }) {
       pix_key: pixKey.trim() || null,
       payment_link: paymentLink.trim() || null,
       order_index: orderIndex ? parseInt(orderIndex) : 1,
-      category_id: categoryId || null,
       active,
     };
     if (editing) {
-      await updateBatch.mutateAsync({ id: editing.id, ...data });
+      // Edit mode: single batch, use first selected or null
+      await updateBatch.mutateAsync({ id: editing.id, ...baseData, category_id: selectedCatIds[0] || null });
     } else {
-      await createBatch.mutateAsync(data);
+      // Create mode: one batch per selected category (or one global if none selected)
+      if (selectedCatIds.length === 0) {
+        await createBatch.mutateAsync({ ...baseData, category_id: null });
+      } else {
+        for (const catId of selectedCatIds) {
+          await createBatch.mutateAsync({ ...baseData, category_id: catId });
+        }
+      }
     }
     setShowForm(false);
   };
@@ -755,11 +762,61 @@ function LotesTab({ eventId }: { eventId: string }) {
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editing ? 'Editar Lote' : 'Novo Lote'}>
         <div className="space-y-4">
-          <div><label className={labelClass}>Aplicar Lote À Categoria</label>
-            <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={inputClass}>
-              <option value="">Todas as Categorias do Evento (Lote Global)</option>
-              {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+          <div>
+            <label className={labelClass}>Aplicar Lote À Categoria</label>
+            {editing ? (
+              <select value={selectedCatIds[0] || ''} onChange={e => setSelectedCatIds(e.target.value ? [e.target.value] : [])} className={inputClass}>
+                <option value="">Todas as Categorias do Evento (Lote Global)</option>
+                {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            ) : (
+              <div className="space-y-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCatIds([])}
+                  className={`w-full text-left px-3 py-2 rounded-lg border text-sm font-bold transition-all ${
+                    selectedCatIds.length === 0
+                      ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
+                      : 'border-[#262626] bg-[#050505] text-zinc-400 hover:border-zinc-600'
+                  }`}
+                >
+                  ✨ Todas as Categorias (Lote Global)
+                </button>
+                <div className="grid grid-cols-1 gap-1">
+                  {categories?.map(c => {
+                    const isSelected = selectedCatIds.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCatIds(prev =>
+                            isSelected ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                          );
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-all flex items-center gap-2 ${
+                          isSelected
+                            ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-white'
+                            : 'border-[#262626] bg-[#050505] text-zinc-400 hover:border-zinc-600'
+                        }`}
+                      >
+                        <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] ${
+                          isSelected ? 'bg-[#EDAC02] border-[#EDAC02] text-black' : 'border-[#444] bg-transparent'
+                        }`}>
+                          {isSelected && '✓'}
+                        </span>
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedCatIds.length > 1 && (
+                  <p className="text-[10px] text-[#EDAC02] font-bold mt-1">
+                    ✨ Será criado 1 lote para cada uma das {selectedCatIds.length} categorias selecionadas
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-4 gap-4">
             <div className="col-span-3"><label className={labelClass}>Nome *</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: 1º Lote - Earlybird" className={inputClass} /></div>
