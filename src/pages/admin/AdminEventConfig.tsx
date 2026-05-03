@@ -1128,6 +1128,23 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const { data: categories } = useCategories(eventId);
   const [filter, setFilter] = useState<string | null>(null);
   
+  // Installment data for all registrations in this event
+  const [allInstallments, setAllInstallments] = useState<any[]>([]);
+  const fetchInstallments = async () => {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const regIds = registrations?.map((r: any) => r.id) || [];
+    if (regIds.length === 0) { setAllInstallments([]); return; }
+    const { data } = await (supabase as any).from('registration_installments').select('*').in('registration_id', regIds).order('installment_number');
+    setAllInstallments(data || []);
+  };
+  useEffect(() => { if (registrations?.length) fetchInstallments(); }, [registrations]);
+
+  const getRegInstallments = (regId: string) => allInstallments.filter(i => i.registration_id === regId);
+  const pendingInstallments = allInstallments.filter(i => i.status !== 'paid');
+  const overdueInstallments = allInstallments.filter(i => i.status !== 'paid' && i.due_date < new Date().toISOString().split('T')[0]);
+  const dueTodayInstallments = allInstallments.filter(i => i.status !== 'paid' && i.due_date === new Date().toISOString().split('T')[0]);
+  const withReceiptPending = allInstallments.filter(i => i.status !== 'paid' && i.receipt_url);
+
   const [editingReg, setEditingReg] = useState<any>(null);
   const [editBibNumber, setEditBibNumber] = useState('');
   const [editStatus, setEditStatus] = useState('');
@@ -1280,9 +1297,11 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     }
   };
 
-  const filtered = filter
-    ? registrations?.filter((r: any) => r.status === filter)
-    : registrations;
+  const filtered = filter === 'installments'
+    ? registrations?.filter((r: any) => (r as any).payment_type === 'installments')
+    : filter
+      ? registrations?.filter((r: any) => r.status === filter)
+      : registrations;
 
   const statusConfig: Record<string, { label: string; color: string }> = {
     confirmed: { label: 'Confirmado', color: 'bg-green-500/20 text-green-400' },
@@ -1450,6 +1469,20 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             {label}
           </button>
         ))}
+
+        {/* Installments filter */}
+        {allInstallments.length > 0 && (
+          <button
+            onClick={() => setFilter(filter === 'installments' ? null : 'installments')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+              filter === 'installments'
+                ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
+                : 'border-[#262626] text-zinc-500 hover:border-zinc-600'
+            }`}
+          >
+            💳 Parcelados ({registrations?.filter((r: any) => (r as any).payment_type === 'installments').length || 0})
+          </button>
+        )}
         
         <div className="flex-1" />
         <button onClick={handleExport} className="px-4 py-1.5 bg-[#111] border border-[#262626] text-zinc-300 text-xs font-bold rounded-lg hover:border-green-500 hover:text-green-500 transition-all flex items-center gap-2 shadow-sm mr-2">
@@ -1465,6 +1498,28 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           🔢 Lote de Numeração
         </button>
       </div>
+
+      {/* Installment Alert Banner */}
+      {(overdueInstallments.length > 0 || dueTodayInstallments.length > 0 || withReceiptPending.length > 0) && (
+        <div className="flex items-center gap-3 p-3 bg-[#0a0a0a] border border-amber-500/20 rounded-xl flex-wrap">
+          <span className="text-sm">⚠️</span>
+          {overdueInstallments.length > 0 && (
+            <span className="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-bold border border-red-500/20">
+              🔴 {overdueInstallments.length} vencida{overdueInstallments.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {dueTodayInstallments.length > 0 && (
+            <span className="px-2 py-1 bg-amber-500/10 text-amber-400 rounded text-xs font-bold border border-amber-500/20">
+              🟡 {dueTodayInstallments.length} vence{dueTodayInstallments.length > 1 ? 'm' : ''} HOJE
+            </span>
+          )}
+          {withReceiptPending.length > 0 && (
+            <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-xs font-bold border border-blue-500/20">
+              📎 {withReceiptPending.length} comprovante{withReceiptPending.length > 1 ? 's' : ''} p/ conferir
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -1497,7 +1552,22 @@ function InscricoesTab({ eventId }: { eventId: string }) {
                   </td>
                   <td className="py-3 px-3 text-zinc-400">{(reg.categories as any)?.name || '—'}</td>
                   <td className="py-3 px-3 text-zinc-400">{(reg.heats as any)?.title || '—'}</td>
-                  <td className="py-3 px-3"><span className={`px-2 py-1 rounded text-[10px] font-bold ${st.color}`}>{st.label}</span></td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${st.color}`}>{st.label}</span>
+                    {(() => {
+                      const regInst = getRegInstallments(reg.id);
+                      if (regInst.length === 0) return null;
+                      const paid = regInst.filter((i: any) => i.status === 'paid').length;
+                      const total = regInst.length;
+                      const hasOverdue = regInst.some((i: any) => i.status !== 'paid' && i.due_date < new Date().toISOString().split('T')[0]);
+                      const hasReceipt = regInst.some((i: any) => i.status !== 'paid' && i.receipt_url);
+                      return (
+                        <span className={`ml-1.5 px-2 py-1 rounded text-[10px] font-bold ${paid === total ? 'bg-green-500/20 text-green-400' : hasOverdue ? 'bg-red-500/20 text-red-400' : 'bg-[#EDAC02]/20 text-[#EDAC02]'}`}>
+                          💳 {paid}/{total}{hasReceipt ? ' 📎' : ''}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="py-3 px-3 text-right text-[#EDAC02] font-bold">R$ {(reg.total_paid || 0).toFixed(2)}</td>
                   <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
                     {allPhotos.length > 0 ? (
@@ -1572,6 +1642,118 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               </div>
             );
           })}
+
+          {/* Installments Management Section */}
+          {editingReg?.id !== 'new' && (() => {
+            const regInst = getRegInstallments(editingReg?.id);
+            if (regInst.length === 0) return null;
+            const paidAmt = regInst.filter((i: any) => i.status === 'paid').reduce((s: number, i: any) => s + Number(i.amount), 0);
+            const totalAmt = regInst.reduce((s: number, i: any) => s + Number(i.amount), 0);
+            const paidCount = regInst.filter((i: any) => i.status === 'paid').length;
+            const progressPct = totalAmt > 0 ? (paidAmt / totalAmt) * 100 : 0;
+            const portalUrl = `${window.location.origin}/pagamento/${editingReg?.id}`;
+
+            const handleConfirmInstallment = async (instId: string) => {
+              const { supabase } = await import('@/integrations/supabase/client');
+              await (supabase as any).from('registration_installments').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', instId);
+              // Check if all paid
+              const updated = regInst.map((i: any) => i.id === instId ? { ...i, status: 'paid' } : i);
+              if (updated.every((i: any) => i.status === 'paid')) {
+                await supabase.from('registrations').update({ status: 'confirmed', total_paid: totalAmt } as any).eq('id', editingReg.id);
+                setEditStatus('confirmed');
+                setEditTotalPaid(totalAmt);
+                toast.success('Todas parcelas pagas! Inscrição confirmada ✅');
+              } else {
+                const newPaid = updated.filter((i: any) => i.status === 'paid').reduce((s: number, i: any) => s + Number(i.amount), 0);
+                setEditTotalPaid(newPaid);
+                toast.success('Parcela confirmada!');
+              }
+              refetch();
+              fetchInstallments();
+            };
+
+            const handleConfirmAll = async () => {
+              const { supabase } = await import('@/integrations/supabase/client');
+              const pending = regInst.filter((i: any) => i.status !== 'paid');
+              await Promise.all(pending.map((i: any) => (supabase as any).from('registration_installments').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', i.id)));
+              await supabase.from('registrations').update({ status: 'confirmed', total_paid: totalAmt } as any).eq('id', editingReg.id);
+              setEditStatus('confirmed');
+              setEditTotalPaid(totalAmt);
+              toast.success('Todas parcelas confirmadas! Inscrição confirmada ✅');
+              refetch();
+              fetchInstallments();
+            };
+
+            const genWhatsApp = (inst: any) => {
+              const phone = editingReg?.athlete_phone?.replace(/\D/g, '') || '';
+              const fullPhone = phone.startsWith('55') ? phone : `55${phone}`;
+              const name = editingReg?.athlete_name || '';
+              const formattedDate = new Date(inst.due_date + 'T12:00:00').toLocaleDateString('pt-BR');
+              const msg = encodeURIComponent(
+                `Olá ${name}! 🏃\n\n` +
+                `Lembrete UAIROX: sua ${inst.installment_number}ª parcela de R$ ${Number(inst.amount).toFixed(2)} ` +
+                `vence em ${formattedDate}.\n\n` +
+                `💰 Pague via PIX e envie o comprovante pelo portal:\n` +
+                `👉 ${portalUrl}\n\n` +
+                `Qualquer dúvida, estamos à disposição! 💪`
+              );
+              return `https://wa.me/${fullPhone}?text=${msg}`;
+            };
+
+            return (
+              <div className="bg-[#0a0a0a] border border-[#EDAC02]/20 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">💳 Parcelas PIX</p>
+                  <span className="text-xs text-zinc-400 font-bold">{paidCount}/{regInst.length} pagas</span>
+                </div>
+                <div className="w-full bg-[#1a1a1a] rounded-full h-2 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${progressPct >= 100 ? 'bg-green-500' : progressPct >= 50 ? 'bg-[#EDAC02]' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, progressPct)}%` }} />
+                </div>
+                <div className="space-y-2">
+                  {regInst.map((inst: any) => {
+                    const isPaid = inst.status === 'paid';
+                    const today = new Date().toISOString().split('T')[0];
+                    const isOverdue = !isPaid && inst.due_date < today;
+                    const isDueToday = !isPaid && inst.due_date === today;
+                    return (
+                      <div key={inst.id} className={`p-3 rounded-lg border ${isPaid ? 'border-green-500/20 bg-green-500/5' : isOverdue ? 'border-red-500/20 bg-red-500/5' : 'border-[#262626] bg-[#111]'}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-[#EDAC02]">{inst.installment_number}ª</span>
+                            <span className="text-sm font-bold text-white">R$ {Number(inst.amount).toFixed(2)}</span>
+                            <span className="text-[10px] text-zinc-500">📅 {new Date(inst.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isPaid ? 'bg-green-500/20 text-green-400' : isOverdue ? 'bg-red-500/20 text-red-400' : isDueToday ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {isPaid ? `✅ Pago${inst.paid_at ? ' ' + new Date(inst.paid_at).toLocaleDateString('pt-BR') : ''}` : isOverdue ? '❌ Vencida' : isDueToday ? '⚡ Vence HOJE' : '⏳ Pendente'}
+                          </span>
+                        </div>
+                        {inst.receipt_url && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-blue-400 font-bold">📎 Comprovante:</span>
+                            <a href={inst.receipt_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#EDAC02] underline hover:text-white">🔍 Ver</a>
+                          </div>
+                        )}
+                        {!isPaid && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <button onClick={() => handleConfirmInstallment(inst.id)} className="px-3 py-1.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg text-[10px] font-bold hover:bg-green-500/20 transition-colors">✅ Confirmar</button>
+                            <a href={genWhatsApp(inst)} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20 rounded-lg text-[10px] font-bold hover:bg-[#25D366]/20 transition-colors">💬 WhatsApp</a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {paidCount < regInst.length && (
+                  <button onClick={handleConfirmAll} className="w-full py-2 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg text-xs font-bold hover:bg-green-500/20 transition-colors">✅ Confirmar Todas as Parcelas</button>
+                )}
+                <div className="flex items-center gap-2 pt-2 border-t border-[#1a1a1a]">
+                  <span className="text-[10px] text-zinc-500">Portal:</span>
+                  <code className="text-[10px] text-[#EDAC02] font-mono flex-1 truncate">{portalUrl}</code>
+                  <button onClick={() => { navigator.clipboard.writeText(portalUrl); toast.success('Link copiado!'); }} className="text-[10px] text-zinc-400 hover:text-[#EDAC02] font-bold">Copiar</button>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex flex-col gap-3 pt-3 border-t border-[#1a1a1a]">
             <div className="flex gap-3">
