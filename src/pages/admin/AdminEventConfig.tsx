@@ -665,6 +665,21 @@ function LotesTab({ eventId }: { eventId: string }) {
     setShowForm(true);
   };
 
+  const duplicateBatch = (b: any) => {
+    setEditing(null);
+    setName(b.name + ' (Cópia)');
+    setPrice(String(b.price));
+    setStartDate(toLocalDatetimeLocal(b.start_date));
+    setEndDate(toLocalDatetimeLocal(b.end_date));
+    setMaxRegs(String(b.max_registrations || ''));
+    setPixKey(b.pix_key || '');
+    setPaymentLink(b.payment_link || '');
+    setOrderIndex(String((batches?.length || 0) + 1));
+    setCategoryId(b.category_id || '');
+    setActive(false);
+    setShowForm(true);
+  };
+
   const handleSave = async () => {
     if (!name.trim() || !price) return;
     const data: any = {
@@ -729,8 +744,9 @@ function LotesTab({ eventId }: { eventId: string }) {
               </div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => openForm(batch)} className="p-2 rounded-lg hover:bg-[#111] text-zinc-400 text-xs">✏️</button>
-              <button onClick={() => deleteBatch.mutate({ id: batch.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-400 text-xs">🗑️</button>
+              <button onClick={() => duplicateBatch(batch)} className="p-2 rounded-lg hover:bg-[#EDAC02]/10 text-zinc-400 hover:text-[#EDAC02] text-xs transition-colors" title="Duplicar Lote">📋</button>
+              <button onClick={() => openForm(batch)} className="p-2 rounded-lg hover:bg-[#111] text-zinc-400 text-xs" title="Editar Lote">✏️</button>
+              <button onClick={() => deleteBatch.mutate({ id: batch.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-400 text-xs" title="Excluir Lote">🗑️</button>
             </div>
           </div>
         ))}
