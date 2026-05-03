@@ -125,7 +125,17 @@ export default function PublicEventRegistration() {
   const registrationRef = useRef<HTMLDivElement>(null);
 
   const globalActiveBatch = getActiveBatch(batches);
-  const globalIsSoldOut = batches.length > 0 && !globalActiveBatch;
+  // Check if ANY batch is active (global or category-specific)
+  const anyBatchActive = batches.some(b => {
+    const now = new Date();
+    const start = b.start_date ? new Date(b.start_date) : null;
+    const end = b.end_date ? new Date(b.end_date) : null;
+    if (start && now < start) return false;
+    if (end && now > end) return false;
+    if (b.max_registrations && (b.registrations_count || 0) >= b.max_registrations) return false;
+    return true;
+  });
+  const globalIsSoldOut = batches.length > 0 && !anyBatchActive;
 
   // Capacity logic
   const maxCapacity = event?.max_capacity as number | null;
