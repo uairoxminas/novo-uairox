@@ -453,6 +453,12 @@ export default function PublicEventRegistration() {
                       <div className="flex items-end justify-between">
                         <div>
                           <p className={`text-3xl font-black italic tracking-tighter ${localIsSoldOut || isEventFull ? 'text-zinc-600' : 'text-[#EDAC02]'}`}>{formatCurrency(price)}</p>
+                          {localActiveBatch?.price_card && localActiveBatch.price_card !== localActiveBatch.price && (
+                            <p className="text-xs text-zinc-400 mt-1">💳 Cartão: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_card))}</span></p>
+                          )}
+                          {localActiveBatch?.price_installments && localActiveBatch.price_installments !== localActiveBatch.price && (
+                            <p className="text-xs text-zinc-400 mt-0.5">📅 Parcelado: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_installments))}</span></p>
+                          )}
                           {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
                         </div>
                         {event.status === 'open' && !localIsSoldOut && !isEventFull && (
@@ -599,7 +605,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card' | null>(null);
 
   // Installment state
-  const [paymentType, setPaymentType] = useState<'full' | 'installments'>('full');
+  const [paymentType, setPaymentType] = useState<'full' | 'card' | 'installments'>('full');
   const [installmentCount, setInstallmentCount] = useState<2 | 3>(2);
   const [installmentDate2, setInstallmentDate2] = useState('');
   const [installmentDate3, setInstallmentDate3] = useState('');
@@ -623,17 +629,19 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const basePricePix = formActiveBatch ? Number(formActiveBatch.price) : 0;
   const basePriceCard = formActiveBatch?.price_card ? Number(formActiveBatch.price_card) : basePricePix;
   const basePriceInstallments = formActiveBatch?.price_installments ? Number(formActiveBatch.price_installments) : basePricePix;
-  const basePrice = paymentType === 'installments' ? basePriceInstallments : basePricePix;
+  const basePrice = paymentType === 'installments' ? basePriceInstallments : paymentType === 'card' ? basePriceCard : basePricePix;
   
   const kitPrice = selectedKit ? Number(selectedKit.price) : 0;
+  // Coupon only for PIX à vista and Cartão — NOT for parcelado
   let discount = 0;
-  if (couponDiscount) {
+  if (couponDiscount && paymentType !== 'installments') {
     discount = couponDiscount.discount_type === 'percentage'
       ? (basePrice * couponDiscount.discount_value) / 100
       : couponDiscount.discount_value;
   }
   const totalPrice = Math.max(0, basePrice + kitPrice - discount);
   const totalPriceCard = Math.max(0, basePriceCard + kitPrice - discount);
+  const totalPriceInstallmentsNoDiscount = Math.max(0, basePriceInstallments + kitPrice);
   const installmentAmounts = paymentType === 'installments' ? calcInstallmentAmounts(totalPrice, installmentCount) : [];
 
   // Helper to update a specific athlete field
@@ -1318,7 +1326,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                 ))}
               </div>
             </div>
-            {!isEventFull && (
+            {!isEventFull && paymentType !== 'installments' && (
               <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5">
                 <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">🏷️ Cupom</p>
                 <div className="flex gap-2">
@@ -1355,26 +1363,30 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       <p className="text-xs text-zinc-500">{formatCurrency(Math.max(0, basePricePix + kitPrice - discount))}</p>
                     </div>
                   </button>
-                  <button type="button" onClick={() => setPaymentType('installments')}
+                  <button type="button" onClick={() => { setPaymentType('installments'); setCouponCode(''); setCouponDiscount(null as any); }}
                     className={`w-full text-left p-3 rounded-lg border transition-all flex items-center gap-3 ${paymentType === 'installments' ? 'border-[#EDAC02] bg-[#EDAC02]/5' : 'border-[#262626] hover:border-zinc-600'}`}>
                     <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentType === 'installments' ? 'border-[#EDAC02]' : 'border-zinc-600'}`}>
                       {paymentType === 'installments' && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
                     </span>
                     <div>
                       <p className="text-sm font-bold text-white">PIX Parcelado</p>
-                      <p className="text-xs text-zinc-500">{formatCurrency(Math.max(0, basePriceInstallments + kitPrice - discount))} — 2x de {formatCurrency(calcInstallmentAmounts(Math.max(0, basePriceInstallments + kitPrice - discount), 2)[0])} ou 3x de {formatCurrency(calcInstallmentAmounts(Math.max(0, basePriceInstallments + kitPrice - discount), 3)[0])}</p>
+                      <p className="text-xs text-zinc-500">{formatCurrency(totalPriceInstallmentsNoDiscount)} — 2x de {formatCurrency(calcInstallmentAmounts(totalPriceInstallmentsNoDiscount, 2)[0])} ou 3x de {formatCurrency(calcInstallmentAmounts(totalPriceInstallmentsNoDiscount, 3)[0])}</p>
+                      <p className="text-[10px] text-red-400/60 mt-0.5">⚠️ Cupons não se aplicam ao parcelado</p>
                     </div>
                   </button>
 
                   {/* Cartão option */}
                   {formActiveBatch?.payment_link && (
-                    <div className="p-3 rounded-lg border border-[#262626] bg-[#050505] flex items-center gap-3">
-                      <span className="w-4 h-4 rounded-full border-2 border-zinc-700 flex-shrink-0" />
+                    <button type="button" onClick={() => setPaymentType('card')}
+                      className={`w-full text-left p-3 rounded-lg border transition-all flex items-center gap-3 ${paymentType === 'card' ? 'border-[#EDAC02] bg-[#EDAC02]/5' : 'border-[#262626] hover:border-zinc-600'}`}>
+                      <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentType === 'card' ? 'border-[#EDAC02]' : 'border-zinc-600'}`}>
+                        {paymentType === 'card' && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
+                      </span>
                       <div>
-                        <p className="text-sm font-bold text-zinc-400">💳 Cartão</p>
-                        <p className="text-xs text-zinc-600">{formatCurrency(totalPriceCard)} — via link de pagamento</p>
+                        <p className="text-sm font-bold text-white">💳 Cartão</p>
+                        <p className="text-xs text-zinc-500">{formatCurrency(totalPriceCard)} — via link de pagamento</p>
                       </div>
-                    </div>
+                    </button>
                   )}
                 </div>
 
@@ -1428,6 +1440,10 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       <div className="flex items-start gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
                         <span className="text-amber-400 text-xs mt-0.5">⚠️</span>
                         <p className="text-[11px] text-amber-400/80">Todas as parcelas devem ser quitadas até <strong className="text-amber-400">{maxInstallmentDate.toLocaleDateString('pt-BR')}</strong> (10 dias antes do evento).</p>
+                      </div>
+                      <div className="flex items-start gap-2 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                        <span className="text-red-400 text-xs mt-0.5">🚨</span>
+                        <p className="text-[11px] text-red-400/80">Em caso de não quitação das parcelas, será realizada <strong className="text-red-400">devolução de 50%</strong> do valor pago até o momento.</p>
                       </div>
                     )}
                   </div>
