@@ -1214,6 +1214,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const statusConfig: Record<string, { label: string; color: string }> = {
     confirmed: { label: 'Confirmado', color: 'bg-green-500/20 text-green-400' },
     pending: { label: 'Pendente', color: 'bg-yellow-500/20 text-yellow-400' },
+    waitlist: { label: 'Lista de Espera', color: 'bg-amber-500/20 text-amber-400' },
     cancelled: { label: 'Cancelado', color: 'bg-red-500/20 text-red-400' },
   };
 
@@ -1362,6 +1363,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           ['all', `Todos (${registrations?.length || 0})`],
           ['confirmed', `Confirmados (${registrations?.filter((r: any) => r.status === 'confirmed').length || 0})`],
           ['pending', `Pendentes (${registrations?.filter((r: any) => r.status === 'pending').length || 0})`],
+          ['waitlist', `Lista de Espera (${registrations?.filter((r: any) => r.status === 'waitlist').length || 0})`],
         ].map(([key, label]) => (
           <button
             key={key}

@@ -64,6 +64,7 @@ function EventFormDialog({
   const [slug, setSlug] = useState((event as any)?.slug || '');
   const [requireShirtSize, setRequireShirtSize] = useState((event as any)?.require_shirt_size || false);
   const [eventType, setEventType] = useState<EventType>((event?.event_type as EventType) || 'oficial');
+  const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity ? String(event.max_capacity) : '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +107,7 @@ function EventFormDialog({
       whatsapp_group_link: whatsappLink.trim() || null,
       slug: slug.trim() || null,
       require_shirt_size: requireShirtSize,
+      max_capacity: maxCapacity ? parseInt(maxCapacity) : null,
     };
     if (endDate) payload.end_date = new Date(endDate).toISOString();
 
@@ -310,6 +312,20 @@ function EventFormDialog({
             </button>
           </div>
 
+          {/* Max Capacity */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">🏟️ Capacidade Máxima de Inscrições</label>
+            <input
+              type="number"
+              min="1"
+              value={maxCapacity}
+              onChange={e => setMaxCapacity(e.target.value)}
+              placeholder="Ilimitado (deixe vazio)"
+              className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors"
+            />
+            <p className="text-[10px] text-zinc-500 mt-1.5">Número total máximo de inscrições no evento (todas as categorias somadas). Ao atingir, novas inscrições são bloqueadas e atletas podem entrar na lista de espera. Deixe vazio para ilimitado.</p>
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-[#1a1a1a]">
             <button
@@ -490,6 +506,42 @@ function EventCard({
             <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Receita</p>
           </div>
         </div>
+
+        {/* Capacity Bar */}
+        {event.max_capacity && (() => {
+          const count = event._registrations_count;
+          const cap = event.max_capacity;
+          const pct = Math.min(100, Math.round((count / cap) * 100));
+          const isFull = count >= cap;
+          const isNearFull = pct >= 80 && !isFull;
+          const waitlist = event._waitlist_count;
+
+          const barColor = isFull ? 'bg-red-500' : isNearFull ? 'bg-amber-500' : 'bg-green-500';
+          const borderColor = isFull ? 'border-red-500/40' : isNearFull ? 'border-amber-500/30' : 'border-[#1a1a1a]';
+          const textColor = isFull ? 'text-red-400' : isNearFull ? 'text-amber-400' : 'text-zinc-400';
+
+          return (
+            <div className={`p-3 rounded-lg border ${borderColor} ${isFull ? 'bg-red-500/5' : 'bg-[#050505]'} mb-4`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-[10px] font-black uppercase tracking-widest ${textColor}`}>
+                  {isFull ? '🔴 LOTADO' : isNearFull ? '⚠️ QUASE LOTADO' : '📊 CAPACIDADE'}
+                </span>
+                <span className="text-xs font-black text-white">{count} / {cap}</span>
+              </div>
+              <div className="w-full bg-[#111] rounded-full h-2 overflow-hidden border border-[#262626]">
+                <div className={`h-full ${barColor} transition-all duration-1000 rounded-full`} style={{ width: `${Math.max(2, pct)}%` }} />
+              </div>
+              {isFull && (
+                <p className="text-[10px] text-red-400 font-bold mt-1.5">Inscrições bloqueadas automaticamente. Novos atletas entram na lista de espera.</p>
+              )}
+              {waitlist > 0 && (
+                <p className="text-[10px] text-amber-400 font-bold mt-1">
+                  📋 {waitlist} atleta{waitlist > 1 ? 's' : ''} na lista de espera
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Actions */}
         <div className="flex gap-2">

@@ -17,12 +17,14 @@ export interface EventRow {
   race_status: string | null;
   event_type: EventType;
   whatsapp_group_link: string | null;
+  max_capacity: number | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface EventWithStats extends EventRow {
   _registrations_count: number;
+  _waitlist_count: number;
   _categories_count: number;
   _revenue: number;
 }
@@ -52,10 +54,10 @@ export function useEvents() {
 
       const eventIds = events.map(e => e.id);
 
-      // Fetch registration counts per event
+      // Fetch registration counts per event (with status for waitlist separation)
       const { data: regCounts } = await supabase
         .from("registrations")
-        .select("event_id, total_paid")
+        .select("event_id, total_paid, status")
         .in("event_id", eventIds);
 
       // Fetch category counts per event
@@ -65,11 +67,15 @@ export function useEvents() {
         .in("event_id", eventIds);
 
       // Build stats maps
-      const regMap: Record<string, { count: number; revenue: number }> = {};
+      const regMap: Record<string, { count: number; waitlist: number; revenue: number }> = {};
       (regCounts || []).forEach(r => {
-        if (!regMap[r.event_id]) regMap[r.event_id] = { count: 0, revenue: 0 };
-        regMap[r.event_id].count++;
-        regMap[r.event_id].revenue += r.total_paid || 0;
+        if (!regMap[r.event_id]) regMap[r.event_id] = { count: 0, waitlist: 0, revenue: 0 };
+        if ((r as any).status === 'waitlist') {
+          regMap[r.event_id].waitlist++;
+        } else {
+          regMap[r.event_id].count++;
+          regMap[r.event_id].revenue += r.total_paid || 0;
+        }
       });
 
       const catMap: Record<string, number> = {};
@@ -80,6 +86,7 @@ export function useEvents() {
       return events.map(ev => ({
         ...ev,
         _registrations_count: regMap[ev.id]?.count || 0,
+        _waitlist_count: regMap[ev.id]?.waitlist || 0,
         _categories_count: catMap[ev.id] || 0,
         _revenue: regMap[ev.id]?.revenue || 0,
       })) as unknown as EventWithStats[];
