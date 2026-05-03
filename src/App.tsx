@@ -36,6 +36,7 @@ import AdminPhotos from './pages/admin/AdminPhotos';
 import AdminSquad from './pages/admin/AdminSquad';
 import AdminLocations from './pages/admin/AdminLocations';
 import PublicEventRegistration from './pages/PublicEventRegistration';
+import PaymentPortal from './pages/PaymentPortal';
 
 // Páginas Juiz
 import JudgePassagesPanel from './pages/judge/JudgePassagesPanel';
@@ -83,6 +84,9 @@ export default function App() {
 
           {/* Inscrição Pública em Eventos */}
           <Route path="/evento/:id" element={<PublicEventRegistration />} />
+
+          {/* Portal de Pagamento (Parcelas PIX) */}
+          <Route path="/pagamento/:registrationId" element={<PaymentPortal />} />
 
           {/* 2. Área do Admin — Acesso total com senha */}
           <Route path="/admin" element={
