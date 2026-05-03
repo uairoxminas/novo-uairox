@@ -603,14 +603,18 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const maxInstallmentDate = event?.date ? calcMaxInstallmentDate(event.date) : null;
   const maxInstallmentDateStr = maxInstallmentDate ? maxInstallmentDate.toISOString().split('T')[0] : '';
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const installmentAmounts = paymentType === 'installments' ? calcInstallmentAmounts(totalPrice, installmentCount) : [];
-
   const selectedCategory = categories.find(c => c.id === categoryId);
   const selectedKit = kits.find(k => k.id === kitId);
   const formActiveBatch = getActiveBatch(batches, categoryId);
   const teamSize = selectedCategory?.team_size || 1;
   const isTeam = teamSize > 1;
-  const basePrice = formActiveBatch ? Number(formActiveBatch.price) : 0;
+
+  // Price per payment method — fallback to base price
+  const basePricePix = formActiveBatch ? Number(formActiveBatch.price) : 0;
+  const basePriceCard = formActiveBatch?.price_card ? Number(formActiveBatch.price_card) : basePricePix;
+  const basePriceInstallments = formActiveBatch?.price_installments ? Number(formActiveBatch.price_installments) : basePricePix;
+  const basePrice = paymentType === 'installments' ? basePriceInstallments : basePricePix;
+  
   const kitPrice = selectedKit ? Number(selectedKit.price) : 0;
   let discount = 0;
   if (couponDiscount) {
@@ -619,6 +623,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       : couponDiscount.discount_value;
   }
   const totalPrice = Math.max(0, basePrice + kitPrice - discount);
+  const totalPriceCard = Math.max(0, basePriceCard + kitPrice - discount);
+  const installmentAmounts = paymentType === 'installments' ? calcInstallmentAmounts(totalPrice, installmentCount) : [];
 
   // Helper to update a specific athlete field
   const updateAthlete = (index: number, field: keyof AthleteData, value: string) => {
@@ -1314,9 +1320,9 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             )}
             {!isEventFull && (
               <div className="bg-[#0a0a0a] border border-[#EDAC02]/20 rounded-xl p-5">
-                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">💰 Total</p>
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">💰 Valor da Inscrição</p>
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="text-zinc-400">Inscrição</span><span className="text-white">{formatCurrency(basePrice)}</span></div>
+                  <div className="flex justify-between"><span className="text-zinc-400">Inscrição ({paymentType === 'installments' ? 'Parcelado' : 'PIX'})</span><span className="text-white">{formatCurrency(basePrice)}</span></div>
                   {kitPrice > 0 && <div className="flex justify-between"><span className="text-zinc-400">Kit</span><span className="text-white">+ {formatCurrency(kitPrice)}</span></div>}
                   {discount > 0 && <div className="flex justify-between"><span className="text-green-400">Desconto</span><span className="text-green-400">- {formatCurrency(discount)}</span></div>}
                   <div className="border-t border-[#1a1a1a] pt-2 mt-2 flex justify-between"><span className="text-white font-bold">Total</span><span className="text-2xl font-black text-[#EDAC02]">{formatCurrency(totalPrice)}</span></div>
@@ -1335,8 +1341,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       {paymentType === 'full' && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
                     </span>
                     <div>
-                      <p className="text-sm font-bold text-white">À Vista</p>
-                      <p className="text-xs text-zinc-500">{formatCurrency(totalPrice)}</p>
+                      <p className="text-sm font-bold text-white">PIX À Vista</p>
+                      <p className="text-xs text-zinc-500">{formatCurrency(Math.max(0, basePricePix + kitPrice - discount))}</p>
                     </div>
                   </button>
                   <button type="button" onClick={() => setPaymentType('installments')}
@@ -1345,10 +1351,21 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       {paymentType === 'installments' && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
                     </span>
                     <div>
-                      <p className="text-sm font-bold text-white">Parcelar em PIX</p>
-                      <p className="text-xs text-zinc-500">2x de {formatCurrency(calcInstallmentAmounts(totalPrice, 2)[0])} ou 3x de {formatCurrency(calcInstallmentAmounts(totalPrice, 3)[0])}</p>
+                      <p className="text-sm font-bold text-white">PIX Parcelado</p>
+                      <p className="text-xs text-zinc-500">{formatCurrency(Math.max(0, basePriceInstallments + kitPrice - discount))} — 2x de {formatCurrency(calcInstallmentAmounts(Math.max(0, basePriceInstallments + kitPrice - discount), 2)[0])} ou 3x de {formatCurrency(calcInstallmentAmounts(Math.max(0, basePriceInstallments + kitPrice - discount), 3)[0])}</p>
                     </div>
                   </button>
+
+                  {/* Cartão option */}
+                  {formActiveBatch?.payment_link && (
+                    <div className="p-3 rounded-lg border border-[#262626] bg-[#050505] flex items-center gap-3">
+                      <span className="w-4 h-4 rounded-full border-2 border-zinc-700 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold text-zinc-400">💳 Cartão</p>
+                        <p className="text-xs text-zinc-600">{formatCurrency(totalPriceCard)} — via link de pagamento</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {paymentType === 'installments' && (

@@ -627,6 +627,8 @@ function LotesTab({ eventId }: { eventId: string }) {
   const [editing, setEditing] = useState<any>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [priceCard, setPriceCard] = useState('');
+  const [priceInstallments, setPriceInstallments] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxRegs, setMaxRegs] = useState('');
@@ -641,6 +643,8 @@ function LotesTab({ eventId }: { eventId: string }) {
       setEditing(b);
       setName(b.name);
       setPrice(String(b.price));
+      setPriceCard(b.price_card ? String(b.price_card) : '');
+      setPriceInstallments(b.price_installments ? String(b.price_installments) : '');
       setStartDate(toLocalDatetimeLocal(b.start_date));
       setEndDate(toLocalDatetimeLocal(b.end_date));
       setMaxRegs(String(b.max_registrations || ''));
@@ -653,6 +657,8 @@ function LotesTab({ eventId }: { eventId: string }) {
       setEditing(null);
       setName('');
       setPrice('');
+      setPriceCard('');
+      setPriceInstallments('');
       setStartDate('');
       setEndDate('');
       setMaxRegs('');
@@ -669,6 +675,8 @@ function LotesTab({ eventId }: { eventId: string }) {
     setEditing(null);
     setName(b.name + ' (Cópia)');
     setPrice(String(b.price));
+    setPriceCard(b.price_card ? String(b.price_card) : '');
+    setPriceInstallments(b.price_installments ? String(b.price_installments) : '');
     setStartDate(toLocalDatetimeLocal(b.start_date));
     setEndDate(toLocalDatetimeLocal(b.end_date));
     setMaxRegs(String(b.max_registrations || ''));
@@ -686,6 +694,8 @@ function LotesTab({ eventId }: { eventId: string }) {
       event_id: eventId,
       name: name.trim(),
       price: parseFloat(price),
+      price_card: priceCard ? parseFloat(priceCard) : null,
+      price_installments: priceInstallments ? parseFloat(priceInstallments) : null,
       start_date: startDate ? new Date(startDate).toISOString() : null,
       end_date: endDate ? new Date(endDate).toISOString() : null,
       max_registrations: maxRegs ? parseInt(maxRegs) : null,
@@ -745,6 +755,8 @@ function LotesTab({ eventId }: { eventId: string }) {
                 </p>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-lg font-black text-[#EDAC02]">R$ {Number(batch.price).toFixed(2)}</span>
+                  {batch.price_card && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">💳 R$ {Number(batch.price_card).toFixed(2)}</span>}
+                  {batch.price_installments && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 font-bold">📅 R$ {Number(batch.price_installments).toFixed(2)}</span>}
                   {batch.start_date && <span className="text-[10px] text-zinc-500">{format(new Date(batch.start_date), 'dd/MM/yy', { locale: ptBR })} → {batch.end_date ? format(new Date(batch.end_date), 'dd/MM/yy', { locale: ptBR }) : '∞'}</span>}
                   {batch.max_registrations && <span className="px-2 py-0.5 rounded bg-[#111] text-[10px] text-zinc-400 border border-[#262626]">Máx: {batch.max_registrations}</span>}
                 </div>
@@ -826,7 +838,23 @@ function LotesTab({ eventId }: { eventId: string }) {
              <input type="checkbox" id="activeBatch" checked={active} onChange={e => setActive(e.target.checked)} className="w-5 h-5 accent-[#EDAC02] cursor-pointer" />
              <label htmlFor="activeBatch" className="text-sm font-bold text-white cursor-pointer select-none">Lote Ativo (Disponível para inscrições)</label>
           </div>
-          <div><label className={labelClass}>Valor Total da Inscrição (R$) *</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="150.00" className={inputClass} /><p className="text-[10px] text-zinc-500 mt-1">Este é o valor total que o atleta paga pela inscrição, independente do número de participantes na categoria (individual, dupla, trio...).</p></div>
+          <div>
+            <label className={labelClass}>Preço PIX À Vista (R$) *</label>
+            <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="130.00" className={inputClass} />
+            <p className="text-[10px] text-zinc-500 mt-1">Valor base para pagamento via PIX à vista.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>💳 Preço Cartão (R$)</label>
+              <input type="number" step="0.01" value={priceCard} onChange={e => setPriceCard(e.target.value)} placeholder={price || 'Mesmo do PIX'} className={inputClass} />
+              <p className="text-[10px] text-zinc-500 mt-1">Deixe vazio para usar o preço PIX.</p>
+            </div>
+            <div>
+              <label className={labelClass}>📅 Preço Parcelado (R$)</label>
+              <input type="number" step="0.01" value={priceInstallments} onChange={e => setPriceInstallments(e.target.value)} placeholder={price || 'Mesmo do PIX'} className={inputClass} />
+              <p className="text-[10px] text-zinc-500 mt-1">Deixe vazio para usar o preço PIX.</p>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelClass}>Início</label><input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputClass} /></div>
             <div><label className={labelClass}>Término</label><input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputClass} /></div>
