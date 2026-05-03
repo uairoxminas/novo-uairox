@@ -18,6 +18,8 @@ export interface EventRow {
   event_type: EventType;
   whatsapp_group_link: string | null;
   max_capacity: number | null;
+  pix_installments_enabled: boolean;
+  pix_installments_deadline: string | null;
   created_at: string;
   updated_at: string;
 }
