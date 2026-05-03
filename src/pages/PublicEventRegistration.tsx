@@ -1437,14 +1437,16 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                     </div>
 
                     {maxInstallmentDate && (
-                      <div className="flex items-start gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
-                        <span className="text-amber-400 text-xs mt-0.5">⚠️</span>
-                        <p className="text-[11px] text-amber-400/80">Todas as parcelas devem ser quitadas até <strong className="text-amber-400">{maxInstallmentDate.toLocaleDateString('pt-BR')}</strong> (10 dias antes do evento).</p>
-                      </div>
-                      <div className="flex items-start gap-2 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-                        <span className="text-red-400 text-xs mt-0.5">🚨</span>
-                        <p className="text-[11px] text-red-400/80">Em caso de não quitação das parcelas, será realizada <strong className="text-red-400">devolução de 50%</strong> do valor pago até o momento.</p>
-                      </div>
+                      <>
+                        <div className="flex items-start gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                          <span className="text-amber-400 text-xs mt-0.5">⚠️</span>
+                          <p className="text-[11px] text-amber-400/80">Todas as parcelas devem ser quitadas até <strong className="text-amber-400">{maxInstallmentDate.toLocaleDateString('pt-BR')}</strong> (10 dias antes do evento).</p>
+                        </div>
+                        <div className="flex items-start gap-2 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                          <span className="text-red-400 text-xs mt-0.5">🚨</span>
+                          <p className="text-[11px] text-red-400/80">Em caso de não quitação das parcelas, será realizada <strong className="text-red-400">devolução de 50%</strong> do valor pago até o momento.</p>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
