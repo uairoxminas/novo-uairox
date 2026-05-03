@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { calcInstallmentAmounts, calcMaxInstallmentDate } from '@/hooks/useInstallments';
 
 // ============ DATA HOOK ============
 function usePublicEvent(idOrSlug?: string) {
@@ -587,6 +588,23 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card' | null>(null);
 
+  // Installment state
+  const [paymentType, setPaymentType] = useState<'full' | 'installments'>('full');
+  const [installmentCount, setInstallmentCount] = useState<2 | 3>(2);
+  const [installmentDate2, setInstallmentDate2] = useState('');
+  const [installmentDate3, setInstallmentDate3] = useState('');
+
+  // Installment helpers
+  const pixInstallmentsAvailable = !isEventFull && event?.pix_installments_enabled && (() => {
+    const deadline = event?.pix_installments_deadline;
+    if (!deadline) return true;
+    return new Date() <= new Date(deadline + 'T23:59:59');
+  })();
+  const maxInstallmentDate = event?.date ? calcMaxInstallmentDate(event.date) : null;
+  const maxInstallmentDateStr = maxInstallmentDate ? maxInstallmentDate.toISOString().split('T')[0] : '';
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const installmentAmounts = paymentType === 'installments' ? calcInstallmentAmounts(totalPrice, installmentCount) : [];
+
   const selectedCategory = categories.find(c => c.id === categoryId);
   const selectedKit = kits.find(k => k.id === kitId);
   const formActiveBatch = getActiveBatch(batches, categoryId);
@@ -682,12 +700,15 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         gym: m.gym.trim(), photo_url: m.photo_url || null,
       })) : null;
 
+      const isInstallments = paymentType === 'installments' && !isEventFull;
+
       const { data, error } = await supabase.from('registrations').insert({
         event_id: eventId, category_id: categoryId, kit_id: isEventFull ? null : (kitId || null),
         batch_id: isEventFull ? null : (formActiveBatch?.id || null), coupon_id: isEventFull ? null : (couponDiscount?.id || null),
         status: isEventFull ? 'waitlist' : 'pending', 
-        total_paid: isEventFull ? 0 : totalPrice,
-        payment_method: isEventFull ? null : (formActiveBatch?.payment_link ? 'link' : 'pix'),
+        total_paid: isEventFull ? 0 : (isInstallments ? 0 : totalPrice),
+        payment_method: isEventFull ? null : (isInstallments ? 'pix' : (formActiveBatch?.payment_link ? 'link' : 'pix')),
+        payment_type: isInstallments ? 'installments' : 'full',
         athlete_name: a1.name.trim(), athlete_email: a1.email.trim(),
         athlete_phone: a1.phone.trim(), athlete_birth_date: a1.birth_date || null,
         athlete_gender: a1.gender || null, athlete_shirt_size: null,
@@ -701,6 +722,18 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         await supabase.from('discount_coupons').update({ current_uses: (couponDiscount.current_uses || 0) + 1 }).eq('id', couponDiscount.id);
       }
       setRegistrationId(data.id);
+
+      // Create installments if parcelado
+      if (isInstallments) {
+        const amounts = calcInstallmentAmounts(totalPrice, installmentCount);
+        const today = new Date().toISOString().split('T')[0];
+        const installments: any[] = [{ registration_id: data.id, installment_number: 1, amount: amounts[0], due_date: today, status: 'pending' }];
+        installments.push({ registration_id: data.id, installment_number: 2, amount: amounts[1], due_date: installmentDate2, status: 'pending' });
+        if (installmentCount === 3) {
+          installments.push({ registration_id: data.id, installment_number: 3, amount: amounts[2], due_date: installmentDate3, status: 'pending' });
+        }
+        await (supabase as any).from('registration_installments').insert(installments);
+      }
       
       // Disparo automático do Email Via Edge Function (Fire and Forget)
       supabase.functions.invoke('send-registration-email', {
@@ -797,6 +830,82 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                   Acessar GRUPO DE ATLETAS
                 </a>
               )}
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    // Installment success screen
+    if (paymentType === 'installments') {
+      const amounts = calcInstallmentAmounts(totalPrice, installmentCount);
+      const portalUrl = `${window.location.origin}/pagamento/${registrationId}`;
+      return (
+        <section className="py-20 bg-[#050505]">
+          <div className="max-w-xl mx-auto px-4">
+            <div className="bg-[#0a0a0a] border border-[#EDAC02]/30 rounded-2xl p-8 text-center">
+              <div className="w-20 h-20 rounded-full bg-[#EDAC02]/10 flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">💳</span>
+              </div>
+              <h2 className="text-2xl font-black text-white mb-2">Inscrição Parcelada! 🎉</h2>
+              <p className="text-sm text-zinc-400 mb-6">
+                <span className="text-white font-bold">{event.title}</span> — PIX Parcelado ({installmentCount}x de {formatCurrency(amounts[0])})
+              </p>
+
+              {/* 1st installment PIX */}
+              <div className="bg-[#050505] rounded-xl p-5 mb-4 border border-[#EDAC02]/20 text-left">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">⚡ 1ª Parcela — {formatCurrency(amounts[0])} (pagar agora)</p>
+                {formActiveBatch?.pix_key && (
+                  <div>
+                    <p className="text-xs text-zinc-500 mb-1 font-bold">CHAVE PIX:</p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all">{formActiveBatch.pix_key}</code>
+                      <button onClick={() => { navigator.clipboard.writeText(formActiveBatch.pix_key!); toast.success('PIX copiado!'); }} className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm">Copiar</button>
+                    </div>
+                  </div>
+                )}
+                {/* Upload comprovante 1a parcela */}
+                <label className="flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed border-[#262626] rounded-xl cursor-pointer hover:border-[#EDAC02]/30 transition-colors">
+                  {receiptUrl ? (
+                    <div className="flex items-center gap-2 text-green-500">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                      <span className="text-sm font-bold">Comprovante Enviado!</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-400 font-bold">{receiptUploading ? 'Enviando...' : '📎 Anexar Comprovante da 1ª Parcela'}</p>
+                  )}
+                  <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleUploadReceipt} disabled={receiptUploading} />
+                </label>
+              </div>
+
+              {/* Próximas parcelas */}
+              <div className="bg-[#050505] rounded-xl p-5 mb-4 border border-[#1a1a1a] text-left">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">📅 Próximas Parcelas</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-400">2ª Parcela</span>
+                    <span className="text-white font-bold">{formatCurrency(amounts[1])} — {new Date(installmentDate2 + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  {installmentCount === 3 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">3ª Parcela</span>
+                      <span className="text-white font-bold">{formatCurrency(amounts[2])} — {new Date(installmentDate3 + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Portal link */}
+              <div className="bg-[#050505] rounded-xl p-5 mb-6 border border-[#EDAC02]/10 text-left">
+                <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-2">🔗 Portal de Pagamentos</p>
+                <p className="text-xs text-zinc-500 mb-3">Acesse para pagar parcelas e enviar comprovantes:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-xs text-[#EDAC02] font-mono border border-[#262626] truncate">{portalUrl}</code>
+                  <button onClick={() => { navigator.clipboard.writeText(portalUrl); toast.success('Link copiado!'); }} className="px-3 py-2.5 bg-[#111] border border-[#262626] text-zinc-300 font-bold rounded-lg text-xs hover:text-[#EDAC02] transition-colors">Copiar</button>
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-500 mb-2">Código: <span className="text-white font-mono">{registrationId?.slice(0, 8)}</span></p>
             </div>
           </div>
         </section>
@@ -1214,6 +1323,90 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                 </div>
               </div>
             )}
+
+            {/* Installment Payment Option */}
+            {pixInstallmentsAvailable && totalPrice > 0 && (
+              <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider px-5 pt-5 pb-3">💳 Forma de Pagamento</p>
+                <div className="px-5 pb-3 space-y-2">
+                  <button type="button" onClick={() => setPaymentType('full')}
+                    className={`w-full text-left p-3 rounded-lg border transition-all flex items-center gap-3 ${paymentType === 'full' ? 'border-[#EDAC02] bg-[#EDAC02]/5' : 'border-[#262626] hover:border-zinc-600'}`}>
+                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentType === 'full' ? 'border-[#EDAC02]' : 'border-zinc-600'}`}>
+                      {paymentType === 'full' && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">À Vista</p>
+                      <p className="text-xs text-zinc-500">{formatCurrency(totalPrice)}</p>
+                    </div>
+                  </button>
+                  <button type="button" onClick={() => setPaymentType('installments')}
+                    className={`w-full text-left p-3 rounded-lg border transition-all flex items-center gap-3 ${paymentType === 'installments' ? 'border-[#EDAC02] bg-[#EDAC02]/5' : 'border-[#262626] hover:border-zinc-600'}`}>
+                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentType === 'installments' ? 'border-[#EDAC02]' : 'border-zinc-600'}`}>
+                      {paymentType === 'installments' && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">Parcelar em PIX</p>
+                      <p className="text-xs text-zinc-500">2x de {formatCurrency(calcInstallmentAmounts(totalPrice, 2)[0])} ou 3x de {formatCurrency(calcInstallmentAmounts(totalPrice, 3)[0])}</p>
+                    </div>
+                  </button>
+                </div>
+
+                {paymentType === 'installments' && (
+                  <div className="px-5 pb-5 pt-2 border-t border-[#1a1a1a] space-y-4">
+                    {/* Installment count selector */}
+                    <div>
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Nº de Parcelas</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => { setInstallmentCount(2); setInstallmentDate3(''); }}
+                          className={`p-3 rounded-lg border text-center transition-all ${installmentCount === 2 ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-white' : 'border-[#262626] text-zinc-400 hover:border-zinc-600'}`}>
+                          <p className="text-sm font-black">2x</p>
+                          <p className="text-xs text-zinc-500">{formatCurrency(calcInstallmentAmounts(totalPrice, 2)[0])}</p>
+                        </button>
+                        <button type="button" onClick={() => setInstallmentCount(3)}
+                          className={`p-3 rounded-lg border text-center transition-all ${installmentCount === 3 ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-white' : 'border-[#262626] text-zinc-400 hover:border-zinc-600'}`}>
+                          <p className="text-sm font-black">3x</p>
+                          <p className="text-xs text-zinc-500">{formatCurrency(calcInstallmentAmounts(totalPrice, 3)[0])}</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Installment schedule */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">📅 Cronograma</p>
+                      {/* 1st - today */}
+                      <div className="flex items-center gap-3 p-3 bg-[#111] rounded-lg border border-[#262626]">
+                        <span className="text-xs font-black text-[#EDAC02] w-6">1ª</span>
+                        <span className="text-sm text-white font-bold flex-1">{formatCurrency(installmentAmounts[0] || 0)}</span>
+                        <span className="text-xs text-zinc-500 flex items-center gap-1">🔒 Hoje</span>
+                      </div>
+                      {/* 2nd */}
+                      <div className="flex items-center gap-3 p-3 bg-[#050505] rounded-lg border border-[#262626]">
+                        <span className="text-xs font-black text-[#EDAC02] w-6">2ª</span>
+                        <span className="text-sm text-white font-bold flex-1">{formatCurrency(installmentAmounts[1] || 0)}</span>
+                        <input type="date" value={installmentDate2} onChange={e => setInstallmentDate2(e.target.value)} min={tomorrowStr} max={maxInstallmentDateStr}
+                          className="bg-[#111] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#EDAC02] focus:outline-none" />
+                      </div>
+                      {/* 3rd (if 3x) */}
+                      {installmentCount === 3 && (
+                        <div className="flex items-center gap-3 p-3 bg-[#050505] rounded-lg border border-[#262626]">
+                          <span className="text-xs font-black text-[#EDAC02] w-6">3ª</span>
+                          <span className="text-sm text-white font-bold flex-1">{formatCurrency(installmentAmounts[2] || 0)}</span>
+                          <input type="date" value={installmentDate3} onChange={e => setInstallmentDate3(e.target.value)} min={installmentDate2 || tomorrowStr} max={maxInstallmentDateStr}
+                            className="bg-[#111] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-white focus:border-[#EDAC02] focus:outline-none" />
+                        </div>
+                      )}
+                    </div>
+
+                    {maxInstallmentDate && (
+                      <div className="flex items-start gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                        <span className="text-amber-400 text-xs mt-0.5">⚠️</span>
+                        <p className="text-[11px] text-amber-400/80">Todas as parcelas devem ser quitadas até <strong className="text-amber-400">{maxInstallmentDate.toLocaleDateString('pt-BR')}</strong> (10 dias antes do evento).</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {isEventFull && (
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-5 text-center">
                 <p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">📋 Lista de Espera</p>
@@ -1228,11 +1421,18 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           {step > 0 && <button onClick={() => setStep(s => s - 1)} className="flex-1 py-3.5 border border-[#262626] rounded-xl text-zinc-400 font-bold hover:bg-[#111] transition-colors">← Voltar</button>}
           {step < steps.length - 1 ? (
             <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} className="flex-1 py-3.5 bg-[#EDAC02] text-black font-black rounded-xl hover:bg-[#d49b02] transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Continuar →</button>
-          ) : (
-            <button onClick={handleSubmit} disabled={submitting} className={`flex-1 py-3.5 font-black rounded-xl transition-colors disabled:opacity-50 ${isEventFull ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-[#EDAC02] text-black hover:bg-[#d49b02]'}`}>
-              {submitting ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />Processando...</span> : isEventFull ? '📋 Entrar na Lista de Espera' : '✅ Confirmar Inscrição'}
-            </button>
-          )}
+          ) : (() => {
+            const installmentDatesValid = paymentType !== 'installments' || (
+              installmentDate2 && (installmentCount === 2 || installmentDate3)
+            );
+            const isDisabled = submitting || (paymentType === 'installments' && !installmentDatesValid);
+            const btnLabel = isEventFull ? '📋 Entrar na Lista de Espera' : (paymentType === 'installments' ? `💳 Confirmar ${installmentCount}x de ${formatCurrency(installmentAmounts[0] || 0)}` : '✅ Confirmar Inscrição');
+            return (
+              <button onClick={handleSubmit} disabled={isDisabled} className={`flex-1 py-3.5 font-black rounded-xl transition-colors disabled:opacity-50 ${isEventFull ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-[#EDAC02] text-black hover:bg-[#d49b02]'}`}>
+                {submitting ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />Processando...</span> : btnLabel}
+              </button>
+            );
+          })()}
         </div>
       </div>
     </section>
