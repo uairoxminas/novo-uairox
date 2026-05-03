@@ -65,6 +65,8 @@ function EventFormDialog({
   const [requireShirtSize, setRequireShirtSize] = useState((event as any)?.require_shirt_size || false);
   const [eventType, setEventType] = useState<EventType>((event?.event_type as EventType) || 'oficial');
   const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity ? String(event.max_capacity) : '');
+  const [pixInstallmentsEnabled, setPixInstallmentsEnabled] = useState((event as any)?.pix_installments_enabled || false);
+  const [pixInstallmentsDeadline, setPixInstallmentsDeadline] = useState((event as any)?.pix_installments_deadline || '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +110,8 @@ function EventFormDialog({
       slug: slug.trim() || null,
       require_shirt_size: requireShirtSize,
       max_capacity: maxCapacity ? parseInt(maxCapacity) : null,
+      pix_installments_enabled: pixInstallmentsEnabled,
+      pix_installments_deadline: pixInstallmentsDeadline || null,
     };
     if (endDate) payload.end_date = new Date(endDate).toISOString();
 
@@ -324,6 +328,49 @@ function EventFormDialog({
               className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors"
             />
             <p className="text-[10px] text-zinc-500 mt-1.5">Número total máximo de inscrições no evento (todas as categorias somadas). Ao atingir, novas inscrições são bloqueadas e atletas podem entrar na lista de espera. Deixe vazio para ilimitado.</p>
+          </div>
+
+          {/* PIX Parcelado */}
+          <div className="border border-[#262626] rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between p-4 bg-[#050505]">
+              <div>
+                <p className="text-sm font-bold text-white flex items-center gap-2">💳 PIX Parcelado</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Permitir que atletas parcelem a inscrição em até 3x via PIX</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPixInstallmentsEnabled(!pixInstallmentsEnabled)}
+                className={`w-11 h-6 rounded-full transition-colors relative ${pixInstallmentsEnabled ? 'bg-[#EDAC02]' : 'bg-[#262626]'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${pixInstallmentsEnabled ? 'left-[22px]' : 'left-0.5'}`} />
+              </button>
+            </div>
+            {pixInstallmentsEnabled && (
+              <div className="p-4 border-t border-[#1a1a1a] bg-[#080808] space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">📅 Data Limite para Inscrições Parceladas</label>
+                  <input
+                    type="date"
+                    value={pixInstallmentsDeadline}
+                    onChange={e => setPixInstallmentsDeadline(e.target.value)}
+                    className="w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1.5">Até quando o atleta pode se inscrever escolhendo parcelamento. Após essa data, só pagamento à vista.</p>
+                </div>
+                {date && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                    <span className="text-amber-400 text-sm mt-0.5">⚠️</span>
+                    <p className="text-xs text-amber-400/80">
+                      Independente das datas escolhidas pelo atleta, todas as parcelas devem ser quitadas até{' '}
+                      <strong className="text-amber-400">
+                        {new Date(new Date(date).getTime() - 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}
+                      </strong>{' '}
+                      (10 dias antes do evento).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}
