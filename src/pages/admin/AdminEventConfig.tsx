@@ -1518,6 +1518,25 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               📎 {withReceiptPending.length} comprovante{withReceiptPending.length > 1 ? 's' : ''} p/ conferir
             </span>
           )}
+          <div className="flex-1" />
+          <button
+            onClick={async () => {
+              const { supabase } = await import('@/integrations/supabase/client');
+              toast.loading('Enviando lembretes...');
+              try {
+                const { data, error } = await supabase.functions.invoke('send-installment-reminder', { body: {} });
+                toast.dismiss();
+                if (error) throw error;
+                toast.success(`✅ ${data?.sent || 0} lembrete(s) enviado(s)${data?.overdue_marked ? ` | ${data.overdue_marked} marcadas como vencidas` : ''}`);
+              } catch (err: any) {
+                toast.dismiss();
+                toast.error('Erro: ' + err.message);
+              }
+            }}
+            className="px-3 py-1.5 bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 rounded-lg text-xs font-bold hover:bg-[#EDAC02] hover:text-black transition-all flex items-center gap-1.5"
+          >
+            📧 Enviar Lembretes
+          </button>
         </div>
       )}
 
