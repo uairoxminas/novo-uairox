@@ -452,12 +452,15 @@ export default function PublicEventRegistration() {
                     <div className="pt-6 border-t border-[#1a1a1a]">
                       <div className="flex items-end justify-between">
                         <div>
-                          <p className={`text-3xl font-black italic tracking-tighter ${localIsSoldOut || isEventFull ? 'text-zinc-600' : 'text-[#EDAC02]'}`}>{formatCurrency(price)}</p>
+                          <div className="mb-2">
+                            <p className="text-xs text-zinc-400 font-bold mb-1">💲 Pix á vista:</p>
+                            <p className={`text-3xl font-black italic tracking-tighter leading-none ${localIsSoldOut || isEventFull ? 'text-zinc-600' : 'text-[#EDAC02]'}`}>{formatCurrency(price)}</p>
+                          </div>
                           {localActiveBatch?.price_card && Number(localActiveBatch.price_card) !== price && (
                             <p className="text-xs text-zinc-400 mt-1">💳 Cartão: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_card))}</span></p>
                           )}
                           {localActiveBatch?.price_installments && Number(localActiveBatch.price_installments) !== price && (
-                            <p className="text-xs text-zinc-400 mt-0.5">📅 Parcelado: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_installments))}</span></p>
+                            <p className="text-xs text-zinc-400 mt-0.5">📅 Pix Parcelado: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_installments))}</span></p>
                           )}
                           {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
                         </div>
