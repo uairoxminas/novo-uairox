@@ -11,6 +11,17 @@
       ],
       "destination": "/api/evento/:slug"
     },
+    {
+      "source": "/parceiro/:token",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|twitterbot|whatsapp|linkedinbot|slackbot|telegrambot|discordbot|googlebot|bingbot|applebot|bot|crawler|spider|preview).*"
+        }
+      ],
+      "destination": "/api/parceiro/:token"
+    },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
 }

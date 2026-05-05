@@ -37,6 +37,7 @@ import AdminSquad from './pages/admin/AdminSquad';
 import AdminLocations from './pages/admin/AdminLocations';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 import PaymentPortal from './pages/PaymentPortal';
+import PartnerViewPage from './pages/PartnerViewPage';
 
 // Páginas Juiz
 import JudgePassagesPanel from './pages/judge/JudgePassagesPanel';
@@ -87,6 +88,9 @@ export default function App() {
 
           {/* Portal de Pagamento (Parcelas PIX) */}
           <Route path="/pagamento/:registrationId" element={<PaymentPortal />} />
+
+          {/* Painel do Parceiro — Visualização read-only via token */}
+          <Route path="/parceiro/:token" element={<PartnerViewPage />} />
 
           {/* 2. Área do Admin — Acesso total com senha */}
           <Route path="/admin" element={

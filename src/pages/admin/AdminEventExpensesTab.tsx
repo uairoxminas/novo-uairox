@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useEventExpenseCategories, useCreateExpenseCategory, useDeleteExpenseCategory, useEventExpenses, useCreateEventExpense, useDeleteEventExpense, useEventStats } from '@/hooks/useEventConfig';
 
 const cardClass = "bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl";
@@ -21,7 +22,16 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
   const [newCat, setNewCat] = useState({ name: '', planned_amount: '' });
 
   const [showExpModal, setShowExpModal] = useState(false);
-  const [newExp, setNewExp] = useState({ category_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0], status: 'paid' });
+  const [newExp, setNewExp] = useState({ category_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0], status: 'paid', paid_by: '' });
+
+  // Receipt upload state
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Receipt viewer modal
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   const revenue = eventStats?.revenue || 0;
   
@@ -49,20 +59,82 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
     setNewCat({ name: '', planned_amount: '' });
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Formato inválido. Use imagem (JPG, PNG, WebP) ou PDF.');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 10MB.');
+      return;
+    }
+
+    setReceiptFile(file);
+
+    // Generate preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setReceiptPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      // PDF - show icon preview
+      setReceiptPreview('pdf');
+    }
+  };
+
+  const clearReceipt = () => {
+    setReceiptFile(null);
+    setReceiptPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExp.description || !newExp.amount || !newExp.category_id) return;
-    await createExpense.mutateAsync({
-      event_id: eventId,
-      category_id: newExp.category_id,
-      description: newExp.description,
-      amount: parseFloat(newExp.amount),
-      expense_date: newExp.expense_date,
-      status: newExp.status,
-    });
-    setShowExpModal(false);
-    setNewExp({ category_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0], status: 'paid' });
+
+    setUploading(true);
+    let receiptUrl: string | null = null;
+
+    try {
+      // Upload receipt if file selected
+      if (receiptFile) {
+        const ext = receiptFile.name.split('.').pop();
+        const fileName = `expense-receipts/${eventId}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('event-assets').upload(fileName, receiptFile);
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from('event-assets').getPublicUrl(fileName);
+        receiptUrl = urlData.publicUrl;
+      }
+
+      await createExpense.mutateAsync({
+        event_id: eventId,
+        category_id: newExp.category_id,
+        description: newExp.description,
+        amount: parseFloat(newExp.amount),
+        expense_date: newExp.expense_date,
+        status: newExp.status,
+        receipt_url: receiptUrl,
+        paid_by: newExp.paid_by || null,
+      });
+
+      setShowExpModal(false);
+      setNewExp({ category_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0], status: 'paid', paid_by: '' });
+      clearReceipt();
+    } catch (err: any) {
+      toast.error('Erro ao lançar despesa: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
   };
+
+  const isReceiptImage = (url: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
 
   if (isLoadingCats || isLoadingExp) return <div className="text-zinc-500 py-10 text-center">Carregando despesas...</div>;
 
@@ -156,9 +228,9 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
               <p className="text-zinc-500 text-sm text-center py-4">Nenhuma despesa lançada.</p>
             ) : expenses.map((exp: any) => (
               <div key={exp.id} className="bg-[#111] border border-[#262626] rounded-lg p-3 flex justify-between items-center group">
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white">{exp.description}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-[10px] uppercase tracking-wider text-zinc-500 bg-[#1a1a1a] px-2 py-0.5 rounded">
                       {exp.event_expense_categories?.name || 'Sem Categoria'}
                     </span>
@@ -166,9 +238,23 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${exp.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-orange-500/10 text-orange-500'}`}>
                       {exp.status === 'paid' ? 'Pago' : 'Pendente'}
                     </span>
+                    {exp.paid_by && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                        💳 {exp.paid_by}
+                      </span>
+                    )}
+                    {exp.receipt_url && (
+                      <button
+                        onClick={() => setViewingReceipt(exp.receipt_url)}
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                        Comprovante
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                   <span className="text-sm font-bold text-white">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   <button 
                     onClick={() => deleteExpense.mutate({ id: exp.id, event_id: eventId })}
@@ -212,10 +298,10 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
       {/* MODAL: Nova Despesa */}
       {showExpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0a0a0a] border border-[#262626] rounded-xl w-full max-w-md overflow-hidden">
-            <div className="p-5 border-b border-[#262626] flex justify-between items-center">
+          <div className="bg-[#0a0a0a] border border-[#262626] rounded-xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b border-[#262626] flex justify-between items-center sticky top-0 bg-[#0a0a0a] z-10">
               <h3 className="text-lg font-black text-white">Lançar Despesa Real</h3>
-              <button onClick={() => setShowExpModal(false)} className="text-zinc-500 hover:text-white">✕</button>
+              <button onClick={() => { setShowExpModal(false); clearReceipt(); }} className="text-zinc-500 hover:text-white">✕</button>
             </div>
             <form onSubmit={handleCreateExpense} className="p-5 space-y-4">
               <div>
@@ -246,11 +332,100 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
                   <option value="pending">⏳ A Pagar (Pendente)</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Quem Pagou</label>
+                <input type="text" className={inputClass} placeholder="Ex: João, Empresa X..." value={newExp.paid_by} onChange={e => setNewExp({ ...newExp, paid_by: e.target.value })} />
+              </div>
+
+              {/* Receipt Upload */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Comprovante (Opcional)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+
+                {!receiptPreview ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-[#262626] rounded-lg p-4 flex flex-col items-center gap-2 hover:border-[#EDAC02]/50 hover:bg-[#EDAC02]/5 transition-all group"
+                  >
+                    <svg className="w-8 h-8 text-zinc-600 group-hover:text-[#EDAC02] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                      Clique para anexar imagem ou PDF
+                    </span>
+                    <span className="text-[10px] text-zinc-600">JPG, PNG, WebP ou PDF • Máx 10MB</span>
+                  </button>
+                ) : (
+                  <div className="relative border border-[#262626] rounded-lg overflow-hidden">
+                    {receiptPreview === 'pdf' ? (
+                      <div className="flex items-center gap-3 p-4 bg-[#111]">
+                        <div className="w-12 h-12 bg-red-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-white font-bold truncate">{receiptFile?.name}</p>
+                          <p className="text-[10px] text-zinc-500">{receiptFile ? (receiptFile.size / 1024).toFixed(0) + ' KB' : ''} • PDF</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <img src={receiptPreview} alt="Preview" className="w-full h-32 object-cover" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={clearReceipt}
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-500/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center transition-colors text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => setShowExpModal(false)} className={btnGhost}>Cancelar</button>
-                <button type="submit" disabled={createExpense.isPending} className={btnGold}>{createExpense.isPending ? 'Salvando...' : 'Lançar Despesa'}</button>
+                <button type="button" onClick={() => { setShowExpModal(false); clearReceipt(); }} className={btnGhost}>Cancelar</button>
+                <button type="submit" disabled={createExpense.isPending || uploading} className={btnGold}>
+                  {uploading ? 'Enviando...' : createExpense.isPending ? 'Salvando...' : 'Lançar Despesa'}
+                </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Visualizar Comprovante */}
+      {viewingReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setViewingReceipt(null)}>
+          <div className="relative max-w-3xl w-full max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setViewingReceipt(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full flex items-center justify-center transition-colors z-10 border border-zinc-600"
+            >
+              ✕
+            </button>
+            {isReceiptImage(viewingReceipt) ? (
+              <img src={viewingReceipt} alt="Comprovante" className="w-full rounded-xl border border-[#262626] object-contain max-h-[80vh]" />
+            ) : (
+              <iframe src={viewingReceipt} className="w-full h-[80vh] rounded-xl border border-[#262626] bg-white" title="Comprovante PDF" />
+            )}
+            <div className="mt-3 text-center">
+              <a
+                href={viewingReceipt}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#EDAC02] hover:underline font-bold"
+              >
+                Abrir em nova aba ↗
+              </a>
+            </div>
           </div>
         </div>
       )}

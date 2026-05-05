@@ -12,6 +12,7 @@ function usePublicEvent(idOrSlug?: string) {
   const [kits, setKits] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const [registrationCount, setRegistrationCount] = useState(0);
+  const [confirmedCount, setConfirmedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
 
@@ -57,12 +58,21 @@ function usePublicEvent(idOrSlug?: string) {
       setKits(kitRes.data || []);
       setStages(stgRes.data || []);
       setRegistrationCount(regCountRes.count || 0);
+
+      // Count confirmed registrations for PIX switch logic
+      const { count: confCount } = await supabase
+        .from('registrations')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', eid)
+        .eq('status', 'confirmed');
+      setConfirmedCount(confCount || 0);
+
       setLoading(false);
     }
     resolveEvent();
   }, [idOrSlug]);
 
-  return { event, categories, batches, kits, stages, registrationCount, loading, resolvedId };
+  return { event, categories, batches, kits, stages, registrationCount, confirmedCount, loading, resolvedId };
 }
 
 // ============ HELPERS ============
@@ -119,7 +129,7 @@ function getDaysUntil(dateStr: string) {
 // ============ MAIN PAGE ============
 export default function PublicEventRegistration() {
   const { id } = useParams<{ id: string }>();
-  const { event, categories, batches, kits, stages, registrationCount, loading, resolvedId } = usePublicEvent(id);
+  const { event, categories, batches, kits, stages, registrationCount, confirmedCount, loading, resolvedId } = usePublicEvent(id);
   const [showRegistration, setShowRegistration] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const registrationRef = useRef<HTMLDivElement>(null);
@@ -540,6 +550,7 @@ export default function PublicEventRegistration() {
             kits={kits}
             initialCategoryId={categoryId}
             isEventFull={isEventFull}
+            confirmedCount={confirmedCount}
           />
         </div>
       )}
@@ -574,8 +585,8 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 }
 
 // ============ REGISTRATION FORM ============
-function RegistrationForm({ eventId, event, categories, batches, kits, initialCategoryId, isEventFull }: {
-  eventId: string; event: any; categories: any[]; batches: any[]; kits: any[]; initialCategoryId: string; isEventFull: boolean;
+function RegistrationForm({ eventId, event, categories, batches, kits, initialCategoryId, isEventFull, confirmedCount }: {
+  eventId: string; event: any; categories: any[]; batches: any[]; kits: any[]; initialCategoryId: string; isEventFull: boolean; confirmedCount: number;
 }) {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -595,8 +606,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     }
   }, [kits, kitId]);
   // Athlete data structure - index 0 = main athlete, 1+ = team members
-  type AthleteData = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; gym: string; photo_url: string; };
-  const emptyAthlete = (): AthleteData => ({ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', gym: '', photo_url: '' });
+  type AthleteData = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; shirt_size: string; gym: string; photo_url: string; };
+  const emptyAthlete = (): AthleteData => ({ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', shirt_size: '', gym: '', photo_url: '' });
   const [athletes, setAthletes] = useState<AthleteData[]>([emptyAthlete()]);
   const [teamName, setTeamName] = useState('');
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
@@ -627,6 +638,18 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const formActiveBatch = getActiveBatch(batches, categoryId);
   const teamSize = selectedCategory?.team_size || 1;
   const isTeam = teamSize > 1;
+
+  // PIX Switch: override pix_key if event has secondary key and threshold is reached
+  const getEffectivePixKey = (): string | null => {
+    const batchKey = formActiveBatch?.pix_key || null;
+    const secondaryKey = event?.pix_key_secondary;
+    const switchAt = event?.pix_switch_at;
+    if (secondaryKey && switchAt && confirmedCount >= switchAt) {
+      return secondaryKey;
+    }
+    return batchKey;
+  };
+  const effectivePixKey = getEffectivePixKey();
 
   // Price per payment method — fallback to base price
   const basePricePix = formActiveBatch ? Number(formActiveBatch.price) : 0;
@@ -709,12 +732,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
   const handleSubmit = async () => {
     const a1 = athletes[0];
-    if (!categoryId || !a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.gym.trim()) { toast.error('Preencha os campos obrigatórios do Atleta 1.'); return; }
+    if (!categoryId || !a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.shirt_size || !a1.gym.trim()) { toast.error('Preencha os campos obrigatórios do Atleta 1.'); return; }
     if (isTeam) {
       if (!teamName.trim()) { toast.error('Informe o nome da equipe.'); return; }
       for (let i = 1; i < athletes.length; i++) {
         const m = athletes[i];
-        if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.gym.trim()) {
+        if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.shirt_size || !m.gym.trim()) {
           toast.error(`Preencha os campos obrigatórios do Atleta ${i + 1}.`); return;
         }
       }
@@ -724,6 +747,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       const teamMembersData = isTeam ? athletes.slice(1).map(m => ({
         name: m.name.trim(), email: m.email.trim(), phone: m.phone.trim(),
         instagram: m.instagram.trim(), birth_date: m.birth_date, gender: m.gender,
+        shirt_size: m.shirt_size,
         gym: m.gym.trim(), photo_url: m.photo_url || null,
       })) : null;
 
@@ -738,7 +762,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         payment_type: isInstallments ? 'installments' : 'full',
         athlete_name: a1.name.trim(), athlete_email: a1.email.trim(),
         athlete_phone: a1.phone.trim(), athlete_birth_date: a1.birth_date || null,
-        athlete_gender: a1.gender || null, athlete_shirt_size: null,
+        athlete_gender: a1.gender || null, athlete_shirt_size: a1.shirt_size || null,
         athlete_instagram: a1.instagram.trim() || null,
         athlete_gym: a1.gym.trim() || null,
         athlete_photo_url: a1.photo_url || null,
@@ -882,12 +906,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               {/* 1st installment PIX */}
               <div className="bg-[#050505] rounded-xl p-5 mb-4 border border-[#EDAC02]/20 text-left">
                 <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">⚡ 1ª Parcela — {formatCurrency(amounts[0])} (pagar agora)</p>
-                {formActiveBatch?.pix_key && (
+                {effectivePixKey && (
                   <div>
                     <p className="text-xs text-zinc-500 mb-1 font-bold">CHAVE PIX:</p>
                     <div className="flex items-center gap-2 mb-3">
-                      <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all">{formActiveBatch.pix_key}</code>
-                      <button onClick={() => { navigator.clipboard.writeText(formActiveBatch.pix_key!); toast.success('PIX copiado!'); }} className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm">Copiar</button>
+                      <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all">{effectivePixKey}</code>
+                      <button onClick={() => { navigator.clipboard.writeText(effectivePixKey!); toast.success('PIX copiado!'); }} className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm">Copiar</button>
                     </div>
                   </div>
                 )}
@@ -953,7 +977,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               <div className="bg-[#050505] rounded-xl p-5 mb-6 border border-[#1a1a1a] text-left">
                 <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">💰 Pagamento</p>
                           {(() => {
-                  const hasPix = !!formActiveBatch?.pix_key;
+                  const hasPix = !!effectivePixKey;
                   const hasCard = !!formActiveBatch?.payment_link;
                   const showSelection = hasPix && hasCard && !selectedPaymentMethod;
                   const methodToShow = selectedPaymentMethod || (hasPix && !hasCard ? 'pix' : !hasPix && hasCard ? 'card' : null);
@@ -994,12 +1018,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                         </button>
                       )}
 
-                      {methodToShow === 'pix' && formActiveBatch?.pix_key && (
+                      {methodToShow === 'pix' && effectivePixKey && (
                         <div>
                           <p className="text-xs text-zinc-500 mb-1 font-bold">CHAVE PIX:</p>
                           <div className="flex items-center gap-2 mb-4">
-                            <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all shadow-inner">{formActiveBatch.pix_key}</code>
-                            <button onClick={() => { navigator.clipboard.writeText(formActiveBatch.pix_key!); toast.success('PIX copiado!'); }} className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm hover:bg-[#d49b02] transition-colors shadow">Copiar</button>
+                            <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all shadow-inner">{effectivePixKey}</code>
+                            <button onClick={() => { navigator.clipboard.writeText(effectivePixKey!); toast.success('PIX copiado!'); }} className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm hover:bg-[#d49b02] transition-colors shadow">Copiar</button>
                           </div>
 
                           {/* Área de Upload do Comprovante */}
@@ -1136,12 +1160,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     if (step === 0) return !!categoryId;
     if (step === 1) {
       const a1 = athletes[0];
-      if (!a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.gym.trim()) return false;
+      if (!a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.shirt_size || !a1.gym.trim()) return false;
       if (isTeam) {
         if (!teamName.trim()) return false;
         for (let i = 1; i < athletes.length; i++) {
           const m = athletes[i];
-          if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.gym.trim()) return false;
+          if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.shirt_size || !m.gym.trim()) return false;
         }
       }
       return true;
@@ -1279,6 +1303,18 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                   <div><label className={labelClass}>Data de Nascimento *</label><input type="date" value={athlete.birth_date} onChange={e => updateAthlete(idx, 'birth_date', e.target.value)} className={inputClass} /></div>
                   <div><label className={labelClass}>Gênero *</label><select value={athlete.gender} onChange={e => updateAthlete(idx, 'gender', e.target.value)} className={inputClass}><option value="">Selecione</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
                 </div>
+                <div>
+                  <label className={labelClass}>Tamanho da Camisa *</label>
+                  <select value={athlete.shirt_size} onChange={e => updateAthlete(idx, 'shirt_size', e.target.value)} className={inputClass}>
+                    <option value="">Selecione o tamanho</option>
+                    <option value="PP">PP</option>
+                    <option value="P">P</option>
+                    <option value="M">M</option>
+                    <option value="G">G</option>
+                    <option value="GG">GG</option>
+                    <option value="EXG">EXG</option>
+                  </select>
+                </div>
                 {/* Training Photo Upload */}
                 <div>
                   <label className={labelClass}>Foto Treinando <span className="text-zinc-600 normal-case">(para post CONFIRMED — opcional)</span></label>
@@ -1324,6 +1360,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                     <div className="flex justify-between"><span className="text-zinc-400">WhatsApp</span><span className="text-white">{a.phone}</span></div>
                     {a.instagram && <div className="flex justify-between"><span className="text-zinc-400">Instagram</span><span className="text-white">{a.instagram}</span></div>}
                     <div className="flex justify-between"><span className="text-zinc-400">Local de Treino</span><span className="text-white truncate ml-4">{a.gym}</span></div>
+                    {a.shirt_size && <div className="flex justify-between"><span className="text-zinc-400">Camisa</span><span className="text-white">{a.shirt_size}</span></div>}
                     {a.photo_url && <div className="flex justify-between items-center"><span className="text-zinc-400">Foto</span><span className="text-green-400 text-xs">✅ Enviada</span></div>}
                   </div>
                 ))}

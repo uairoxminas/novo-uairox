@@ -61,6 +61,30 @@ function OverviewTab({ eventId }: { eventId: string }) {
   const { data: stats } = useEventStats(eventId);
   const { data: stages } = useEventStages(eventId);
   const { data: categories } = useCategories(eventId);
+  const { data: event } = useEvent(eventId);
+  const updateEvent = useUpdateEvent();
+
+  // PIX Switch state
+  const [pixSecondary, setPixSecondary] = useState('');
+  const [pixSwitchAt, setPixSwitchAt] = useState('');
+  const [pixDirty, setPixDirty] = useState(false);
+
+  useEffect(() => {
+    if (event) {
+      setPixSecondary((event as any).pix_key_secondary || '');
+      setPixSwitchAt((event as any).pix_switch_at ? String((event as any).pix_switch_at) : '');
+      setPixDirty(false);
+    }
+  }, [event]);
+
+  const handleSavePixSwitch = async () => {
+    await updateEvent.mutateAsync({
+      id: eventId,
+      pix_key_secondary: pixSecondary.trim() || null,
+      pix_switch_at: pixSwitchAt ? parseInt(pixSwitchAt) : null,
+    });
+    setPixDirty(false);
+  };
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -96,6 +120,60 @@ function OverviewTab({ eventId }: { eventId: string }) {
             </div>
           ))}
           {(!stats?.byCategory || stats.byCategory.length === 0) && emptyState('Nenhuma inscrição ainda')}
+        </div>
+      </div>
+
+      {/* PIX Switch Config */}
+      <div className="md:col-span-2">
+        <div className={`${cardClass} p-5`}>
+          <div className="flex items-center gap-3 mb-4">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">🔄 Troca Automática de Chave PIX</h3>
+            <span className="text-[10px] px-2 py-0.5 bg-[#EDAC02]/10 text-[#EDAC02] rounded font-bold border border-[#EDAC02]/20 uppercase tracking-wider">Parceria</span>
+          </div>
+          <p className="text-xs text-zinc-500 mb-4">
+            Configure uma chave PIX secundária que será exibida automaticamente após um determinado número de inscrições confirmadas.
+            Ideal para eventos em parceria onde a receita é dividida por volume.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className={labelClass}>Chave PIX Secundária (Parceiro)</label>
+              <input
+                value={pixSecondary}
+                onChange={e => { setPixSecondary(e.target.value); setPixDirty(true); }}
+                placeholder="CPF, email ou telefone do parceiro"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Trocar a partir da Nª inscrição confirmada</label>
+              <input
+                type="number"
+                min="1"
+                value={pixSwitchAt}
+                onChange={e => { setPixSwitchAt(e.target.value); setPixDirty(true); }}
+                placeholder="Ex: 26"
+                className={inputClass}
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleSavePixSwitch}
+                disabled={!pixDirty || updateEvent.isPending}
+                className={`${btnGold} w-full disabled:opacity-40`}
+              >
+                {updateEvent.isPending ? '...' : '💾 Salvar Regra PIX'}
+              </button>
+            </div>
+          </div>
+          {pixSecondary && pixSwitchAt && (
+            <div className="mt-4 p-3 bg-[#050505] rounded-lg border border-[#262626] text-xs text-zinc-400">
+              <p>📌 <strong className="text-white">Regra ativa:</strong> Até a <span className="text-[#EDAC02] font-bold">{Number(pixSwitchAt) - 1}ª</span> inscrição confirmada → chave PIX do <strong className="text-white">lote</strong></p>
+              <p className="mt-1">📌 A partir da <span className="text-[#EDAC02] font-bold">{pixSwitchAt}ª</span> inscrição confirmada → chave PIX: <code className="text-[#EDAC02] bg-[#111] px-1.5 py-0.5 rounded">{pixSecondary}</code></p>
+              {stats?.confirmed != null && (
+                <p className="mt-2 text-zinc-500">Atualmente: <span className={`font-bold ${(stats.confirmed || 0) >= Number(pixSwitchAt) ? 'text-green-400' : 'text-yellow-400'}`}>{stats.confirmed} confirmado(s)</span> — {(stats.confirmed || 0) >= Number(pixSwitchAt) ? '✅ Chave secundária ATIVA' : '⏳ Chave primária (lote) em uso'}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1152,6 +1230,7 @@ function KitsTab({ eventId }: { eventId: string }) {
 
 // ============ TAB: INSCRIÇÕES ============
 function InscricoesTab({ eventId }: { eventId: string }) {
+  const { data: event } = useEvent(eventId);
   const { data: registrations, refetch } = useEventRegistrations(eventId);
   const { data: categories } = useCategories(eventId);
   const [filter, setFilter] = useState<string | null>(null);
@@ -1179,7 +1258,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const [editTeamName, setEditTeamName] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editTotalPaid, setEditTotalPaid] = useState<number>(0);
-  type AthEdit = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; gym: string; photo_url: string; };
+  type AthEdit = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; shirt_size: string; gym: string; photo_url: string; };
   const [editAthletes, setEditAthletes] = useState<AthEdit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -1340,12 +1419,12 @@ function InscricoesTab({ eventId }: { eventId: string }) {
 
   const openEditModal = (reg: any) => {
     const teamSize = (reg.categories as any)?.team_size || 1;
-    const a1: AthEdit = { name: reg.athlete_name||'', email: reg.athlete_email||'', phone: reg.athlete_phone||'', instagram: reg.athlete_instagram||'', birth_date: reg.athlete_birth_date||'', gender: reg.athlete_gender||'', gym: reg.athlete_gym||'', photo_url: reg.athlete_photo_url||'' };
+    const a1: AthEdit = { name: reg.athlete_name||'', email: reg.athlete_email||'', phone: reg.athlete_phone||'', instagram: reg.athlete_instagram||'', birth_date: reg.athlete_birth_date||'', gender: reg.athlete_gender||'', shirt_size: reg.athlete_shirt_size||'', gym: reg.athlete_gym||'', photo_url: reg.athlete_photo_url||'' };
     const members: AthEdit[] = [a1];
     if (teamSize > 1 && reg.team_members) {
-      (reg.team_members as any[]).forEach(m => members.push({ name: m.name||'', email: m.email||'', phone: m.phone||'', instagram: m.instagram||'', birth_date: m.birth_date||'', gender: m.gender||'', gym: m.gym||'', photo_url: m.photo_url||'' }));
+      (reg.team_members as any[]).forEach(m => members.push({ name: m.name||'', email: m.email||'', phone: m.phone||'', instagram: m.instagram||'', birth_date: m.birth_date||'', gender: m.gender||'', shirt_size: m.shirt_size||'', gym: m.gym||'', photo_url: m.photo_url||'' }));
     }
-    while (members.length < teamSize) members.push({ name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', gym:'', photo_url:'' });
+    while (members.length < teamSize) members.push({ name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', shirt_size:'', gym:'', photo_url:'' });
     setEditAthletes(members);
     setEditBibNumber(reg.bib_number||'');
     setEditStatus(reg.status);
@@ -1364,7 +1443,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
       setEditAthletes(prev => {
         const arr = [...prev];
         if (arr.length < newTeamSize) {
-          while (arr.length < newTeamSize) arr.push({ name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', gym:'', photo_url:'' });
+          while (arr.length < newTeamSize) arr.push({ name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', shirt_size:'', gym:'', photo_url:'' });
           return arr;
         } else if (arr.length > newTeamSize) {
           return arr.slice(0, newTeamSize);
@@ -1375,7 +1454,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   };
 
   const openNewRegModal = () => {
-    setEditAthletes([{ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', gym: '', photo_url: '' }]);
+    setEditAthletes([{ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', shirt_size: '', gym: '', photo_url: '' }]);
     setEditBibNumber('');
     setEditStatus('pending');
     setEditTeamName('');
@@ -1403,6 +1482,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         Instagram_Atleta_1: r.athlete_instagram || '',
         Data_Nasc_Atleta_1: r.athlete_birth_date || '',
         Genero_Atleta_1: r.athlete_gender || '',
+        Tamanho_Camisa_Atleta_1: r.athlete_shirt_size || '',
         Local_Treino_Atleta_1: r.athlete_gym || ''
       };
       
@@ -1414,6 +1494,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           base[`Instagram_Atleta_${idx+2}`] = m.instagram || '';
           base[`Data_Nasc_Atleta_${idx+2}`] = m.birth_date || '';
           base[`Genero_Atleta_${idx+2}`] = m.gender || '';
+          base[`Tamanho_Camisa_Atleta_${idx+2}`] = m.shirt_size || '';
           base[`Local_Treino_Atleta_${idx+2}`] = m.gym || '';
         });
       }
@@ -1432,14 +1513,14 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     if (!editCategoryId) return toast.error('Selecione a categoria para continuar.');
     setIsSaving(true);
     const { supabase } = await import('@/integrations/supabase/client');
-    const a1 = editAthletes[0] || { name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', gym:'' };
-    const teamMembers = editAthletes.length > 1 ? editAthletes.slice(1).map(m => ({ name:m.name, email:m.email, phone:m.phone, instagram:m.instagram, birth_date:m.birth_date, gender:m.gender, gym:m.gym, photo_url:m.photo_url||null })) : null;
+    const a1 = editAthletes[0] || { name:'', email:'', phone:'', instagram:'', birth_date:'', gender:'', shirt_size:'', gym:'' };
+    const teamMembers = editAthletes.length > 1 ? editAthletes.slice(1).map(m => ({ name:m.name, email:m.email, phone:m.phone, instagram:m.instagram, birth_date:m.birth_date, gender:m.gender, shirt_size:m.shirt_size, gym:m.gym, photo_url:m.photo_url||null })) : null;
     
     const payload = {
       event_id: eventId,
       athlete_name: a1.name, athlete_email: a1.email, athlete_phone: a1.phone,
       athlete_instagram: a1.instagram||null, athlete_birth_date: a1.birth_date||null,
-      athlete_gender: a1.gender||null, athlete_gym: a1.gym||null, athlete_photo_url: a1.photo_url||null,
+      athlete_gender: a1.gender||null, athlete_shirt_size: a1.shirt_size||null, athlete_gym: a1.gym||null, athlete_photo_url: a1.photo_url||null,
       status: editStatus || 'pending', bib_number: editBibNumber ? parseInt(editBibNumber) : null,
       total_paid: editTotalPaid,
       team_name: editTeamName||null, team_members: teamMembers,
@@ -1453,6 +1534,17 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     } else {
       const res = await supabase.from('registrations').update(payload).eq('id', editingReg.id);
       error = res.error;
+
+      if (!error && editingReg.status !== 'confirmed' && editStatus === 'confirmed' && a1.email) {
+        supabase.functions.invoke('send-confirmation-email', {
+          body: { 
+            athlete_name: a1.name || 'Atleta', 
+            athlete_email: a1.email,
+            event_image_url: event?.image_url || null,
+            whatsapp_link: (event as any)?.whatsapp_group_link || null
+          }
+        }).catch(err => console.error('Erro no envio de email:', err));
+      }
     }
     
     setIsSaving(false);
@@ -1680,9 +1772,10 @@ function InscricoesTab({ eventId }: { eventId: string }) {
                   <div><label className={lC}>WhatsApp</label><input value={ath.phone} onChange={e => updateEditAthlete(idx,'phone',e.target.value)} className={iC} /></div>
                   <div><label className={lC}>Instagram</label><input value={ath.instagram} onChange={e => updateEditAthlete(idx,'instagram',e.target.value)} className={iC} /></div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <div><label className={lC}>Data Nasc.</label><input type="date" value={ath.birth_date} onChange={e => updateEditAthlete(idx,'birth_date',e.target.value)} className={iC} /></div>
                   <div><label className={lC}>Gênero</label><select value={ath.gender} onChange={e => updateEditAthlete(idx,'gender',e.target.value)} className={iC}><option value="">—</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
+                  <div><label className={lC}>Camisa</label><select value={ath.shirt_size} onChange={e => updateEditAthlete(idx,'shirt_size',e.target.value)} className={iC}><option value="">—</option><option value="PP">PP</option><option value="P">P</option><option value="M">M</option><option value="G">G</option><option value="GG">GG</option><option value="EXG">EXG</option></select></div>
                   <div><label className={lC}>Local de Treino</label><input value={ath.gym} onChange={e => updateEditAthlete(idx,'gym',e.target.value)} className={iC} /></div>
                 </div>
                 {ath.photo_url && <div className="flex items-center gap-3 pt-2 border-t border-[#1a1a1a]"><a href={ath.photo_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-[#EDAC02] hover:underline font-bold">📸 Ver Foto Treinando →</a></div>}
@@ -1710,6 +1803,17 @@ function InscricoesTab({ eventId }: { eventId: string }) {
                 setEditStatus('confirmed');
                 setEditTotalPaid(totalAmt);
                 toast.success('Todas parcelas pagas! Inscrição confirmada ✅');
+
+                if (editingReg.athlete_email && editingReg.status !== 'confirmed') {
+                  supabase.functions.invoke('send-confirmation-email', {
+                    body: { 
+                      athlete_name: editingReg.athlete_name || 'Atleta', 
+                      athlete_email: editingReg.athlete_email,
+                      event_image_url: event?.image_url || null,
+                      whatsapp_link: (event as any)?.whatsapp_group_link || null
+                    }
+                  }).catch(e => console.error(e));
+                }
               } else {
                 const newPaid = updated.filter((i: any) => i.status === 'paid').reduce((s: number, i: any) => s + Number(i.amount), 0);
                 setEditTotalPaid(newPaid);
@@ -1727,6 +1831,18 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               setEditStatus('confirmed');
               setEditTotalPaid(totalAmt);
               toast.success('Todas parcelas confirmadas! Inscrição confirmada ✅');
+              
+              if (editingReg.athlete_email && editingReg.status !== 'confirmed') {
+                supabase.functions.invoke('send-confirmation-email', {
+                  body: { 
+                    athlete_name: editingReg.athlete_name || 'Atleta', 
+                    athlete_email: editingReg.athlete_email,
+                    event_image_url: event?.image_url || null,
+                    whatsapp_link: (event as any)?.whatsapp_group_link || null
+                  }
+                }).catch(e => console.error(e));
+              }
+
               refetch();
               fetchInstallments();
             };
@@ -2518,6 +2634,155 @@ function CronogramaTab({ eventId }: { eventId: string }) {
 
 import AdminEventExpensesTab from './AdminEventExpensesTab';
 
+// ============ PARTNER LINKS MANAGER ============
+function PartnerLinksManager({ eventId }: { eventId: string }) {
+  const [links, setLinks] = useState<any[]>([]);
+  const [newLabel, setNewLabel] = useState('Parceiro');
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const fetchLinks = async () => {
+    const { data } = await (supabase as any)
+      .from('event_partner_links')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false });
+    setLinks(data || []);
+  };
+
+  useEffect(() => { fetchLinks(); }, [eventId]);
+
+  const handleCreate = async () => {
+    setLoading(true);
+    const { error } = await (supabase as any)
+      .from('event_partner_links')
+      .insert({ event_id: eventId, label: newLabel.trim() || 'Parceiro' });
+    if (error) { toast.error('Erro: ' + error.message); }
+    else { toast.success('Link de parceiro criado!'); setShowForm(false); setNewLabel('Parceiro'); }
+    setLoading(false);
+    fetchLinks();
+  };
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Revogar este link? O parceiro perderá acesso.')) return;
+    await (supabase as any)
+      .from('event_partner_links')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('id', id);
+    toast.success('Link revogado!');
+    fetchLinks();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este link permanentemente?')) return;
+    await (supabase as any).from('event_partner_links').delete().eq('id', id);
+    toast.success('Link excluído!');
+    fetchLinks();
+  };
+
+  const copyLink = (token: string) => {
+    const url = `https://www.uairox.com.br/parceiro/${token}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link do parceiro copiado!');
+  };
+
+  const activeLinks = links.filter(l => !l.revoked_at);
+  const revokedLinks = links.filter(l => !!l.revoked_at);
+
+  return (
+    <div className={`${cardClass} p-5`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">🤝 Links para Parceiros</h3>
+          <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded font-bold border border-blue-500/20 uppercase tracking-wider">
+            Somente Visualização
+          </span>
+        </div>
+        <button onClick={() => setShowForm(!showForm)} className={btnGold}>
+          + Novo Link
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500 mb-4">
+        Gere links únicos para parceiros acompanharem as inscrições. Eles podem ver tudo, mas não podem editar nada.
+      </p>
+
+      {showForm && (
+        <div className="flex items-end gap-3 mb-4 p-3 bg-[#050505] rounded-lg border border-[#262626]">
+          <div className="flex-1">
+            <label className={labelClass}>Nome do Parceiro</label>
+            <input
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              placeholder="Ex: Box CrossFit XYZ"
+              className={inputClass}
+            />
+          </div>
+          <button onClick={handleCreate} disabled={loading} className={`${btnGold} disabled:opacity-50`}>
+            {loading ? '...' : 'Gerar Link'}
+          </button>
+          <button onClick={() => setShowForm(false)} className={btnOutline}>
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {activeLinks.length > 0 && (
+        <div className="space-y-2">
+          {activeLinks.map(link => (
+            <div key={link.id} className="flex items-center gap-3 p-3 bg-[#050505] rounded-lg border border-[#262626] group">
+              <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-white font-bold">{link.label}</span>
+                  <span className="text-[10px] text-zinc-600 font-mono">#{link.token.slice(0, 8)}</span>
+                </div>
+                <span className="text-[10px] text-zinc-600 font-mono block truncate">uairox.com.br/parceiro/{link.token}</span>
+              </div>
+              <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => copyLink(link.token)}
+                  className="px-3 py-1.5 bg-[#EDAC02]/10 text-[#EDAC02] text-xs font-bold rounded-lg hover:bg-[#EDAC02] hover:text-black transition-all"
+                >
+                  📋 Copiar
+                </button>
+                <button
+                  onClick={() => handleRevoke(link.id)}
+                  className="px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-bold rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                >
+                  Revogar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {revokedLinks.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-[10px] text-zinc-600 cursor-pointer hover:text-zinc-400 uppercase tracking-wider font-bold">
+            {revokedLinks.length} link(s) revogado(s)
+          </summary>
+          <div className="space-y-1 mt-2">
+            {revokedLinks.map(link => (
+              <div key={link.id} className="flex items-center gap-3 p-2 bg-[#050505] rounded-lg border border-[#1a1a1a] opacity-40">
+                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                <span className="text-xs text-zinc-500 line-through flex-1">{link.label} — #{link.token.slice(0, 8)}</span>
+                <button onClick={() => handleDelete(link.id)} className="text-[10px] text-red-500 hover:underline">Excluir</button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {links.length === 0 && (
+        <div className="text-center py-6 text-zinc-600 text-sm">
+          Nenhum link de parceiro criado ainda.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============ MAIN PAGE ============
 const TABS = [
   { key: 'overview', label: '📊 Visão Geral' },
@@ -2595,6 +2860,9 @@ export default function AdminEventConfig() {
           </div>
         </div>
       </div>
+
+      {/* Partner Links Management */}
+      <PartnerLinksManager eventId={id!} />
 
       {/* Tabs */}
       <div className="flex gap-1 flex-wrap border-b border-[#1a1a1a] pb-0">

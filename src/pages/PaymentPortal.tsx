@@ -12,6 +12,7 @@ export default function PaymentPortal() {
   const [event, setEvent] = useState<any>(null);
   const [category, setCategory] = useState<any>(null);
   const [batch, setBatch] = useState<any>(null);
+  const [confirmedCount, setConfirmedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<number | null>(null);
 
@@ -39,6 +40,15 @@ export default function PaymentPortal() {
     setCategory(catRes.data);
     setInstallments(instRes.data || []);
     setBatch(batchRes.data);
+
+    // Count confirmed registrations for PIX switch logic
+    const { count: confCount } = await supabase
+      .from('registrations')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', reg.event_id)
+      .eq('status', 'confirmed');
+    setConfirmedCount(confCount || 0);
+
     setLoading(false);
   };
 
@@ -102,6 +112,17 @@ export default function PaymentPortal() {
 
   // Determine which is the current pending installment (the one that should be paid next)
   const currentPendingIdx = installments.findIndex((i: any) => i.status !== 'paid');
+
+  // PIX Switch: override pix_key if event has secondary key and threshold is reached
+  const effectivePixKey = (() => {
+    const batchKey = batch?.pix_key || null;
+    const secondaryKey = (event as any)?.pix_key_secondary;
+    const switchAt = (event as any)?.pix_switch_at;
+    if (secondaryKey && switchAt && confirmedCount >= switchAt) {
+      return secondaryKey;
+    }
+    return batchKey;
+  })();
 
   return (
     <div className="min-h-screen bg-[#050505]">
@@ -183,13 +204,13 @@ export default function PaymentPortal() {
               {isCurrentPending && !isPaid && (
                 <div className="border-t border-[#1a1a1a] p-5 bg-[#080808] space-y-4">
                   {/* PIX Key */}
-                  {batch?.pix_key && (
+                  {effectivePixKey && (
                     <div>
                       <p className="text-xs text-zinc-500 font-bold mb-1.5">CHAVE PIX:</p>
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all">{batch.pix_key}</code>
+                        <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all">{effectivePixKey}</code>
                         <button
-                          onClick={() => { navigator.clipboard.writeText(batch.pix_key); toast.success('PIX copiado!'); }}
+                          onClick={() => { navigator.clipboard.writeText(effectivePixKey); toast.success('PIX copiado!'); }}
                           className="px-4 py-2.5 bg-[#EDAC02] text-black font-black rounded-lg text-sm hover:bg-[#d49b02] transition-colors"
                         >
                           Copiar

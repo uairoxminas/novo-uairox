@@ -708,7 +708,7 @@ export function useEventExpenses(eventId?: string) {
 export function useCreateEventExpense() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (expense: { event_id: string; category_id?: string | null; description: string; amount: number; expense_date: string; status: string }) => {
+    mutationFn: async (expense: { event_id: string; category_id?: string | null; description: string; amount: number; expense_date: string; status: string; receipt_url?: string | null; paid_by?: string | null }) => {
       const { data, error } = await (supabase as any).from("event_expenses").insert(expense).select().single();
       if (error) throw error;
       return data;
