@@ -609,7 +609,8 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
 
   // ===== URGENCY BADGE SYSTEM =====
   const getUrgencyBadge = (ev: any) => {
-    if (ev.status !== 'open') return null;
+    const isFull = ev.max_capacity ? (ev._registrations_count || 0) >= ev.max_capacity : false;
+    if (ev.status !== 'open' || isFull) return null;
     const now = new Date();
     const eventDate = new Date(ev.date);
     const daysUntil = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
