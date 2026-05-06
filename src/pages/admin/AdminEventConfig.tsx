@@ -2783,6 +2783,113 @@ function PartnerLinksManager({ eventId }: { eventId: string }) {
   );
 }
 
+// ============ TAB: ESPERA (WAITLIST) ============
+function EsperaTab({ eventId }: { eventId: string }) {
+  const [waitlist, setWaitlist] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchWaitlist();
+  }, [eventId]);
+
+  const fetchWaitlist = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('event_waitlist' as any)
+        .select('*')
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      setWaitlist(data || []);
+    } catch (err) {
+      console.error('Error fetching waitlist:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteEntry = async (id: string) => {
+    if (!window.confirm('Remover este contato da lista?')) return;
+    try {
+      const { error } = await supabase.from('event_waitlist' as any).delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Contato removido');
+      fetchWaitlist();
+    } catch (err: any) {
+      toast.error('Erro ao remover: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-white">Lista de Espera</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">Contatos de interessados (Vagas Esgotadas)</p>
+        </div>
+        <div className="bg-[#111] px-3 py-1 rounded-lg border border-[#262626]">
+          <span className="text-xs font-bold text-zinc-400">Total: </span>
+          <span className="text-sm font-black text-white">{waitlist.length}</span>
+        </div>
+      </div>
+
+      <div className={`${cardClass} overflow-hidden`}>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-[#1a1a1a] bg-[#111]/50">
+              <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Data/Hora</th>
+              <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Nome</th>
+              <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Telefone</th>
+              <th className="p-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#1a1a1a]">
+            {loading ? (
+              <tr><td colSpan={4} className="p-8 text-center text-zinc-500">Carregando...</td></tr>
+            ) : waitlist.length === 0 ? (
+              <tr><td colSpan={4} className="p-8 text-center text-zinc-500">Nenhum contato na lista de espera.</td></tr>
+            ) : (
+              waitlist.map((entry) => (
+                <tr key={entry.id} className="hover:bg-[#111]/30 transition-colors group">
+                  <td className="p-4 text-xs text-zinc-400 whitespace-nowrap">
+                    {format(new Date(entry.created_at), "dd/MM/yyyy HH:mm")}
+                  </td>
+                  <td className="p-4 text-sm font-bold text-white">
+                    {entry.name}
+                  </td>
+                  <td className="p-4 text-sm text-zinc-300">
+                    {entry.phone}
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <a
+                        href={`https://wa.me/55${entry.phone.replace(/\D/g, '')}?text=Ol%C3%A1%20${encodeURIComponent(entry.name)},%20temos%20uma%20vaga%20dispon%C3%ADvel%20para%20o%20UAIROX!`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2 py-1.5 bg-green-500/10 text-green-400 text-xs font-bold rounded-lg hover:bg-green-500 hover:text-white transition-all"
+                      >
+                        WhatsApp
+                      </a>
+                      <button
+                        onClick={() => deleteEntry(entry.id)}
+                        className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ============ MAIN PAGE ============
 const TABS = [
   { key: 'overview', label: '📊 Visão Geral' },
@@ -2795,6 +2902,7 @@ const TABS = [
   { key: 'cupons', label: '🏷️ Cupons' },
   { key: 'kits', label: '🎽 Kits' },
   { key: 'despesas', label: '💸 Despesas' },
+  { key: 'espera', label: '⏳ Lista de Espera' },
 ];
 
 export default function AdminEventConfig() {

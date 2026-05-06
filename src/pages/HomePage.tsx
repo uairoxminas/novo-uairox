@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSiteConfig } from '@/hooks/useSiteConfig';
 import { usePublicEvents } from '@/hooks/useEvents';
 import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
+import WaitlistModal from '@/components/WaitlistModal';
 
 export default function HomePage() {
   const { data: config, isLoading } = useSiteConfig();
@@ -567,6 +568,7 @@ function UairoxPredictor({ config }: { config: any }) {
 // ============ UPCOMING EVENTS SECTION (Dynamic from Supabase) ============
 function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
   const { data: dbEvents } = usePublicEvents();
+  const [waitlistEventId, setWaitlistEventId] = useState<string | null>(null);
 
   // Generate acronym from location (e.g. "Centro Esportivo Sesi - Betim MG" → "BTM")
   const getAcronym = (location: string) => {
@@ -665,9 +667,10 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
 
   // Map event status to card style
   const getCardProps = (ev: any) => {
-    const isOpen = ev.status === 'open';
-    const isPlanning = ev.status === 'planning';
-    const isClosed = ev.status === 'closed';
+    const isFull = ev.max_capacity ? (ev._registrations_count || 0) >= ev.max_capacity : false;
+    const isClosed = ev.status === 'closed' || isFull;
+    const isOpen = ev.status === 'open' && !isFull;
+    const isPlanning = ev.status === 'planning' && !isFull;
     const batchName = ev._active_batch?.name;
 
     let planningBadge = 'Em Breve';
@@ -682,10 +685,12 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
 
     return {
       is_badge_active: isOpen,
-      badge_text: isOpen ? (batchName || 'Inscrições Abertas') : isPlanning ? planningBadge : isClosed ? 'Encerrado' : 'Em Breve',
-      is_disabled: isClosed,
-      btn_text: isOpen ? 'Garantir Vaga' : isPlanning ? 'Em Breve' : 'Aguarde',
+      badge_text: isOpen ? (batchName || 'Inscrições Abertas') : isPlanning ? planningBadge : isClosed ? 'VAGAS ESGOTADAS' : 'Em Breve',
+      is_disabled: isClosed && !isClosed, // wait, keep it somewhat disabled if we want it to look faded, but actually the user wants VAGAS ESGOTADAS, so let's let it not be disabled
+      is_closed: isClosed,
+      btn_text: isOpen ? 'Garantir Vaga' : isPlanning ? 'Em Breve' : isClosed ? 'Lista de Espera' : 'Aguarde',
       btn_link: isOpen ? `/evento/${ev.slug || ev.id}` : isPlanning ? `/evento/${ev.slug || ev.id}` : null,
+      event_id: ev.id
     };
   };
 
@@ -725,7 +730,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
                 {card.badge_text}
               </span>
             ) : (
-              <span className={`inline-block px-3 py-1 ${card.is_disabled ? 'bg-dark-border/90 text-dark-muted backdrop-blur-sm' : 'bg-white/90 text-black backdrop-blur-sm'} font-black uppercase tracking-widest text-xs shadow-lg`}>
+              <span className={`inline-block px-3 py-1 ${card.is_closed ? 'bg-red-500 text-white backdrop-blur-sm' : card.is_disabled ? 'bg-dark-border/90 text-dark-muted backdrop-blur-sm' : 'bg-white/90 text-black backdrop-blur-sm'} font-black uppercase tracking-widest text-xs shadow-lg`}>
                 {card.badge_text}
               </span>
             )}
@@ -786,7 +791,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
 
           {/* Buttons */}
           <div className="mt-auto">
-            {card.btn_link && !card.is_disabled ? (
+            {card.btn_link && !card.is_disabled && !card.is_closed ? (
               <a
                 href={card.btn_link}
                 className={`block w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors text-center ${
@@ -799,12 +804,17 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
               </a>
             ) : (
               <button
+                onClick={() => {
+                  if (card.is_closed) setWaitlistEventId(card.event_id);
+                }}
                 className={`w-full py-4 font-black uppercase tracking-widest skew-x-[-10deg] transition-colors ${
-                  card.is_disabled
-                    ? 'bg-dark-bg border border-dark-border text-dark-muted'
-                    : card.is_badge_active
-                      ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
-                      : 'border-2 border-dark-border text-white group-hover:border-white'
+                  card.is_closed
+                    ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white cursor-pointer'
+                    : card.is_disabled
+                      ? 'bg-dark-bg border border-dark-border text-dark-muted'
+                      : card.is_badge_active
+                        ? 'bg-white text-black group-hover:bg-brand-500 group-hover:text-white'
+                        : 'border-2 border-dark-border text-white group-hover:border-white'
                 }`}
               >
                 <span className="inline-block skew-x-[10deg]">{card.btn_text}</span>
@@ -910,6 +920,13 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
           </div>
         )}
       </div>
+      
+      {waitlistEventId && (
+        <WaitlistModal
+          eventId={waitlistEventId}
+          onClose={() => setWaitlistEventId(null)}
+        />
+      )}
     </section>
   );
 }

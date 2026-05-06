@@ -273,6 +273,19 @@ export function usePublicEvents() {
           .select("event_id, name, price, start_date, end_date, active")
           .in("event_id", eventIds)
           .order("order_index");
+
+        // Fetch registration counts per event to calculate capacity
+        const { data: regCounts } = await supabase
+          .from("registrations")
+          .select("event_id, status")
+          .in("event_id", eventIds);
+
+        const regMap: Record<string, number> = {};
+        (regCounts || []).forEach(r => {
+          if (r.status !== 'waitlist') {
+            regMap[r.event_id] = (regMap[r.event_id] || 0) + 1;
+          }
+        });
         
         const now = new Date();
         const batchMap: Record<string, any> = {};
@@ -301,6 +314,7 @@ export function usePublicEvents() {
           ...ev,
           _active_batch: batchMap[ev.id] || null,
           _next_batch: nextBatchMap[ev.id] || null,
+          _registrations_count: regMap[ev.id] || 0,
         }));
       }
       
