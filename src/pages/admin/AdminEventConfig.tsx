@@ -2236,7 +2236,14 @@ function BateriasTab({ eventId }: { eventId: string }) {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={(e) => { e.stopPropagation(); deleteHeat.mutate({ id: heat.id, event_id: eventId }); }} className="p-1.5 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 text-xs">🗑️</button>
+                      <button onClick={(e) => { 
+                        e.stopPropagation(); 
+                        const newTitle = window.prompt('Editar nome da bateria:', heat.title);
+                        if (newTitle && newTitle.trim() !== heat.title) {
+                          updateHeat.mutate({ id: heat.id, event_id: eventId, title: newTitle.trim() });
+                        }
+                      }} className="p-1.5 rounded hover:bg-[#EDAC02]/10 text-zinc-500 hover:text-[#EDAC02] text-xs" title="Editar Nome">✏️</button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteHeat.mutate({ id: heat.id, event_id: eventId }); }} className="p-1.5 rounded hover:bg-red-500/10 text-zinc-500 hover:text-red-400 text-xs" title="Excluir">🗑️</button>
                     </div>
                     <svg className={`w-4 h-4 text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
