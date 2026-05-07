@@ -12,6 +12,17 @@
       "destination": "/api/evento/:slug"
     },
     {
+      "source": "/evento/:slug/cronograma",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|twitterbot|whatsapp|linkedinbot|slackbot|telegrambot|discordbot|googlebot|bingbot|applebot|bot|crawler|spider|preview).*"
+        }
+      ],
+      "destination": "/api/evento/:slug?isCronograma=true"
+    },
+    {
       "source": "/parceiro/:token",
       "has": [
         {

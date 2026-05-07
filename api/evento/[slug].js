@@ -11,7 +11,7 @@ function escapeHtml(str) {
 }
 
 export default async function handler(req, res) {
-  const { slug } = req.query;
+  const { slug, isCronograma } = req.query;
   const idOrSlug = Array.isArray(slug) ? slug[0] : slug;
   
   if (!idOrSlug) {
@@ -54,16 +54,20 @@ export default async function handler(req, res) {
     
     if (!isBot) {
       // Real user somehow hit the API → client-side redirect to prevent infinite loops
-      const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/evento/${escapeHtml(idOrSlug)}"></head><body><script>window.location.replace("/evento/${escapeHtml(idOrSlug)}");</script></body></html>`;
+      const redirectPath = `/evento/${escapeHtml(idOrSlug)}${isCronograma ? '/cronograma' : ''}`;
+      const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${redirectPath}"></head><body><script>window.location.replace("${redirectPath}");</script></body></html>`;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.status(200).send(html);
     }
 
     // It's a bot → serve HTML with rich OG tags
-    const title = event.title || 'UAIROX - Hybrid RUN';
+    const titleBase = event.title || 'UAIROX - Hybrid RUN';
+    const title = isCronograma ? `⚠️ CRONOGRAMA DAS PROVAS - ${titleBase}` : titleBase;
+    
     const rawDesc = event.description || 'A maior competição de fitness híbrido do Brasil.';
+    const descriptionBase = rawDesc.length > 160 ? rawDesc.substring(0, 157) + '...' : rawDesc;
     const image = event.image_url || 'https://uairox.com.br/logo-uairox.png';
-    const canonicalUrl = `https://www.uairox.com.br/evento/${event.slug || event.id}`;
+    const canonicalUrl = `https://www.uairox.com.br/evento/${event.slug || event.id}${isCronograma ? '/cronograma' : ''}`;
     
     let dateStr = '';
     if (event.date) {
@@ -72,8 +76,12 @@ export default async function handler(req, res) {
       } catch(e) {}
     }
     
-    const description = rawDesc.length > 160 ? rawDesc.substring(0, 157) + '...' : rawDesc;
-    const fullDescription = `${description}${dateStr ? ` · 📅 ${dateStr}` : ''}${event.location ? ` · 📍 ${event.location}` : ''}`;
+    let fullDescription = '';
+    if (isCronograma) {
+      fullDescription = `- Não haverá mudança de horários / equipes\n- Confira se o seu nome ou da sua equipe estão corretos\n- Cheque no mínimo 30-60 minutos antes da sua largada\nEm caso de atraso o atleta está desclassificado`;
+    } else {
+      fullDescription = `${descriptionBase}${dateStr ? ` · 📅 ${dateStr}` : ''}${event.location ? ` · 📍 ${event.location}` : ''}`;
+    }
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
