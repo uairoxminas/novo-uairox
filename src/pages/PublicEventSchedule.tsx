@@ -220,7 +220,7 @@ function PublicHeatLanes({ heatId, laneCount }: { heatId: string; laneCount: num
               {hasAthlete ? (
                 <>
                   <p className="text-[11px] font-black text-[#EDAC02] leading-none mb-0.5">#{reg?.bib_number || '?'}</p>
-                  <p className="text-[10px] text-white uppercase font-bold truncate px-1" title={displayName}>
+                  <p className="text-[10px] text-white uppercase font-bold px-1 break-words leading-tight" title={displayName}>
                     {displayName}
                   </p>
                 </>

@@ -2370,7 +2370,7 @@ function HeatLanesDetail({ heatId, laneCount }: { heatId: string; laneCount: num
                    {hasAthlete ? `#${reg?.bib_number || '?'}` : '—'}
                  </p>
                  {hasAthlete && (
-                   <p className="text-[9px] text-white/70 uppercase truncate mt-0.5 w-full font-bold" title={displayName}>
+                   <p className="text-[9px] text-white/70 uppercase break-words leading-tight mt-0.5 w-full font-bold" title={displayName}>
                      {displayName}
                    </p>
                  )}
