@@ -546,9 +546,8 @@ export function useAutoGenerateHeats() {
          for (let i = 0; i < regs.length; i += lane_count) {
              const chunk = regs.slice(i, i + lane_count);
              const uniqueCatNamesArr = Array.from(new Set(chunk.map((r:any) => r.categories?.name)));
-             const uniqueCatNames = uniqueCatNamesArr.join(' / ');
-             
-             const title = uniqueCatNames.length > 50 ? `Bateria Mista ${heatIndexGlobal}` : `${uniqueCatNames} - Bat. ${heatIndexGlobal}`;
+             const prefixName = (uniqueCatNamesArr[0] as string)?.split(' ')[0].toUpperCase() || 'MISTA';
+             const title = `${prefixName} - BATERIA ${heatIndexGlobal}`;
              const mainCatId = chunk[0].category_id; // Sempre pega a categoria mãe como host para satisfazer NOT NULL
 
              const { data, error } = await supabase.from("heats").insert({
@@ -581,11 +580,12 @@ export function useAutoGenerateHeats() {
              if (subset.length === 0) continue;
              
              const catName = subset[0].categories?.name || 'Categoria';
+             const prefixName = catName.split(' ')[0].toUpperCase();
              const numHeats = Math.ceil(subset.length / lane_count);
              
              for (let i = 0; i < numHeats; i++) {
                  const chunk = subset.slice(i * lane_count, (i + 1) * lane_count);
-                 const title = `${catName} - Bat. ${i + 1}`;
+                 const title = `${prefixName} - BATERIA ${heatIndexGlobal}`;
                  
                  const { data, error } = await supabase.from("heats").insert({
                     event_id, category_id: catId, title, start_time: currentDateTime.toTimeString().slice(0, 5), lane_count, status: 'pending'
@@ -602,6 +602,7 @@ export function useAutoGenerateHeats() {
                  }
                  
                  currentDateTime.setMinutes(currentDateTime.getMinutes() + interval_minutes);
+                 heatIndexGlobal++;
              }
          }
       }
