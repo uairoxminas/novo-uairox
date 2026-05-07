@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useHeats, useEventStages } from '@/hooks/useEventConfig';
+import { useHeats, useEventStages, useLaneAssignments } from '@/hooks/useEventConfig';
 
 export default function PublicEventSchedule() {
   const { id } = useParams<{ id: string }>();
@@ -164,6 +164,8 @@ export default function PublicEventSchedule() {
                             <span className="w-1 h-1 rounded-full bg-zinc-700" />
                             <span className="text-xs font-bold text-zinc-500 uppercase">{item.lanes} Raias</span>
                           </div>
+                          
+                          <PublicHeatLanes heatId={item.id} laneCount={item.lanes} />
                         </div>
                       </div>
                     ))}
@@ -192,6 +194,50 @@ export default function PublicEventSchedule() {
         </Link>
         <p className="text-xs text-zinc-600 font-bold uppercase tracking-widest">UAIROX © {new Date().getFullYear()} • Cronograma Oficial</p>
       </footer>
+    </div>
+  );
+}
+
+function PublicHeatLanes({ heatId, laneCount }: { heatId: string; laneCount: number }) {
+  const { data: lanes, isLoading } = useLaneAssignments(heatId);
+
+  if (isLoading) return <div className="pt-4 mt-4 border-t border-[#1a1a1a] text-center"><div className="w-5 h-5 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin mx-auto" /></div>;
+
+  return (
+    <div className="pt-4 mt-4 border-t border-[#1a1a1a]">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {(lanes && lanes.length > 0) ? lanes.map((lane: any) => {
+          const hasAthlete = !!lane.registration_id;
+          const reg = lane.registrations as any;
+          const displayName = reg?.team_name || reg?.athlete_name || '?';
+          return (
+            <div key={lane.id} className={`rounded p-2 text-center border ${
+              hasAthlete
+                ? 'bg-[#EDAC02]/10 border-[#EDAC02]/20'
+                : 'bg-[#111] border-[#262626]'
+            }`}>
+              <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Raia {lane.lane_number}</p>
+              {hasAthlete ? (
+                <>
+                  <p className="text-[11px] font-black text-[#EDAC02] leading-none mb-0.5">#{reg?.bib_number || '?'}</p>
+                  <p className="text-[10px] text-white uppercase font-bold truncate px-1" title={displayName}>
+                    {displayName}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs font-bold text-zinc-600">—</p>
+              )}
+            </div>
+          );
+        }) : (
+          Array.from({ length: laneCount }, (_, i) => (
+            <div key={i} className="rounded p-2 text-center border border-[#262626] bg-[#111]">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Raia {i + 1}</p>
+              <p className="text-xs font-bold text-zinc-600">—</p>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
