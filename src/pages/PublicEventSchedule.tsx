@@ -16,10 +16,10 @@ export default function PublicEventSchedule() {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id!);
       let evData: any = null;
       if (isUUID) {
-        const { data } = await supabase.from('events').select('*').eq('id', id).single();
+        const { data } = await supabase.from('events').select('*').eq('id', id!).single();
         evData = data;
       } else {
-        const { data } = await (supabase as any).from('events').select('*').eq('slug', id).single();
+        const { data } = await (supabase as any).from('events').select('*').eq('slug', id!).single();
         evData = data;
       }
       setEvent(evData);
