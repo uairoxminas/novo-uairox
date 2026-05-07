@@ -93,15 +93,7 @@ export default function PublicEventSchedule() {
         
 
 
-        {/* Legend */}
-        <div className="flex gap-6 flex-wrap mb-10 pb-6 border-b border-[#1a1a1a]">
-          {Object.entries(statusLabels).map(([key, label]) => (
-            <div key={key} className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${statusColors[key]}`} />
-              <span className="text-xs text-zinc-400 uppercase tracking-widest font-bold">{label}</span>
-            </div>
-          ))}
-        </div>
+
 
         {/* Timeline */}
         {Object.keys(timeGroups).length > 0 ? (
