@@ -2548,9 +2548,18 @@ function CronogramaTab({ eventId }: { eventId: string }) {
           <h3 className="text-sm font-bold text-white">Cronograma do Evento</h3>
           <p className="text-xs text-zinc-500 mt-0.5">Visão do dia do evento por ordem de horário</p>
         </div>
-        <button onClick={handlePrint} className="px-4 py-2 border border-[#EDAC02] text-[#EDAC02] font-bold text-xs uppercase tracking-wider rounded flex items-center gap-2 hover:bg-[#EDAC02]/10 transition-colors">
-          🖨️ Imprimir
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => {
+            const link = `${window.location.origin}/evento/${eventId}/cronograma`;
+            navigator.clipboard.writeText(link);
+            toast.success("Link do cronograma público copiado!");
+          }} className="px-4 py-2 border border-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-wider rounded flex items-center gap-2 hover:bg-[#111] transition-colors">
+            🔗 Copiar Link Público
+          </button>
+          <button onClick={handlePrint} className="px-4 py-2 border border-[#EDAC02] text-[#EDAC02] font-bold text-xs uppercase tracking-wider rounded flex items-center gap-2 hover:bg-[#EDAC02]/10 transition-colors">
+            🖨️ Imprimir
+          </button>
+        </div>
       </div>
 
       {/* Legend */}
