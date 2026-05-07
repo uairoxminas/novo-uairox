@@ -103,20 +103,7 @@ export default function PublicEventSchedule() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-12">
         
-        {/* Stages Summary */}
-        {stages && stages.length > 0 && (
-          <div className="mb-12">
-            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Provas do Evento</h4>
-            <div className="flex gap-2 flex-wrap">
-              {stages.map((s: any, i: number) => (
-                <div key={s.id} className="px-4 py-2.5 rounded-lg bg-[#111] border border-[#262626] flex items-center gap-3">
-                  <span className="w-6 h-6 rounded bg-[#EDAC02]/10 text-[#EDAC02] font-black flex items-center justify-center text-xs">{i + 1}</span>
-                  <span className="text-sm text-white font-bold">{s.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Legend */}
         <div className="flex gap-6 flex-wrap mb-10 pb-6 border-b border-[#1a1a1a]">
