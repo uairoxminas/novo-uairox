@@ -635,6 +635,7 @@ export function useCategoryRegCounts(eventId?: string) {
       (data || []).forEach(r => {
         counts[r.category_id] = (counts[r.category_id] || 0) + 1;
       });
+      return counts;
     },
     enabled: !!eventId,
   });
