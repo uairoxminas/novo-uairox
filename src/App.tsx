@@ -38,6 +38,7 @@ import AdminLocations from './pages/admin/AdminLocations';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 import PaymentPortal from './pages/PaymentPortal';
 import PartnerViewPage from './pages/PartnerViewPage';
+import PublicEventSchedule from './pages/PublicEventSchedule';
 
 // Páginas Juiz
 import JudgePassagesPanel from './pages/judge/JudgePassagesPanel';
@@ -85,6 +86,7 @@ export default function App() {
 
           {/* Inscrição Pública em Eventos */}
           <Route path="/evento/:id" element={<PublicEventRegistration />} />
+          <Route path="/evento/:id/cronograma" element={<PublicEventSchedule />} />
 
           {/* Portal de Pagamento (Parcelas PIX) */}
           <Route path="/pagamento/:registrationId" element={<PaymentPortal />} />
