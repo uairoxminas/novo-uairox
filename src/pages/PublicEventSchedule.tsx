@@ -67,19 +67,7 @@ export default function PublicEventSchedule() {
     timeGroups[item.time].push(item);
   });
 
-  const statusColors: Record<string, string> = {
-    pending: 'border-zinc-600 bg-zinc-600',
-    ready: 'border-blue-500 bg-blue-500',
-    running: 'border-green-500 bg-green-500 animate-pulse',
-    completed: 'border-[#EDAC02] bg-[#EDAC02]',
-  };
 
-  const statusLabels: Record<string, string> = {
-    pending: 'Aguardando',
-    ready: 'Pronta',
-    running: 'Em Andamento',
-    completed: 'Finalizada',
-  };
 
   return (
     <div className="min-h-screen bg-[#050505]">
@@ -117,40 +105,18 @@ export default function PublicEventSchedule() {
 
         {/* Timeline */}
         {Object.keys(timeGroups).length > 0 ? (
-          <div className="relative pl-6 md:pl-8">
-            {/* Vertical line */}
-            <div className="absolute left-[8px] md:left-[16px] top-2 bottom-0 w-px bg-[#1a1a1a]" />
-
-            <div className="space-y-8">
+          <div className="space-y-12 pl-2">
               {Object.entries(timeGroups).map(([time, items]) => (
                 <div key={time} className="relative">
-                  {/* Dot */}
-                  <div className={`absolute -left-[30px] md:-left-[38px] top-1.5 w-4 h-4 rounded-full border-4 border-[#050505] z-10 ${statusColors[(items as any)[0].status] || 'bg-zinc-600'}`} />
-                  
                   <div className="mb-4">
-                    <span className="text-xl md:text-2xl font-black text-white font-mono tracking-tight bg-[#111] px-3 py-1 rounded border border-[#262626]">{time}</span>
+                    <span className="text-xl md:text-2xl font-black text-white font-mono tracking-tight bg-[#111] px-3 py-1 rounded border border-[#262626] inline-block">{time}</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(items as any).map((item: any) => (
-                      <div key={item.id} className="bg-[#0a0a0a] border border-[#262626] p-5 rounded-xl hover:border-[#EDAC02]/50 transition-colors">
-                        <div className="flex flex-col gap-3">
-                          <div className="flex justify-between items-start gap-4">
-                            <h3 className="text-lg font-black text-white uppercase italic tracking-tight">{item.title}</h3>
-                            <span className={`shrink-0 px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest ${
-                              item.status === 'completed' ? 'bg-[#EDAC02]/20 text-[#EDAC02]' :
-                              item.status === 'running' ? 'bg-green-500/20 text-green-400' :
-                              'bg-[#111] text-zinc-400 border border-[#262626]'
-                            }`}>
-                              {statusLabels[item.status] || item.status}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-3 pt-3 border-t border-[#1a1a1a]">
-                            <span className="text-xs font-bold text-[#EDAC02] uppercase">{item.category}</span>
-                            <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                            <span className="text-xs font-bold text-zinc-500 uppercase">{item.lanes} Raias</span>
-                          </div>
+                      <div key={item.id} className="bg-[#0a0a0a] border border-[#EDAC02]/40 p-5 rounded-xl">
+                        <div className="flex flex-col">
+                          <h3 className="text-xl md:text-2xl font-black text-white uppercase italic tracking-tight">{item.title}</h3>
                           
                           <PublicHeatLanes heatId={item.id} laneCount={item.lanes} />
                         </div>
@@ -159,7 +125,6 @@ export default function PublicEventSchedule() {
                   </div>
                 </div>
               ))}
-            </div>
           </div>
         ) : (
           <div className="text-center py-20 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
@@ -191,7 +156,7 @@ function PublicHeatLanes({ heatId, laneCount }: { heatId: string; laneCount: num
   if (isLoading) return <div className="pt-4 mt-4 border-t border-[#1a1a1a] text-center"><div className="w-5 h-5 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin mx-auto" /></div>;
 
   return (
-    <div className="pt-4 mt-4 border-t border-[#1a1a1a]">
+    <div className="pt-4 mt-2">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {(lanes && lanes.length > 0) ? lanes.map((lane: any) => {
           const hasAthlete = !!lane.registration_id;
