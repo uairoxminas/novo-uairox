@@ -9,7 +9,7 @@ import {
   useAthleteKits, useCreateAthleteKit, useUpdateAthleteKit, useDeleteAthleteKit,
   useEventRegistrations, useEventStats,
   useHeats, useCreateHeat, useUpdateHeat, useDeleteHeat,
-  useLaneAssignments, useAssignLane, useAutoGenerateHeats, useCategoryRegCounts,
+  useLaneAssignments, useAssignLane, useCreateLaneAssignments, useAutoGenerateHeats, useCategoryRegCounts,
   useUnassignedRegistrations,
 } from '@/hooks/useEventConfig';
 import { format, differenceInDays } from 'date-fns';
@@ -2120,6 +2120,7 @@ function BateriasTab({ eventId }: { eventId: string }) {
   const updateHeat = useUpdateHeat();
   const deleteHeat = useDeleteHeat();
   const autoGenerate = useAutoGenerateHeats();
+  const createLaneAssignments = useCreateLaneAssignments();
 
   const [showForm, setShowForm] = useState(false);
   const [showAutoGen, setShowAutoGen] = useState(false);
@@ -2140,13 +2141,14 @@ function BateriasTab({ eventId }: { eventId: string }) {
 
   const handleManualSave = async () => {
     if (!title.trim() || !categoryId || !startTime) return;
-    await createHeat.mutateAsync({
+    const heat = await createHeat.mutateAsync({
       event_id: eventId,
       category_id: categoryId,
       title: title.trim(),
       start_time: startTime,
       lane_count: parseInt(laneCount) || 8,
     });
+    await createLaneAssignments.mutateAsync({ heat_id: heat.id, lane_count: parseInt(laneCount) || 8 });
     setShowForm(false);
     setTitle(''); setCategoryId(''); setStartTime(''); setLaneCount('8');
   };
@@ -2358,8 +2360,25 @@ function HeatLanesDetail({ heatId, laneCount, eventId, allHeatIds }: { heatId: s
   const { data: lanes, isLoading } = useLaneAssignments(heatId);
   const { data: unassigned } = useUnassignedRegistrations(eventId, allHeatIds);
   const assignLane = useAssignLane();
+  const createLanes = useCreateLaneAssignments();
 
   const [selectedLane, setSelectedLane] = useState<{ id: string; lane_number: number; reg: any } | null>(null);
+  const [pendingLaneNumber, setPendingLaneNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (pendingLaneNumber !== null && lanes && lanes.length > 0) {
+      const lane = lanes.find((l: any) => l.lane_number === pendingLaneNumber);
+      if (lane) {
+        setSelectedLane({ id: lane.id, lane_number: lane.lane_number, reg: null });
+        setPendingLaneNumber(null);
+      }
+    }
+  }, [lanes, pendingLaneNumber]);
+
+  const handlePlaceholderClick = async (laneNumber: number) => {
+    setPendingLaneNumber(laneNumber);
+    await createLanes.mutateAsync({ heat_id: heatId, lane_count: laneCount });
+  };
 
   const handleAssign = (registrationId: string | null) => {
     if (!selectedLane) return;
@@ -2402,7 +2421,11 @@ function HeatLanesDetail({ heatId, laneCount, eventId, allHeatIds }: { heatId: s
           );
         }) : (
           Array.from({ length: laneCount }, (_, i) => (
-            <div key={i} className="rounded-lg p-2 text-center border border-[#262626] bg-[#0a0a0a]">
+            <div
+              key={i}
+              onClick={() => handlePlaceholderClick(i + 1)}
+              className="rounded-lg p-2 text-center border border-[#262626] bg-[#0a0a0a] cursor-pointer hover:border-[#EDAC02]/60 transition-all"
+            >
               <p className="text-[10px] text-zinc-500 uppercase">Raia {i + 1}</p>
               <p className="text-xs font-bold mt-0.5 text-zinc-600">—</p>
             </div>
