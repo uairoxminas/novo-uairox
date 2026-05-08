@@ -583,17 +583,16 @@ export default function PublicEventRegistration() {
                           {localActiveBatch?.price_card && Number(localActiveBatch.price_card) !== price && (
                             <p className="text-xs text-zinc-400 mt-1">💳 Cartão: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_card))}</span></p>
                           )}
-                          {localActiveBatch?.price_installments && Number(localActiveBatch.price_installments) !== price && (
-                            <p className="text-xs text-zinc-400 mt-0.5">
-                              📅 Pix Parcelado:{' '}
-                              <span className="text-white font-bold">
-                                {localActiveBatch.installments_count
-                                  ? `${localActiveBatch.installments_count}x ${formatCurrency(Number(localActiveBatch.price_installments) / localActiveBatch.installments_count)}`
-                                  : formatCurrency(Number(localActiveBatch.price_installments))
-                                }
-                              </span>
-                            </p>
-                          )}
+                          {localActiveBatch?.price_installments && Number(localActiveBatch.price_installments) !== price && (() => {
+                            const totalInstallments = Number(localActiveBatch.price_installments);
+                            const n = localActiveBatch.installments_count || 3;
+                            const perInstallment = totalInstallments / n;
+                            return (
+                              <p className="text-xs text-zinc-400 mt-0.5">
+                                📅 Pix Parcelado: <span className="text-white font-bold">{n}x {formatCurrency(perInstallment)}</span>
+                              </p>
+                            );
+                          })()}
                           {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
                         </div>
                         {event.status === 'open' && !localIsSoldOut && !isEventFull && (
