@@ -1060,10 +1060,12 @@ function CuponsTab({ eventId }: { eventId: string }) {
 
   // Expanded state per coupon for the "Travas de Lote" section
   const [expandedCoupon, setExpandedCoupon] = useState<string | null>(null);
-  // Rule add form state per coupon
-  const [ruleBatchId, setRuleBatchId] = useState('');
+  // Rule add form state — multi-select of batch IDs
+  const [ruleBatchIds, setRuleBatchIds] = useState<string[]>([]);
   const [ruleDiscountType, setRuleDiscountType] = useState('');
   const [ruleDiscountValue, setRuleDiscountValue] = useState('');
+
+  const resetForm = () => { setCode(''); setDiscountValue(''); setMaxUses(''); setPaymentLink(''); setCategoryId(''); setDiscountType('percentage'); };
 
   const handleSave = async () => {
     if (!code.trim() || !discountValue) return;
@@ -1077,20 +1079,35 @@ function CuponsTab({ eventId }: { eventId: string }) {
       category_id: categoryId || undefined,
     });
     setShowForm(false);
-    setCode(''); setDiscountValue(''); setMaxUses(''); setPaymentLink(''); setCategoryId('');
+    resetForm();
   };
 
-  const handleAddRule = async (couponId: string) => {
-    if (!ruleBatchId) return;
-    await createRule.mutateAsync({
-      event_id: eventId,
-      coupon_id: couponId,
-      batch_id: ruleBatchId,
-      discount_type: ruleDiscountType || undefined,
-      discount_value: ruleDiscountValue ? parseFloat(ruleDiscountValue) : undefined,
-    });
-    setRuleBatchId(''); setRuleDiscountType(''); setRuleDiscountValue('');
+  const duplicateCoupon = (c: any) => {
+    setCode(c.code + '_COPIA');
+    setDiscountType(c.discount_type);
+    setDiscountValue(String(c.discount_value));
+    setMaxUses(c.max_uses ? String(c.max_uses) : '');
+    setPaymentLink(c.payment_link || '');
+    setCategoryId(c.category_id || '');
+    setShowForm(true);
   };
+
+  const handleAddRules = async (couponId: string) => {
+    if (ruleBatchIds.length === 0) return;
+    for (const bid of ruleBatchIds) {
+      await createRule.mutateAsync({
+        event_id: eventId,
+        coupon_id: couponId,
+        batch_id: bid,
+        discount_type: ruleDiscountType || undefined,
+        discount_value: ruleDiscountValue ? parseFloat(ruleDiscountValue) : undefined,
+      });
+    }
+    setRuleBatchIds([]); setRuleDiscountType(''); setRuleDiscountValue('');
+  };
+
+  const toggleRuleBatch = (batchId: string) =>
+    setRuleBatchIds(prev => prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]);
 
   const getCouponRules = (couponId: string) =>
     (allRules || []).filter((r: any) => r.coupon_id === couponId);
@@ -1142,10 +1159,11 @@ function CuponsTab({ eventId }: { eventId: string }) {
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                   <button
-                    onClick={() => { setExpandedCoupon(isExpanded ? null : c.id); setRuleBatchId(''); setRuleDiscountType(''); setRuleDiscountValue(''); }}
+                    onClick={() => { setExpandedCoupon(isExpanded ? null : c.id); setRuleBatchIds([]); setRuleDiscountType(''); setRuleDiscountValue(''); }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${isExpanded ? 'bg-red-500/10 text-red-400' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
                     title="Travas de Lote"
                   >🔒 Travas</button>
+                  <button onClick={() => duplicateCoupon(c)} className="p-2 rounded-lg hover:bg-[#EDAC02]/10 text-zinc-500 hover:text-[#EDAC02] transition-all" title="Duplicar Cupom">📋</button>
                   <button onClick={() => deleteCoupon.mutate({ id: c.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all">🗑️</button>
                 </div>
               </div>
@@ -1197,17 +1215,44 @@ function CuponsTab({ eventId }: { eventId: string }) {
 
                   {/* Adicionar nova trava */}
                   <div className="bg-[#0a0a0a] border border-dashed border-[#262626] rounded-lg p-3 space-y-2">
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">+ Adicionar Trava</p>
-                    <select value={ruleBatchId} onChange={e => setRuleBatchId(e.target.value)} className={`${inputClass} text-xs`}>
-                      <option value="">Selecionar lote...</option>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">+ Adicionar Travas</p>
+                      {ruleBatchIds.length > 0 && (
+                        <span className="text-[10px] font-black text-[#EDAC02]">{ruleBatchIds.length} lote{ruleBatchIds.length > 1 ? 's' : ''} selecionado{ruleBatchIds.length > 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                    {/* Multi-select de lotes com checkboxes */}
+                    <div className="max-h-40 overflow-y-auto space-y-1 border border-[#1a1a1a] rounded-lg p-2">
+                      {(batches || []).length === 0 && <p className="text-[10px] text-zinc-600 italic px-1">Nenhum lote criado neste evento.</p>}
                       {(batches || []).map((b: any) => {
                         const catName = b.category_id ? categories?.find((cat: any) => cat.id === b.category_id)?.name : 'Global';
-                        return <option key={b.id} value={b.id}>{b.name} — {catName}</option>;
+                        const alreadyLocked = getCouponRules(c.id).some((r: any) => r.batch_id === b.id);
+                        const isSelected = ruleBatchIds.includes(b.id);
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            disabled={alreadyLocked}
+                            onClick={() => toggleRuleBatch(b.id)}
+                            className={`w-full text-left px-2 py-1.5 rounded flex items-center gap-2 transition-all text-xs ${
+                              alreadyLocked ? 'opacity-40 cursor-not-allowed' :
+                              isSelected ? 'bg-[#EDAC02]/10 border border-[#EDAC02]/30' : 'hover:bg-zinc-800'
+                            }`}
+                          >
+                            <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${
+                              isSelected ? 'bg-[#EDAC02] border-[#EDAC02] text-black font-black' : 'border-zinc-600'
+                            }`}>{isSelected && '✓'}</span>
+                            <span className={`font-bold ${isSelected ? 'text-white' : 'text-zinc-400'}`}>{b.name}</span>
+                            <span className="text-zinc-600 ml-auto">{catName}</span>
+                            {alreadyLocked && <span className="text-[9px] text-zinc-600">já travado</span>}
+                          </button>
+                        );
                       })}
-                    </select>
+                    </div>
+                    {/* Desconto específico (opcional, aplica a todos os selecionados) */}
                     <div className="grid grid-cols-2 gap-2">
                       <select value={ruleDiscountType} onChange={e => setRuleDiscountType(e.target.value)} className={`${inputClass} text-xs`}>
-                        <option value="">Desconto padrão</option>
+                        <option value="">Desconto padrão do cupom</option>
                         <option value="percentage">Porcentagem (%)</option>
                         <option value="fixed">Valor Fixo (R$)</option>
                       </select>
@@ -1219,11 +1264,11 @@ function CuponsTab({ eventId }: { eventId: string }) {
                       />
                     </div>
                     <button
-                      onClick={() => handleAddRule(c.id)}
-                      disabled={!ruleBatchId || createRule.isPending}
+                      onClick={() => handleAddRules(c.id)}
+                      disabled={ruleBatchIds.length === 0 || createRule.isPending}
                       className="w-full py-2 rounded-lg bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 text-xs font-black uppercase tracking-widest hover:bg-[#EDAC02]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {createRule.isPending ? 'Adicionando...' : 'Adicionar Trava'}
+                      {createRule.isPending ? 'Adicionando...' : `Adicionar ${ruleBatchIds.length > 1 ? `${ruleBatchIds.length} Travas` : 'Trava'}`}
                     </button>
                   </div>
                 </div>
