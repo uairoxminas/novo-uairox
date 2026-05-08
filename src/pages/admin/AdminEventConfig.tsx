@@ -1058,18 +1058,23 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const [paymentLink, setPaymentLink] = useState('');
   const [categoryId, setCategoryId] = useState('');
 
-  // Expanded state per coupon for the "Travas de Lote" section
-  const [expandedCoupon, setExpandedCoupon] = useState<string | null>(null);
-  // Rule add form state — multi-select of batch IDs
-  const [ruleBatchIds, setRuleBatchIds] = useState<string[]>([]);
-  const [ruleDiscountType, setRuleDiscountType] = useState('');
-  const [ruleDiscountValue, setRuleDiscountValue] = useState('');
+  // Travas configuradas no formulário de criação
+  const [formBatchIds, setFormBatchIds] = useState<string[]>([]);
+  const [formRuleDiscountType, setFormRuleDiscountType] = useState('');
+  const [formRuleDiscountValue, setFormRuleDiscountValue] = useState('');
 
-  const resetForm = () => { setCode(''); setDiscountValue(''); setMaxUses(''); setPaymentLink(''); setCategoryId(''); setDiscountType('percentage'); };
+  const resetForm = () => {
+    setCode(''); setDiscountValue(''); setMaxUses(''); setPaymentLink('');
+    setCategoryId(''); setDiscountType('percentage');
+    setFormBatchIds([]); setFormRuleDiscountType(''); setFormRuleDiscountValue('');
+  };
+
+  const toggleFormBatch = (batchId: string) =>
+    setFormBatchIds(prev => prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]);
 
   const handleSave = async () => {
     if (!code.trim() || !discountValue) return;
-    await createCoupon.mutateAsync({
+    const newCoupon = await createCoupon.mutateAsync({
       event_id: eventId,
       code: code.trim().toUpperCase(),
       discount_type: discountType,
@@ -1078,6 +1083,17 @@ function CuponsTab({ eventId }: { eventId: string }) {
       payment_link: paymentLink.trim() || undefined,
       category_id: categoryId || undefined,
     });
+    if (formBatchIds.length > 0 && newCoupon?.id) {
+      for (const bid of formBatchIds) {
+        await createRule.mutateAsync({
+          event_id: eventId,
+          coupon_id: newCoupon.id,
+          batch_id: bid,
+          discount_type: formRuleDiscountType || undefined,
+          discount_value: formRuleDiscountValue ? parseFloat(formRuleDiscountValue) : undefined,
+        });
+      }
+    }
     setShowForm(false);
     resetForm();
   };
@@ -1089,25 +1105,9 @@ function CuponsTab({ eventId }: { eventId: string }) {
     setMaxUses(c.max_uses ? String(c.max_uses) : '');
     setPaymentLink(c.payment_link || '');
     setCategoryId(c.category_id || '');
+    setFormBatchIds([]); setFormRuleDiscountType(''); setFormRuleDiscountValue('');
     setShowForm(true);
   };
-
-  const handleAddRules = async (couponId: string) => {
-    if (ruleBatchIds.length === 0) return;
-    for (const bid of ruleBatchIds) {
-      await createRule.mutateAsync({
-        event_id: eventId,
-        coupon_id: couponId,
-        batch_id: bid,
-        discount_type: ruleDiscountType || undefined,
-        discount_value: ruleDiscountValue ? parseFloat(ruleDiscountValue) : undefined,
-      });
-    }
-    setRuleBatchIds([]); setRuleDiscountType(''); setRuleDiscountValue('');
-  };
-
-  const toggleRuleBatch = (batchId: string) =>
-    setRuleBatchIds(prev => prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]);
 
   const getCouponRules = (couponId: string) =>
     (allRules || []).filter((r: any) => r.coupon_id === couponId);
@@ -1126,7 +1126,6 @@ function CuponsTab({ eventId }: { eventId: string }) {
         {coupons?.map((c: any) => {
           const u = c.current_uses || 0;
           const rules = getCouponRules(c.id);
-          const isExpanded = expandedCoupon === c.id;
 
           let pText = "", pColor = "bg-[#EDAC02]", pPercent = 0;
           if (u < 10) { pPercent = (u / 10) * 100; pText = `🏆 Próxima Recompensa: Inscrição Free (Faltam ${10 - u})`; }
@@ -1146,11 +1145,6 @@ function CuponsTab({ eventId }: { eventId: string }) {
                           Apenas: {categories?.find((cat: any) => cat.id === c.category_id)?.name}
                         </span>
                       }
-                      {rules.length > 0 &&
-                        <span className="ml-2 px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold border border-red-500/20 uppercase">
-                          🔒 {rules.length} trava{rules.length > 1 ? 's' : ''} de lote
-                        </span>
-                      }
                     </h4>
                     <p className="text-xs text-zinc-500 mt-1">
                       {u}{c.max_uses ? ` / ${c.max_uses}` : ''} usos confirmados{!c.active && ' • Inativo'}
@@ -1158,15 +1152,38 @@ function CuponsTab({ eventId }: { eventId: string }) {
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <button
-                    onClick={() => { setExpandedCoupon(isExpanded ? null : c.id); setRuleBatchIds([]); setRuleDiscountType(''); setRuleDiscountValue(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${isExpanded ? 'bg-red-500/10 text-red-400' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
-                    title="Travas de Lote"
-                  >🔒 Travas</button>
                   <button onClick={() => duplicateCoupon(c)} className="p-2 rounded-lg hover:bg-[#EDAC02]/10 text-zinc-500 hover:text-[#EDAC02] transition-all" title="Duplicar Cupom">📋</button>
                   <button onClick={() => deleteCoupon.mutate({ id: c.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all">🗑️</button>
                 </div>
               </div>
+
+              {/* Travas de lote existentes — sempre visíveis se houver */}
+              {rules.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-[#1a1a1a] space-y-1.5">
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">🔒 Travas de Lote ({rules.length})</p>
+                  {rules.map((r: any) => {
+                    const batch = r.price_batches;
+                    const catName = batch?.category_id ? categories?.find((cat: any) => cat.id === batch.category_id)?.name : 'Global';
+                    return (
+                      <div key={r.id} className="flex items-center justify-between bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg px-3 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-white">{batch?.name || '—'}</p>
+                          <span className="text-[10px] text-zinc-600">{catName}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {r.discount_value != null
+                            ? <span className="text-xs font-black text-[#EDAC02]">
+                                {r.discount_type === 'percentage' ? `${r.discount_value}% OFF` : `R$ ${Number(r.discount_value).toFixed(2)} OFF`}
+                              </span>
+                            : <span className="text-[10px] text-zinc-600 italic">Desconto padrão</span>
+                          }
+                          <button onClick={() => deleteRule.mutate({ id: r.id, event_id: eventId })} className="text-zinc-600 hover:text-red-400 transition-colors text-xs">✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Gamification */}
               <div className="mt-4 pt-4 border-t border-[#1a1a1a]">
@@ -1178,108 +1195,13 @@ function CuponsTab({ eventId }: { eventId: string }) {
                   <div className={`h-full ${pColor} transition-all duration-1000`} style={{ width: `${Math.max(2, pPercent)}%` }} />
                 </div>
               </div>
-
-              {/* Travas de Lote — expandível */}
-              {isExpanded && (
-                <div className="mt-4 pt-4 border-t border-[#262626] space-y-3">
-                  <p className="text-xs font-black text-zinc-300 uppercase tracking-widest">🔒 Travas de Lote</p>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed">
-                    Se houver travas, o cupom <strong className="text-zinc-300">só funciona nos lotes listados</strong>. Cada trava pode ter um desconto próprio — se não definido, usa o desconto base do cupom.
-                  </p>
-
-                  {/* Regras existentes */}
-                  {rules.length === 0 && (
-                    <p className="text-[10px] text-zinc-600 italic">Nenhuma trava. Cupom válido para qualquer lote.</p>
-                  )}
-                  {rules.map((r: any) => {
-                    const batch = r.price_batches;
-                    const catName = batch?.category_id ? categories?.find((cat: any) => cat.id === batch.category_id)?.name : 'Global';
-                    return (
-                      <div key={r.id} className="flex items-center justify-between bg-[#0a0a0a] border border-[#262626] rounded-lg px-3 py-2">
-                        <div>
-                          <p className="text-xs font-bold text-white">{batch?.name || '—'}</p>
-                          <p className="text-[10px] text-zinc-500">{catName}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {r.discount_value != null
-                            ? <span className="text-xs font-black text-[#EDAC02]">
-                                {r.discount_type === 'percentage' ? `${r.discount_value}% OFF` : `R$ ${Number(r.discount_value).toFixed(2)} OFF`}
-                              </span>
-                            : <span className="text-[10px] text-zinc-500 italic">Desconto padrão do cupom</span>
-                          }
-                          <button onClick={() => deleteRule.mutate({ id: r.id, event_id: eventId })} className="text-zinc-600 hover:text-red-400 transition-colors text-xs">✕</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Adicionar nova trava */}
-                  <div className="bg-[#0a0a0a] border border-dashed border-[#262626] rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">+ Adicionar Travas</p>
-                      {ruleBatchIds.length > 0 && (
-                        <span className="text-[10px] font-black text-[#EDAC02]">{ruleBatchIds.length} lote{ruleBatchIds.length > 1 ? 's' : ''} selecionado{ruleBatchIds.length > 1 ? 's' : ''}</span>
-                      )}
-                    </div>
-                    {/* Multi-select de lotes com checkboxes */}
-                    <div className="max-h-40 overflow-y-auto space-y-1 border border-[#1a1a1a] rounded-lg p-2">
-                      {(batches || []).length === 0 && <p className="text-[10px] text-zinc-600 italic px-1">Nenhum lote criado neste evento.</p>}
-                      {(batches || []).map((b: any) => {
-                        const catName = b.category_id ? categories?.find((cat: any) => cat.id === b.category_id)?.name : 'Global';
-                        const alreadyLocked = getCouponRules(c.id).some((r: any) => r.batch_id === b.id);
-                        const isSelected = ruleBatchIds.includes(b.id);
-                        return (
-                          <button
-                            key={b.id}
-                            type="button"
-                            disabled={alreadyLocked}
-                            onClick={() => toggleRuleBatch(b.id)}
-                            className={`w-full text-left px-2 py-1.5 rounded flex items-center gap-2 transition-all text-xs ${
-                              alreadyLocked ? 'opacity-40 cursor-not-allowed' :
-                              isSelected ? 'bg-[#EDAC02]/10 border border-[#EDAC02]/30' : 'hover:bg-zinc-800'
-                            }`}
-                          >
-                            <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${
-                              isSelected ? 'bg-[#EDAC02] border-[#EDAC02] text-black font-black' : 'border-zinc-600'
-                            }`}>{isSelected && '✓'}</span>
-                            <span className={`font-bold ${isSelected ? 'text-white' : 'text-zinc-400'}`}>{b.name}</span>
-                            <span className="text-zinc-600 ml-auto">{catName}</span>
-                            {alreadyLocked && <span className="text-[9px] text-zinc-600">já travado</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {/* Desconto específico (opcional, aplica a todos os selecionados) */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <select value={ruleDiscountType} onChange={e => setRuleDiscountType(e.target.value)} className={`${inputClass} text-xs`}>
-                        <option value="">Desconto padrão do cupom</option>
-                        <option value="percentage">Porcentagem (%)</option>
-                        <option value="fixed">Valor Fixo (R$)</option>
-                      </select>
-                      <input
-                        type="number" value={ruleDiscountValue} onChange={e => setRuleDiscountValue(e.target.value)}
-                        placeholder={ruleDiscountType === 'percentage' ? '10' : ruleDiscountType === 'fixed' ? '50.00' : 'Padrão'}
-                        disabled={!ruleDiscountType}
-                        className={`${inputClass} text-xs disabled:opacity-40`}
-                      />
-                    </div>
-                    <button
-                      onClick={() => handleAddRules(c.id)}
-                      disabled={ruleBatchIds.length === 0 || createRule.isPending}
-                      className="w-full py-2 rounded-lg bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 text-xs font-black uppercase tracking-widest hover:bg-[#EDAC02]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {createRule.isPending ? 'Adicionando...' : `Adicionar ${ruleBatchIds.length > 1 ? `${ruleBatchIds.length} Travas` : 'Trava'}`}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
         {(!coupons || coupons.length === 0) && emptyState('Nenhum cupom criado')}
       </div>
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title="Novo Cupom">
+      <Modal open={showForm} onClose={() => { setShowForm(false); resetForm(); }} title="Novo Cupom">
         <div className="space-y-4">
           <div><label className={labelClass}>Aplicar Cupom à Categoria</label>
             <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={inputClass}>
@@ -1300,9 +1222,63 @@ function CuponsTab({ eventId }: { eventId: string }) {
           </div>
           <div><label className={labelClass}>Máx. Usos</label><input type="number" value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="Ilimitado" className={inputClass} /></div>
           <div><label className={labelClass}>Link de Pagamento</label><input value={paymentLink} onChange={e => setPaymentLink(e.target.value)} placeholder="https://..." className={inputClass} /></div>
+
+          {/* Travas de Lote */}
+          <div className="pt-1">
+            <div className="flex items-center justify-between mb-2">
+              <label className={labelClass}>🔒 Travas de Lote <span className="text-zinc-600 font-normal normal-case tracking-normal">(Opcional)</span></label>
+              {formBatchIds.length > 0 && (
+                <span className="text-[10px] font-black text-[#EDAC02]">{formBatchIds.length} lote{formBatchIds.length > 1 ? 's' : ''} selecionado{formBatchIds.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
+            <p className="text-[10px] text-zinc-600 mb-2 leading-relaxed">
+              Se selecionado, o cupom <strong className="text-zinc-400">só funcionará nos lotes marcados</strong>. Sem seleção, vale para qualquer lote.
+            </p>
+            <div className="max-h-36 overflow-y-auto space-y-1 border border-[#1a1a1a] rounded-lg p-2 bg-[#0a0a0a]">
+              {(batches || []).length === 0 && <p className="text-[10px] text-zinc-600 italic px-1">Nenhum lote criado neste evento.</p>}
+              {(batches || []).map((b: any) => {
+                const catName = b.category_id ? categories?.find((cat: any) => cat.id === b.category_id)?.name : 'Global';
+                const isSelected = formBatchIds.includes(b.id);
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => toggleFormBatch(b.id)}
+                    className={`w-full text-left px-2 py-1.5 rounded flex items-center gap-2 transition-all text-xs ${
+                      isSelected ? 'bg-[#EDAC02]/10 border border-[#EDAC02]/30' : 'hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${
+                      isSelected ? 'bg-[#EDAC02] border-[#EDAC02] text-black font-black' : 'border-zinc-600'
+                    }`}>{isSelected && '✓'}</span>
+                    <span className={`font-bold ${isSelected ? 'text-white' : 'text-zinc-400'}`}>{b.name}</span>
+                    <span className="text-zinc-600 ml-auto text-[10px]">{catName}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {formBatchIds.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <select value={formRuleDiscountType} onChange={e => setFormRuleDiscountType(e.target.value)} className={`${inputClass} text-xs`}>
+                  <option value="">Desconto padrão do cupom</option>
+                  <option value="percentage">Porcentagem (%) específica</option>
+                  <option value="fixed">Valor Fixo (R$) específico</option>
+                </select>
+                <input
+                  type="number" value={formRuleDiscountValue} onChange={e => setFormRuleDiscountValue(e.target.value)}
+                  placeholder={formRuleDiscountType === 'percentage' ? '10' : formRuleDiscountType === 'fixed' ? '50.00' : 'Padrão'}
+                  disabled={!formRuleDiscountType}
+                  className={`${inputClass} text-xs disabled:opacity-40`}
+                />
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-3 pt-3 border-t border-[#1a1a1a]">
-            <button onClick={() => setShowForm(false)} className={`flex-1 ${btnOutline}`}>Cancelar</button>
-            <button onClick={handleSave} className={`flex-1 ${btnGold}`}>Criar Cupom</button>
+            <button onClick={() => { setShowForm(false); resetForm(); }} className={`flex-1 ${btnOutline}`}>Cancelar</button>
+            <button onClick={handleSave} disabled={createCoupon.isPending || createRule.isPending} className={`flex-1 ${btnGold} disabled:opacity-60`}>
+              {createCoupon.isPending || createRule.isPending ? 'Salvando...' : 'Criar Cupom'}
+            </button>
           </div>
         </div>
       </Modal>
