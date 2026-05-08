@@ -713,6 +713,7 @@ function LotesTab({ eventId }: { eventId: string }) {
   const [maxRegs, setMaxRegs] = useState('');
   const [pixKey, setPixKey] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
+  const [installmentsCount, setInstallmentsCount] = useState('');
   const [selectedCatIds, setSelectedCatIds] = useState<string[]>([]);
   const [active, setActive] = useState(true);
 
@@ -754,6 +755,7 @@ function LotesTab({ eventId }: { eventId: string }) {
       setMaxRegs(String(b.max_registrations || ''));
       setPixKey(b.pix_key || '');
       setPaymentLink(b.payment_link || '');
+      setInstallmentsCount(b.installments_count ? String(b.installments_count) : '');
       setSelectedCatIds(b.category_id ? [b.category_id] : []);
       setActive(b.active !== false);
     } else {
@@ -767,6 +769,7 @@ function LotesTab({ eventId }: { eventId: string }) {
       setMaxRegs('');
       setPixKey('');
       setPaymentLink('');
+      setInstallmentsCount('');
       setSelectedCatIds([]);
       setActive(true);
     }
@@ -784,6 +787,7 @@ function LotesTab({ eventId }: { eventId: string }) {
     setMaxRegs(String(b.max_registrations || ''));
     setPixKey(b.pix_key || '');
     setPaymentLink(b.payment_link || '');
+    setInstallmentsCount(b.installments_count ? String(b.installments_count) : '');
     setSelectedCatIds(b.category_id ? [b.category_id] : []);
     setActive(false);
     setShowForm(true);
@@ -805,7 +809,8 @@ function LotesTab({ eventId }: { eventId: string }) {
         max_registrations: maxRegs ? parseInt(maxRegs) : null,
         pix_key: pixKey.trim() || null,
         payment_link: paymentLink.trim() || null,
-        order_index: editing.order_index, // mantém posição ao editar
+        installments_count: installmentsCount ? parseInt(installmentsCount) : null,
+        order_index: editing.order_index,
         active,
         category_id: catId,
       });
@@ -821,6 +826,7 @@ function LotesTab({ eventId }: { eventId: string }) {
         max_registrations: maxRegs ? parseInt(maxRegs) : undefined,
         pix_key: pixKey.trim() || undefined,
         payment_link: paymentLink.trim() || undefined,
+        installments_count: installmentsCount ? parseInt(installmentsCount) : undefined,
         active,
       };
       if (selectedCatIds.length === 0) {
@@ -998,16 +1004,21 @@ function LotesTab({ eventId }: { eventId: string }) {
             <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="130.00" className={inputClass} />
             <p className="text-[10px] text-zinc-500 mt-1">Valor base para pagamento via PIX à vista.</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>💳 Preço Cartão (R$)</label>
               <input type="number" step="0.01" value={priceCard} onChange={e => setPriceCard(e.target.value)} placeholder={price || 'Mesmo do PIX'} className={inputClass} />
               <p className="text-[10px] text-zinc-500 mt-1">Deixe vazio para usar o preço PIX.</p>
             </div>
             <div>
-              <label className={labelClass}>📅 Preço Parcelado (R$)</label>
+              <label className={labelClass}>📅 Preço Parcelado Total (R$)</label>
               <input type="number" step="0.01" value={priceInstallments} onChange={e => setPriceInstallments(e.target.value)} placeholder={price || 'Mesmo do PIX'} className={inputClass} />
-              <p className="text-[10px] text-zinc-500 mt-1">Deixe vazio para usar o preço PIX.</p>
+              <p className="text-[10px] text-zinc-500 mt-1">Valor total parcelado.</p>
+            </div>
+            <div>
+              <label className={labelClass}>📅 Nº de Parcelas</label>
+              <input type="number" min="2" max="24" value={installmentsCount} onChange={e => setInstallmentsCount(e.target.value)} placeholder="Ex: 3" className={inputClass} />
+              <p className="text-[10px] text-zinc-500 mt-1">Ex: 3 → exibe "3x R$X"</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

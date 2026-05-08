@@ -126,6 +126,112 @@ function getDaysUntil(dateStr: string) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
+// ============ BATCH URGENCY COMPONENT ============
+function BatchUrgency({ batch }: { batch: any }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    if (!batch?.end_date && !batch?.max_registrations) return;
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [batch]);
+
+  if (!batch) return null;
+
+  const hasEndDate = !!batch.end_date;
+  const hasLimit = !!batch.max_registrations;
+  if (!hasEndDate && !hasLimit) return null;
+
+  const used = batch.registrations_count || 0;
+  const total = batch.max_registrations || 0;
+  const remaining = hasLimit ? Math.max(0, total - used) : null;
+  const spotsPercent = hasLimit && total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+
+  let countdown = '';
+  let isLastDay = false;
+  if (hasEndDate) {
+    const diff = new Date(batch.end_date).getTime() - now.getTime();
+    if (diff <= 0) {
+      countdown = 'Encerrado';
+    } else {
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      isLastDay = days === 0;
+      if (days > 0) countdown = `${days}d ${hours}h ${mins}m`;
+      else if (hours > 0) countdown = `${hours}h ${mins}m ${secs}s`;
+      else countdown = `${mins}m ${secs}s`;
+    }
+  }
+
+  return (
+    <div className="space-y-2 mb-3">
+      {hasEndDate && (
+        <div className={`flex items-center gap-1.5 text-xs font-bold ${isLastDay ? 'text-red-400' : 'text-amber-400'}`}>
+          <span>⏱</span>
+          <span>{isLastDay ? '⚠ ÚLTIMO DIA! ' : ''}Termina em {countdown}</span>
+        </div>
+      )}
+      {hasLimit && remaining !== null && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Vagas neste lote</span>
+            <span className={`text-[10px] font-black ${remaining <= 5 ? 'text-red-400' : remaining <= 10 ? 'text-amber-400' : 'text-zinc-300'}`}>
+              {remaining === 0 ? 'Esgotado' : remaining <= 5 ? `⚠ ${remaining} restantes!` : `${remaining} disponíveis`}
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${spotsPercent >= 90 ? 'bg-red-500' : spotsPercent >= 70 ? 'bg-amber-500' : 'bg-green-500'}`}
+              style={{ width: `${spotsPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ LOT PROGRESS DOTS ============
+function LotProgress({ batches, activeBatch, categoryId }: { batches: any[]; activeBatch: any; categoryId?: string }) {
+  const relevant = batches
+    .filter(b => categoryId ? (!b.category_id || b.category_id === categoryId) : !b.category_id)
+    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+  if (relevant.length <= 1) return null;
+
+  const activeIdx = activeBatch ? relevant.findIndex(b => b.id === activeBatch.id) : -1;
+
+  return (
+    <div className="flex items-center gap-0 mb-4">
+      {relevant.map((b, i) => {
+        const isCurrent = i === activeIdx;
+        const isPast = activeIdx !== -1 && i < activeIdx;
+        return (
+          <div key={b.id} className="flex items-center flex-1 min-w-0">
+            <div className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div className={`w-3 h-3 rounded-full border-2 transition-all ${
+                isCurrent ? 'bg-[#EDAC02] border-[#EDAC02] shadow-[0_0_6px_rgba(237,172,2,0.6)]' :
+                isPast ? 'bg-zinc-600 border-zinc-600' :
+                'bg-transparent border-zinc-700'
+              }`} />
+              <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${
+                isCurrent ? 'text-[#EDAC02]' : isPast ? 'text-zinc-600' : 'text-zinc-700'
+              }`}>
+                {b.name.split(/[\s–-]/)[0]} {b.name.split(/[\s–-]/)[1] || ''}
+              </span>
+            </div>
+            {i < relevant.length - 1 && (
+              <div className={`flex-1 h-px mx-1 ${i < activeIdx ? 'bg-zinc-600' : 'bg-zinc-800'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ============ MAIN PAGE ============
 export default function PublicEventRegistration() {
   const { id } = useParams<{ id: string }>();
@@ -460,17 +566,33 @@ export default function PublicEventRegistration() {
                       </div>
                     </div>
                     <div className="pt-6 border-t border-[#1a1a1a]">
+                      {/* Progresso de lotes */}
+                      <LotProgress batches={batches} activeBatch={localActiveBatch} categoryId={cat.id} />
+
+                      {/* Urgência inteligente */}
+                      {!localIsSoldOut && !isEventFull && (
+                        <BatchUrgency batch={localActiveBatch} />
+                      )}
+
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="mb-2">
-                            <p className="text-xs text-zinc-400 font-bold mb-1">💲 Pix á vista:</p>
+                            <p className="text-xs text-zinc-400 font-bold mb-1">💲 Pix à vista:</p>
                             <p className={`text-3xl font-black italic tracking-tighter leading-none ${localIsSoldOut || isEventFull ? 'text-zinc-600' : 'text-[#EDAC02]'}`}>{formatCurrency(price)}</p>
                           </div>
                           {localActiveBatch?.price_card && Number(localActiveBatch.price_card) !== price && (
                             <p className="text-xs text-zinc-400 mt-1">💳 Cartão: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_card))}</span></p>
                           )}
                           {localActiveBatch?.price_installments && Number(localActiveBatch.price_installments) !== price && (
-                            <p className="text-xs text-zinc-400 mt-0.5">📅 Pix Parcelado: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_installments))}</span></p>
+                            <p className="text-xs text-zinc-400 mt-0.5">
+                              📅 Pix Parcelado:{' '}
+                              <span className="text-white font-bold">
+                                {localActiveBatch.installments_count
+                                  ? `${localActiveBatch.installments_count}x ${formatCurrency(Number(localActiveBatch.price_installments) / localActiveBatch.installments_count)}`
+                                  : formatCurrency(Number(localActiveBatch.price_installments))
+                                }
+                              </span>
+                            </p>
                           )}
                           {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
                         </div>
