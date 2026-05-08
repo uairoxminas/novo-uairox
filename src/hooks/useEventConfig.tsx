@@ -497,7 +497,40 @@ export function useAssignLane() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["lane-assignments", vars.heat_id] });
+      qc.invalidateQueries({ queryKey: ["unassigned-registrations"] });
     },
+  });
+}
+
+export function useUnassignedRegistrations(eventId?: string, allHeatIds?: string[]) {
+  return useQuery({
+    queryKey: ["unassigned-registrations", eventId, allHeatIds],
+    queryFn: async () => {
+      let assignedIds: string[] = [];
+      if (allHeatIds && allHeatIds.length > 0) {
+        const { data: assigned } = await supabase
+          .from("heat_lane_assignments")
+          .select("registration_id")
+          .in("heat_id", allHeatIds)
+          .not("registration_id", "is", null);
+        assignedIds = (assigned || []).map((a: any) => a.registration_id).filter(Boolean);
+      }
+
+      let query = supabase
+        .from("registrations")
+        .select("id, bib_number, athlete_name, team_name, category_id, categories(name)")
+        .eq("event_id", eventId!)
+        .in("status", ["confirmed", "pending"]);
+
+      if (assignedIds.length > 0) {
+        query = query.not("id", "in", `(${assignedIds.join(",")})`);
+      }
+
+      const { data, error } = await query.order("bib_number");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!eventId,
   });
 }
 

@@ -9,7 +9,8 @@ import {
   useAthleteKits, useCreateAthleteKit, useUpdateAthleteKit, useDeleteAthleteKit,
   useEventRegistrations, useEventStats,
   useHeats, useCreateHeat, useUpdateHeat, useDeleteHeat,
-  useLaneAssignments, useAutoGenerateHeats, useCategoryRegCounts,
+  useLaneAssignments, useAssignLane, useAutoGenerateHeats, useCategoryRegCounts,
+  useUnassignedRegistrations,
 } from '@/hooks/useEventConfig';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -2248,7 +2249,7 @@ function BateriasTab({ eventId }: { eventId: string }) {
                     <svg className={`w-4 h-4 text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
                 </div>
-                {isExpanded && <HeatLanesDetail heatId={heat.id} laneCount={heat.lane_count} />}
+                {isExpanded && <HeatLanesDetail heatId={heat.id} laneCount={heat.lane_count} eventId={eventId} allHeatIds={(heats || []).map((h: any) => h.id)} />}
               </div>
             );
           })}
@@ -2353,8 +2354,20 @@ function BateriasTab({ eventId }: { eventId: string }) {
 }
 
 // ============ HEAT LANES DETAIL ============
-function HeatLanesDetail({ heatId, laneCount }: { heatId: string; laneCount: number }) {
+function HeatLanesDetail({ heatId, laneCount, eventId, allHeatIds }: { heatId: string; laneCount: number; eventId: string; allHeatIds: string[] }) {
   const { data: lanes, isLoading } = useLaneAssignments(heatId);
+  const { data: unassigned } = useUnassignedRegistrations(eventId, allHeatIds);
+  const assignLane = useAssignLane();
+
+  const [selectedLane, setSelectedLane] = useState<{ id: string; lane_number: number; reg: any } | null>(null);
+
+  const handleAssign = (registrationId: string | null) => {
+    if (!selectedLane) return;
+    assignLane.mutate(
+      { id: selectedLane.id, registration_id: registrationId, heat_id: heatId },
+      { onSuccess: () => setSelectedLane(null) }
+    );
+  };
 
   if (isLoading) return <div className="p-4 border-t border-[#1a1a1a] text-center"><div className="w-5 h-5 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin mx-auto" /></div>;
 
@@ -2366,11 +2379,14 @@ function HeatLanesDetail({ heatId, laneCount }: { heatId: string; laneCount: num
           const reg = lane.registrations as any;
           const displayName = reg?.team_name || reg?.athlete_name || '?';
           return (
-            <div key={lane.id} className={`rounded-lg p-2 text-center border transition-all ${
-              hasAthlete
-                ? 'bg-[#EDAC02]/10 border-[#EDAC02]/20'
-                : 'bg-[#0a0a0a] border-[#262626]'
-            }`}>
+            <div
+              key={lane.id}
+              onClick={() => setSelectedLane({ id: lane.id, lane_number: lane.lane_number, reg: hasAthlete ? reg : null })}
+              className={`rounded-lg p-2 text-center border transition-all cursor-pointer hover:border-[#EDAC02]/60 ${
+                hasAthlete
+                  ? 'bg-[#EDAC02]/10 border-[#EDAC02]/20'
+                  : 'bg-[#0a0a0a] border-[#262626]'
+              }`}>
               <p className="text-[10px] text-zinc-500 uppercase">Raia {lane.lane_number}</p>
               <div className="mt-0.5 flex flex-col items-center">
                  <p className={`text-[11px] font-black leading-tight ${hasAthlete ? 'text-[#EDAC02]' : 'text-zinc-600'}`}>
@@ -2393,6 +2409,43 @@ function HeatLanesDetail({ heatId, laneCount }: { heatId: string; laneCount: num
           ))
         )}
       </div>
+
+      <Modal open={!!selectedLane} onClose={() => setSelectedLane(null)} title={`Raia ${selectedLane?.lane_number}`}>
+        <div className="space-y-3">
+          {selectedLane?.reg && (
+            <div>
+              <p className={labelClass}>Atual</p>
+              <div className="flex items-center justify-between bg-[#EDAC02]/10 border border-[#EDAC02]/20 rounded-lg p-3">
+                <span className="text-sm text-white font-bold">
+                  #{selectedLane.reg.bib_number} — {selectedLane.reg.team_name || selectedLane.reg.athlete_name}
+                </span>
+                <button onClick={() => handleAssign(null)} className="text-xs text-red-400 hover:text-red-300 font-bold transition-colors">
+                  Remover
+                </button>
+              </div>
+            </div>
+          )}
+          <div>
+            <p className={labelClass}>Não alocados ({unassigned?.length || 0})</p>
+            <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+              {(!unassigned || unassigned.length === 0) && (
+                <p className="text-sm text-zinc-600 text-center py-6">Todos os inscritos já estão alocados.</p>
+              )}
+              {unassigned?.map((reg: any) => (
+                <button
+                  key={reg.id}
+                  onClick={() => handleAssign(reg.id)}
+                  disabled={assignLane.isPending}
+                  className="w-full text-left p-3 rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#EDAC02]/50 hover:bg-[#EDAC02]/5 transition-colors"
+                >
+                  <span className="text-sm font-bold text-white">#{reg.bib_number} — {reg.team_name || reg.athlete_name}</span>
+                  <span className="text-[10px] text-zinc-500 ml-2">{(reg.categories as any)?.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
