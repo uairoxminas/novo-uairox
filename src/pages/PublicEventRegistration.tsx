@@ -840,14 +840,34 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
-    const { data } = await supabase
-      .from('discount_coupons').select('*')
+    const { data } = await (supabase as any)
+      .from('discount_coupons')
+      .select('*, coupon_batch_rules(*)')
       .eq('event_id', eventId).eq('code', couponCode.toUpperCase()).eq('active', true).single();
     if (data) {
-      if ((data as any).category_id && (data as any).category_id !== categoryId) { toast.error('Cupom não é válido para a sua categoria atual'); return; }
+      if (data.category_id && data.category_id !== categoryId) { toast.error('Cupom não é válido para a sua categoria atual'); return; }
       if (data.max_uses && (data.current_uses || 0) >= data.max_uses) { toast.error('Cupom esgotado'); return; }
-      setCouponDiscount(data);
-      toast.success(`Cupom aplicado: ${data.discount_type === 'percentage' ? `${data.discount_value}% OFF` : `R$ ${Number(data.discount_value).toFixed(2)} OFF`}`);
+
+      // Verifica travas de lote
+      const rules: any[] = data.coupon_batch_rules || [];
+      let effectiveType: string = data.discount_type;
+      let effectiveValue: number = data.discount_value;
+
+      if (rules.length > 0) {
+        const matchingRule = rules.find((r: any) => r.batch_id === formActiveBatch?.id);
+        if (!matchingRule) {
+          toast.error(`Cupom inválido para o ${formActiveBatch?.name || 'lote atual'}`);
+          return;
+        }
+        if (matchingRule.discount_value != null) {
+          effectiveType = matchingRule.discount_type || data.discount_type;
+          effectiveValue = matchingRule.discount_value;
+        }
+      }
+
+      const applied = { ...data, discount_type: effectiveType, discount_value: effectiveValue };
+      setCouponDiscount(applied);
+      toast.success(`Cupom aplicado: ${effectiveType === 'percentage' ? `${effectiveValue}% OFF` : `R$ ${Number(effectiveValue).toFixed(2)} OFF`}`);
     } else { toast.error('Cupom inválido'); }
   };
 

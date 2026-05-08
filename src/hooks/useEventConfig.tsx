@@ -254,6 +254,54 @@ export function useDeleteDiscountCoupon() {
   });
 }
 
+// ============ COUPON BATCH RULES ============
+export function useCouponBatchRules(eventId?: string) {
+  return useQuery({
+    queryKey: ["coupon-batch-rules", eventId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("coupon_batch_rules")
+        .select("*, price_batches(id, name, order_index, category_id)")
+        .order("created_at");
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useCreateCouponBatchRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rule: { coupon_id: string; batch_id: string; discount_type?: string; discount_value?: number; event_id: string }) => {
+      const { event_id: _eid, ...payload } = rule;
+      const { data, error } = await (supabase as any).from("coupon_batch_rules").insert(payload).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["coupon-batch-rules", vars.event_id] });
+      toast.success("Trava adicionada!");
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+}
+
+export function useDeleteCouponBatchRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, event_id }: { id: string; event_id: string }) => {
+      const { error } = await (supabase as any).from("coupon_batch_rules").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["coupon-batch-rules", vars.event_id] });
+      toast.success("Trava removida!");
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+}
+
 // ============ ATHLETE KITS ============
 export function useAthleteKits(eventId?: string) {
   return useQuery({

@@ -6,6 +6,7 @@ import {
   useEventStages, useCreateEventStage, useUpdateEventStage, useDeleteEventStage,
   usePriceBatches, useCreatePriceBatch, useUpdatePriceBatch, useDeletePriceBatch,
   useDiscountCoupons, useCreateDiscountCoupon, useUpdateDiscountCoupon, useDeleteDiscountCoupon,
+  useCouponBatchRules, useCreateCouponBatchRule, useDeleteCouponBatchRule,
   useAthleteKits, useCreateAthleteKit, useUpdateAthleteKit, useDeleteAthleteKit,
   useEventRegistrations, useEventStats,
   useHeats, useCreateHeat, useUpdateHeat, useDeleteHeat,
@@ -1042,8 +1043,12 @@ function LotesTab({ eventId }: { eventId: string }) {
 function CuponsTab({ eventId }: { eventId: string }) {
   const { data: coupons } = useDiscountCoupons(eventId);
   const { data: categories } = useCategories(eventId);
+  const { data: batches } = usePriceBatches(eventId);
+  const { data: allRules } = useCouponBatchRules(eventId);
   const createCoupon = useCreateDiscountCoupon();
   const deleteCoupon = useDeleteDiscountCoupon();
+  const createRule = useCreateCouponBatchRule();
+  const deleteRule = useDeleteCouponBatchRule();
 
   const [showForm, setShowForm] = useState(false);
   const [code, setCode] = useState('');
@@ -1052,6 +1057,13 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const [maxUses, setMaxUses] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
   const [categoryId, setCategoryId] = useState('');
+
+  // Expanded state per coupon for the "Travas de Lote" section
+  const [expandedCoupon, setExpandedCoupon] = useState<string | null>(null);
+  // Rule add form state per coupon
+  const [ruleBatchId, setRuleBatchId] = useState('');
+  const [ruleDiscountType, setRuleDiscountType] = useState('');
+  const [ruleDiscountValue, setRuleDiscountValue] = useState('');
 
   const handleSave = async () => {
     if (!code.trim() || !discountValue) return;
@@ -1065,12 +1077,23 @@ function CuponsTab({ eventId }: { eventId: string }) {
       category_id: categoryId || undefined,
     });
     setShowForm(false);
-    setCode('');
-    setDiscountValue('');
-    setMaxUses('');
-    setPaymentLink('');
-    setCategoryId('');
+    setCode(''); setDiscountValue(''); setMaxUses(''); setPaymentLink(''); setCategoryId('');
   };
+
+  const handleAddRule = async (couponId: string) => {
+    if (!ruleBatchId) return;
+    await createRule.mutateAsync({
+      event_id: eventId,
+      coupon_id: couponId,
+      batch_id: ruleBatchId,
+      discount_type: ruleDiscountType || undefined,
+      discount_value: ruleDiscountValue ? parseFloat(ruleDiscountValue) : undefined,
+    });
+    setRuleBatchId(''); setRuleDiscountType(''); setRuleDiscountValue('');
+  };
+
+  const getCouponRules = (couponId: string) =>
+    (allRules || []).filter((r: any) => r.coupon_id === couponId);
 
   return (
     <div className="space-y-4">
@@ -1085,22 +1108,13 @@ function CuponsTab({ eventId }: { eventId: string }) {
       <div className="space-y-4">
         {coupons?.map((c: any) => {
           const u = c.current_uses || 0;
-          let pText = "";
-          let pColor = "bg-[#EDAC02]";
-          let pPercent = 0;
-          
-          if (u < 10) {
-            pPercent = (u / 10) * 100;
-            pText = `🏆 Próxima Recompensa: Inscrição Free (Faltam ${10 - u})`;
-          } else if (u < 20) {
-            pPercent = ((u - 10) / 10) * 100;
-            pText = `🌟 Destravou Inscrição! Próxima Recompensa: Camisa (Faltam ${20 - u})`;
-            pColor = "bg-[#25D366]";
-          } else {
-            pPercent = 100;
-            pText = `🔥 SUPER VIP: Ganhou Inscrição + Camisa Exclusiva!`;
-            pColor = "bg-[#ef4444]";
-          }
+          const rules = getCouponRules(c.id);
+          const isExpanded = expandedCoupon === c.id;
+
+          let pText = "", pColor = "bg-[#EDAC02]", pPercent = 0;
+          if (u < 10) { pPercent = (u / 10) * 100; pText = `🏆 Próxima Recompensa: Inscrição Free (Faltam ${10 - u})`; }
+          else if (u < 20) { pPercent = ((u - 10) / 10) * 100; pText = `🌟 Destravou Inscrição! Próxima Recompensa: Camisa (Faltam ${20 - u})`; pColor = "bg-[#25D366]"; }
+          else { pPercent = 100; pText = `🔥 SUPER VIP: Ganhou Inscrição + Camisa Exclusiva!`; pColor = "bg-[#ef4444]"; }
 
           return (
             <div key={c.id} className={`${cardClass} p-5 flex flex-col group`}>
@@ -1110,31 +1124,110 @@ function CuponsTab({ eventId }: { eventId: string }) {
                   <div>
                     <h4 className="font-bold text-white text-base">
                       {c.discount_type === 'percentage' ? `${c.discount_value}% OFF` : `R$ ${Number(c.discount_value).toFixed(2)} OFF`}
-                      {c.category_id && 
+                      {c.category_id &&
                         <span className="ml-2 px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-bold border border-zinc-700 uppercase">
-                          Apenas: {categories?.find(cat => cat.id === c.category_id)?.name}
+                          Apenas: {categories?.find((cat: any) => cat.id === c.category_id)?.name}
+                        </span>
+                      }
+                      {rules.length > 0 &&
+                        <span className="ml-2 px-2 py-0.5 rounded bg-red-500/10 text-red-400 text-[10px] font-bold border border-red-500/20 uppercase">
+                          🔒 {rules.length} trava{rules.length > 1 ? 's' : ''} de lote
                         </span>
                       }
                     </h4>
                     <p className="text-xs text-zinc-500 mt-1">
-                      {c.current_uses || 0}{c.max_uses ? ` / ${c.max_uses}` : ''} usos confirmados
-                      {!c.active && ' • Inativo'}
+                      {u}{c.max_uses ? ` / ${c.max_uses}` : ''} usos confirmados{!c.active && ' • Inativo'}
                     </p>
                   </div>
                 </div>
-                <button onClick={() => deleteCoupon.mutate({ id: c.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">🗑️</button>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={() => { setExpandedCoupon(isExpanded ? null : c.id); setRuleBatchId(''); setRuleDiscountType(''); setRuleDiscountValue(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${isExpanded ? 'bg-red-500/10 text-red-400' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
+                    title="Travas de Lote"
+                  >🔒 Travas</button>
+                  <button onClick={() => deleteCoupon.mutate({ id: c.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all">🗑️</button>
+                </div>
               </div>
 
-              {/* Progress Gamification */}
-              <div className="mt-5 pt-5 border-t border-[#1a1a1a]">
+              {/* Gamification */}
+              <div className="mt-4 pt-4 border-t border-[#1a1a1a]">
                 <div className="flex justify-between text-xs font-bold mb-2">
                   <span className="text-zinc-400">{pText}</span>
                   <span className="text-white">{u} Vendas</span>
                 </div>
                 <div className="w-full bg-[#111] border border-[#262626] rounded-full h-2 overflow-hidden">
-                  <div className={`h-full ${pColor} transition-all duration-1000`} style={{ width: `${Math.max(2, pPercent)}%` }}></div>
+                  <div className={`h-full ${pColor} transition-all duration-1000`} style={{ width: `${Math.max(2, pPercent)}%` }} />
                 </div>
               </div>
+
+              {/* Travas de Lote — expandível */}
+              {isExpanded && (
+                <div className="mt-4 pt-4 border-t border-[#262626] space-y-3">
+                  <p className="text-xs font-black text-zinc-300 uppercase tracking-widest">🔒 Travas de Lote</p>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                    Se houver travas, o cupom <strong className="text-zinc-300">só funciona nos lotes listados</strong>. Cada trava pode ter um desconto próprio — se não definido, usa o desconto base do cupom.
+                  </p>
+
+                  {/* Regras existentes */}
+                  {rules.length === 0 && (
+                    <p className="text-[10px] text-zinc-600 italic">Nenhuma trava. Cupom válido para qualquer lote.</p>
+                  )}
+                  {rules.map((r: any) => {
+                    const batch = r.price_batches;
+                    const catName = batch?.category_id ? categories?.find((cat: any) => cat.id === batch.category_id)?.name : 'Global';
+                    return (
+                      <div key={r.id} className="flex items-center justify-between bg-[#0a0a0a] border border-[#262626] rounded-lg px-3 py-2">
+                        <div>
+                          <p className="text-xs font-bold text-white">{batch?.name || '—'}</p>
+                          <p className="text-[10px] text-zinc-500">{catName}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {r.discount_value != null
+                            ? <span className="text-xs font-black text-[#EDAC02]">
+                                {r.discount_type === 'percentage' ? `${r.discount_value}% OFF` : `R$ ${Number(r.discount_value).toFixed(2)} OFF`}
+                              </span>
+                            : <span className="text-[10px] text-zinc-500 italic">Desconto padrão do cupom</span>
+                          }
+                          <button onClick={() => deleteRule.mutate({ id: r.id, event_id: eventId })} className="text-zinc-600 hover:text-red-400 transition-colors text-xs">✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Adicionar nova trava */}
+                  <div className="bg-[#0a0a0a] border border-dashed border-[#262626] rounded-lg p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">+ Adicionar Trava</p>
+                    <select value={ruleBatchId} onChange={e => setRuleBatchId(e.target.value)} className={`${inputClass} text-xs`}>
+                      <option value="">Selecionar lote...</option>
+                      {(batches || []).map((b: any) => {
+                        const catName = b.category_id ? categories?.find((cat: any) => cat.id === b.category_id)?.name : 'Global';
+                        return <option key={b.id} value={b.id}>{b.name} — {catName}</option>;
+                      })}
+                    </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select value={ruleDiscountType} onChange={e => setRuleDiscountType(e.target.value)} className={`${inputClass} text-xs`}>
+                        <option value="">Desconto padrão</option>
+                        <option value="percentage">Porcentagem (%)</option>
+                        <option value="fixed">Valor Fixo (R$)</option>
+                      </select>
+                      <input
+                        type="number" value={ruleDiscountValue} onChange={e => setRuleDiscountValue(e.target.value)}
+                        placeholder={ruleDiscountType === 'percentage' ? '10' : ruleDiscountType === 'fixed' ? '50.00' : 'Padrão'}
+                        disabled={!ruleDiscountType}
+                        className={`${inputClass} text-xs disabled:opacity-40`}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleAddRule(c.id)}
+                      disabled={!ruleBatchId || createRule.isPending}
+                      className="w-full py-2 rounded-lg bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 text-xs font-black uppercase tracking-widest hover:bg-[#EDAC02]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {createRule.isPending ? 'Adicionando...' : 'Adicionar Trava'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1146,10 +1239,10 @@ function CuponsTab({ eventId }: { eventId: string }) {
           <div><label className={labelClass}>Aplicar Cupom à Categoria</label>
             <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={inputClass}>
               <option value="">Todas as Categorias do Evento (Cupom Global)</option>
-              {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div><label className={labelClass}>Código *</label><input value={code} onChange={e => setCode(e.target.value)} placeholder="Ex: EARLYBIRD" className={`${inputClass} uppercase font-mono tracking-widest`} /></div>
+          <div><label className={labelClass}>Código *</label><input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="Ex: EARLYBIRD" className={`${inputClass} uppercase font-mono tracking-widest`} /></div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Tipo</label>
