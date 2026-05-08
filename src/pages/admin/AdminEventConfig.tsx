@@ -713,9 +713,34 @@ function LotesTab({ eventId }: { eventId: string }) {
   const [maxRegs, setMaxRegs] = useState('');
   const [pixKey, setPixKey] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
-  const [orderIndex, setOrderIndex] = useState('');
   const [selectedCatIds, setSelectedCatIds] = useState<string[]>([]);
   const [active, setActive] = useState(true);
+
+  // Retorna os lotes de um grupo (mesma category_id), ordenados por order_index
+  const getGroup = (catId: string | null) =>
+    (batches || [])
+      .filter((b: any) => (catId === null ? b.category_id === null : b.category_id === catId))
+      .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+
+  // Troca a ordem de dois lotes adjacentes dentro do mesmo grupo
+  const moveBatch = async (batch: any, direction: 'up' | 'down') => {
+    const group = getGroup(batch.category_id);
+    const idx = group.findIndex((b: any) => b.id === batch.id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= group.length) return;
+    const neighbor = group[swapIdx];
+    await Promise.all([
+      updateBatch.mutateAsync({ id: batch.id, event_id: eventId, order_index: neighbor.order_index }),
+      updateBatch.mutateAsync({ id: neighbor.id, event_id: eventId, order_index: batch.order_index }),
+    ]);
+  };
+
+  // Calcula o próximo order_index para um dado category_id
+  const nextOrderIndex = (catId: string | null) => {
+    const group = getGroup(catId);
+    if (group.length === 0) return 1;
+    return Math.max(...group.map((b: any) => b.order_index || 0)) + 1;
+  };
 
   const openForm = (b?: any) => {
     if (b) {
@@ -729,7 +754,6 @@ function LotesTab({ eventId }: { eventId: string }) {
       setMaxRegs(String(b.max_registrations || ''));
       setPixKey(b.pix_key || '');
       setPaymentLink(b.payment_link || '');
-      setOrderIndex(String(b.order_index || ''));
       setSelectedCatIds(b.category_id ? [b.category_id] : []);
       setActive(b.active !== false);
     } else {
@@ -743,7 +767,6 @@ function LotesTab({ eventId }: { eventId: string }) {
       setMaxRegs('');
       setPixKey('');
       setPaymentLink('');
-      setOrderIndex(String((batches?.length || 0) + 1));
       setSelectedCatIds([]);
       setActive(true);
     }
@@ -761,7 +784,6 @@ function LotesTab({ eventId }: { eventId: string }) {
     setMaxRegs(String(b.max_registrations || ''));
     setPixKey(b.pix_key || '');
     setPaymentLink(b.payment_link || '');
-    setOrderIndex(String((batches?.length || 0) + 1));
     setSelectedCatIds(b.category_id ? [b.category_id] : []);
     setActive(false);
     setShowForm(true);
@@ -769,30 +791,43 @@ function LotesTab({ eventId }: { eventId: string }) {
 
   const handleSave = async () => {
     if (!name.trim() || !price) return;
-    const baseData: any = {
-      event_id: eventId,
-      name: name.trim(),
-      price: parseFloat(price),
-      price_card: priceCard ? parseFloat(priceCard) : null,
-      price_installments: priceInstallments ? parseFloat(priceInstallments) : null,
-      start_date: startDate ? new Date(startDate).toISOString() : null,
-      end_date: endDate ? new Date(endDate).toISOString() : null,
-      max_registrations: maxRegs ? parseInt(maxRegs) : null,
-      pix_key: pixKey.trim() || null,
-      payment_link: paymentLink.trim() || null,
-      order_index: orderIndex ? parseInt(orderIndex) : 1,
-      active,
-    };
     if (editing) {
-      // Edit mode: single batch, use first selected or null
-      await updateBatch.mutateAsync({ id: editing.id, ...baseData, category_id: selectedCatIds[0] || null });
+      const catId = selectedCatIds[0] || null;
+      await updateBatch.mutateAsync({
+        id: editing.id,
+        event_id: eventId,
+        name: name.trim(),
+        price: parseFloat(price),
+        price_card: priceCard ? parseFloat(priceCard) : null,
+        price_installments: priceInstallments ? parseFloat(priceInstallments) : null,
+        start_date: startDate ? new Date(startDate).toISOString() : null,
+        end_date: endDate ? new Date(endDate).toISOString() : null,
+        max_registrations: maxRegs ? parseInt(maxRegs) : null,
+        pix_key: pixKey.trim() || null,
+        payment_link: paymentLink.trim() || null,
+        order_index: editing.order_index, // mantém posição ao editar
+        active,
+        category_id: catId,
+      });
     } else {
-      // Create mode: one batch per selected category (or one global if none selected)
+      const baseData = {
+        event_id: eventId,
+        name: name.trim(),
+        price: parseFloat(price),
+        price_card: priceCard ? parseFloat(priceCard) : null,
+        price_installments: priceInstallments ? parseFloat(priceInstallments) : null,
+        start_date: startDate ? new Date(startDate).toISOString() : null,
+        end_date: endDate ? new Date(endDate).toISOString() : null,
+        max_registrations: maxRegs ? parseInt(maxRegs) : null,
+        pix_key: pixKey.trim() || null,
+        payment_link: paymentLink.trim() || null,
+        active,
+      };
       if (selectedCatIds.length === 0) {
-        await createBatch.mutateAsync({ ...baseData, category_id: null });
+        await createBatch.mutateAsync({ ...baseData, category_id: null, order_index: nextOrderIndex(null) });
       } else {
         for (const catId of selectedCatIds) {
-          await createBatch.mutateAsync({ ...baseData, category_id: catId });
+          await createBatch.mutateAsync({ ...baseData, category_id: catId, order_index: nextOrderIndex(catId) });
         }
       }
     }
@@ -808,6 +843,56 @@ function LotesTab({ eventId }: { eventId: string }) {
     return b.active !== false;
   };
 
+  // Monta grupos: Global primeiro, depois cada categoria que tem lotes
+  const globalGroup = getGroup(null);
+  const catGroups = (categories || [])
+    .map((c: any) => ({ cat: c, items: getGroup(c.id) }))
+    .filter(g => g.items.length > 0);
+  const hasAny = (batches?.length || 0) > 0;
+
+  const ordinalLabel = (i: number) => `${i + 1}º Lote`;
+
+  const renderBatchRow = (batch: any, idx: number, group: any[]) => (
+    <div key={batch.id} className={`${cardClass} p-4 flex items-center justify-between group`}>
+      <div className="flex items-center gap-3">
+        {/* Ordenação ↑↓ */}
+        <div className="flex flex-col gap-0.5">
+          <button
+            onClick={() => moveBatch(batch, 'up')}
+            disabled={idx === 0}
+            className="w-6 h-5 flex items-center justify-center rounded hover:bg-[#EDAC02]/10 text-zinc-500 hover:text-[#EDAC02] disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-xs"
+            title="Mover para cima"
+          >▲</button>
+          <button
+            onClick={() => moveBatch(batch, 'down')}
+            disabled={idx === group.length - 1}
+            className="w-6 h-5 flex items-center justify-center rounded hover:bg-[#EDAC02]/10 text-zinc-500 hover:text-[#EDAC02] disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-xs"
+            title="Mover para baixo"
+          >▼</button>
+        </div>
+        {/* Posição */}
+        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest w-12 text-center">{ordinalLabel(idx)}</span>
+        {/* Status */}
+        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isActive(batch) ? 'bg-green-500' : 'bg-zinc-600'}`} title={isActive(batch) ? 'Ativo' : 'Inativo'} />
+        <div>
+          <p className="font-bold text-white text-sm">{batch.name}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-base font-black text-[#EDAC02]">R$ {Number(batch.price).toFixed(2)}</span>
+            {batch.price_card && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">💳 R$ {Number(batch.price_card).toFixed(2)}</span>}
+            {batch.price_installments && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 font-bold">📅 R$ {Number(batch.price_installments).toFixed(2)}</span>}
+            {batch.start_date && <span className="text-[10px] text-zinc-500">{format(new Date(batch.start_date), 'dd/MM/yy', { locale: ptBR })} → {batch.end_date ? format(new Date(batch.end_date), 'dd/MM/yy', { locale: ptBR }) : '∞'}</span>}
+            {batch.max_registrations && <span className="px-2 py-0.5 rounded bg-[#111] text-[10px] text-zinc-400 border border-[#262626]">Máx: {batch.max_registrations}</span>}
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => duplicateBatch(batch)} className="p-2 rounded-lg hover:bg-[#EDAC02]/10 text-zinc-400 hover:text-[#EDAC02] text-xs transition-colors" title="Duplicar Lote">📋</button>
+        <button onClick={() => openForm(batch)} className="p-2 rounded-lg hover:bg-[#111] text-zinc-400 text-xs" title="Editar Lote">✏️</button>
+        <button onClick={() => deleteBatch.mutate({ id: batch.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-400 text-xs" title="Excluir Lote">🗑️</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -818,38 +903,29 @@ function LotesTab({ eventId }: { eventId: string }) {
         <button onClick={() => openForm()} className={btnGold}>+ Novo Lote</button>
       </div>
 
-      <div className="space-y-2">
-        {batches?.map((batch: any, idx: number) => (
-          <div key={batch.id} className={`${cardClass} p-4 flex items-center justify-between group`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-3 h-3 rounded-full ${isActive(batch) ? 'bg-green-500' : 'bg-zinc-600'}`} title={isActive(batch) ? 'Ativo' : 'Inativo'} />
-              <div>
-                <p className="font-bold text-white text-sm">
-                  {batch.name}
-                  {batch.category_id && 
-                    <span className="ml-2 px-2 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] text-[10px] font-bold border border-[#EDAC02]/20 uppercase">
-                      Lote Específico: {categories?.find(c => c.id === batch.category_id)?.name}
-                    </span>
-                  }
-                </p>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-lg font-black text-[#EDAC02]">R$ {Number(batch.price).toFixed(2)}</span>
-                  {batch.price_card && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">💳 R$ {Number(batch.price_card).toFixed(2)}</span>}
-                  {batch.price_installments && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20 font-bold">📅 R$ {Number(batch.price_installments).toFixed(2)}</span>}
-                  {batch.start_date && <span className="text-[10px] text-zinc-500">{format(new Date(batch.start_date), 'dd/MM/yy', { locale: ptBR })} → {batch.end_date ? format(new Date(batch.end_date), 'dd/MM/yy', { locale: ptBR }) : '∞'}</span>}
-                  {batch.max_registrations && <span className="px-2 py-0.5 rounded bg-[#111] text-[10px] text-zinc-400 border border-[#262626]">Máx: {batch.max_registrations}</span>}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => duplicateBatch(batch)} className="p-2 rounded-lg hover:bg-[#EDAC02]/10 text-zinc-400 hover:text-[#EDAC02] text-xs transition-colors" title="Duplicar Lote">📋</button>
-              <button onClick={() => openForm(batch)} className="p-2 rounded-lg hover:bg-[#111] text-zinc-400 text-xs" title="Editar Lote">✏️</button>
-              <button onClick={() => deleteBatch.mutate({ id: batch.id, event_id: eventId })} className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-400 text-xs" title="Excluir Lote">🗑️</button>
-            </div>
+      {!hasAny && emptyState('Nenhum lote de preço. Crie o primeiro!')}
+
+      {/* Grupo Global */}
+      {globalGroup.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Globais (todas as categorias)</span>
+            <div className="flex-1 h-px bg-[#1a1a1a]" />
           </div>
-        ))}
-        {(!batches || batches.length === 0) && emptyState('Nenhum lote de preço. Crie o primeiro!')}
-      </div>
+          {globalGroup.map((batch: any, idx: number) => renderBatchRow(batch, idx, globalGroup))}
+        </div>
+      )}
+
+      {/* Grupos por Categoria */}
+      {catGroups.map(({ cat, items }) => (
+        <div key={cat.id} className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <span className="text-[10px] font-black text-[#EDAC02] uppercase tracking-widest">{cat.name}</span>
+            <div className="flex-1 h-px bg-[#EDAC02]/20" />
+          </div>
+          {items.map((batch: any, idx: number) => renderBatchRow(batch, idx, items))}
+        </div>
+      ))}
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editing ? 'Editar Lote' : 'Novo Lote'}>
         <div className="space-y-4">
@@ -858,7 +934,7 @@ function LotesTab({ eventId }: { eventId: string }) {
             {editing ? (
               <select value={selectedCatIds[0] || ''} onChange={e => setSelectedCatIds(e.target.value ? [e.target.value] : [])} className={inputClass}>
                 <option value="">Todas as Categorias do Evento (Lote Global)</option>
-                {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             ) : (
               <div className="space-y-1.5 mt-2">
@@ -874,7 +950,7 @@ function LotesTab({ eventId }: { eventId: string }) {
                   ✨ Todas as Categorias (Lote Global)
                 </button>
                 <div className="grid grid-cols-1 gap-1">
-                  {categories?.map(c => {
+                  {categories?.map((c: any) => {
                     const isSelected = selectedCatIds.includes(c.id);
                     return (
                       <button
@@ -909,9 +985,9 @@ function LotesTab({ eventId }: { eventId: string }) {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="col-span-3"><label className={labelClass}>Nome *</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: 1º Lote - Earlybird" className={inputClass} /></div>
-            <div className="col-span-1"><label className={labelClass}>Ordem</label><input type="number" value={orderIndex} onChange={e => setOrderIndex(e.target.value)} placeholder="1" className={inputClass} /></div>
+          <div>
+            <label className={labelClass}>Nome *</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: 1º Lote - Earlybird" className={inputClass} />
           </div>
           <div className="flex items-center gap-3 bg-[#111] border border-[#262626] p-3 rounded-lg">
              <input type="checkbox" id="activeBatch" checked={active} onChange={e => setActive(e.target.checked)} className="w-5 h-5 accent-[#EDAC02] cursor-pointer" />
