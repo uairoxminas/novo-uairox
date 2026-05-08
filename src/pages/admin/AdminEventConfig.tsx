@@ -814,17 +814,17 @@ function LotesTab({ eventId }: { eventId: string }) {
         event_id: eventId,
         name: name.trim(),
         price: parseFloat(price),
-        price_card: priceCard ? parseFloat(priceCard) : null,
-        price_installments: priceInstallments ? parseFloat(priceInstallments) : null,
-        start_date: startDate ? new Date(startDate).toISOString() : null,
-        end_date: endDate ? new Date(endDate).toISOString() : null,
-        max_registrations: maxRegs ? parseInt(maxRegs) : null,
-        pix_key: pixKey.trim() || null,
-        payment_link: paymentLink.trim() || null,
+        price_card: priceCard ? parseFloat(priceCard) : undefined,
+        price_installments: priceInstallments ? parseFloat(priceInstallments) : undefined,
+        start_date: startDate ? new Date(startDate).toISOString() : undefined,
+        end_date: endDate ? new Date(endDate).toISOString() : undefined,
+        max_registrations: maxRegs ? parseInt(maxRegs) : undefined,
+        pix_key: pixKey.trim() || undefined,
+        payment_link: paymentLink.trim() || undefined,
         active,
       };
       if (selectedCatIds.length === 0) {
-        await createBatch.mutateAsync({ ...baseData, category_id: null, order_index: nextOrderIndex(null) });
+        await createBatch.mutateAsync({ ...baseData, category_id: undefined, order_index: nextOrderIndex(null) });
       } else {
         for (const catId of selectedCatIds) {
           await createBatch.mutateAsync({ ...baseData, category_id: catId, order_index: nextOrderIndex(catId) });
