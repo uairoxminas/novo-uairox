@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import { sendWebhook } from '@/lib/botconversa';
+import AdminPixParceladoTab from './AdminPixParceladoTab';
 
 // ============ Shared Components / Styles ============
 const GOLD = '#EDAC02';
@@ -1308,56 +1309,48 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const { data: registrations } = useEventRegistrations(eventId);
   const { data: event } = useEvent(eventId);
 
+  const [webhookUrl, setWebhookUrl] = useState('');
   const [inscricaoAtivo, setInscricaoAtivo] = useState(false);
-  const [inscricaoUrl, setInscricaoUrl] = useState('');
   const [confirmadoAtivo, setConfirmadoAtivo] = useState(false);
-  const [confirmadoUrl, setConfirmadoUrl] = useState('');
   const [canceladoAtivo, setCanceladoAtivo] = useState(false);
-  const [canceladoUrl, setCanceladoUrl] = useState('');
   const [pixAtivo, setPixAtivo] = useState(false);
-  const [pixUrl, setPixUrl] = useState('');
   const [pix2dAtivo, setPix2dAtivo] = useState(true);
   const [pixVencAtivo, setPixVencAtivo] = useState(true);
   const [pix1dAtivo, setPix1dAtivo] = useState(true);
   const [pix5dAtivo, setPix5dAtivo] = useState(true);
   const [pixCancelarAuto, setPixCancelarAuto] = useState(false);
-  const [broadcastUrl, setBroadcastUrl] = useState('');
   const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!cfg) return;
+    setWebhookUrl(cfg.trigger_inscricao_url ?? cfg.trigger_confirmado_url ?? cfg.trigger_cancelado_url ?? cfg.trigger_pix_url ?? cfg.trigger_broadcast_url ?? '');
     setInscricaoAtivo(cfg.trigger_inscricao_ativo ?? false);
-    setInscricaoUrl(cfg.trigger_inscricao_url ?? '');
     setConfirmadoAtivo(cfg.trigger_confirmado_ativo ?? false);
-    setConfirmadoUrl(cfg.trigger_confirmado_url ?? '');
     setCanceladoAtivo(cfg.trigger_cancelado_ativo ?? false);
-    setCanceladoUrl(cfg.trigger_cancelado_url ?? '');
     setPixAtivo(cfg.trigger_pix_ativo ?? false);
-    setPixUrl(cfg.trigger_pix_url ?? '');
     setPix2dAtivo(cfg.pix_lembrete_2d_ativo ?? true);
     setPixVencAtivo(cfg.pix_lembrete_venc_ativo ?? true);
     setPix1dAtivo(cfg.pix_atraso_1d_ativo ?? true);
     setPix5dAtivo(cfg.pix_cancelamento_5d_ativo ?? true);
     setPixCancelarAuto(cfg.pix_cancelar_automatico ?? false);
-    setBroadcastUrl(cfg.trigger_broadcast_url ?? '');
   }, [cfg]);
 
   const handleSave = () => upsert.mutate({
     event_id: eventId,
-    trigger_inscricao_ativo: inscricaoAtivo, trigger_inscricao_url: inscricaoUrl || null,
-    trigger_confirmado_ativo: confirmadoAtivo, trigger_confirmado_url: confirmadoUrl || null,
-    trigger_cancelado_ativo: canceladoAtivo, trigger_cancelado_url: canceladoUrl || null,
-    trigger_pix_ativo: pixAtivo, trigger_pix_url: pixUrl || null,
+    trigger_inscricao_ativo: inscricaoAtivo, trigger_inscricao_url: webhookUrl || null,
+    trigger_confirmado_ativo: confirmadoAtivo, trigger_confirmado_url: webhookUrl || null,
+    trigger_cancelado_ativo: canceladoAtivo, trigger_cancelado_url: webhookUrl || null,
+    trigger_pix_ativo: pixAtivo, trigger_pix_url: webhookUrl || null,
     pix_lembrete_2d_ativo: pix2dAtivo, pix_lembrete_venc_ativo: pixVencAtivo,
     pix_atraso_1d_ativo: pix1dAtivo, pix_cancelamento_5d_ativo: pix5dAtivo,
     pix_cancelar_automatico: pixCancelarAuto,
-    trigger_broadcast_url: broadcastUrl || null,
+    trigger_broadcast_url: webhookUrl || null,
   });
 
   const testWebhook = async (url: string, triggerKey: string) => {
     if (!url) { toast.error('Configure a URL primeiro'); return; }
-    const payload = { trigger: triggerKey, teste: true, nome: 'Atleta Teste', telefone: '5531999999999', email: 'teste@uairox.com.br', evento: 'UAIROX Test' };
+    const payload = { trigger: triggerKey, teste: true, nome: 'Atleta Teste', telefone: '5531999999999', email: 'teste@uairox.com.br', evento: 'UAIROX Test', categoria: 'Categoria Teste' };
     let ok = false;
     try {
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -1374,15 +1367,15 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   );
 
   const handleBroadcast = async () => {
-    if (!broadcastUrl) { toast.error('Configure a URL de broadcast'); return; }
+    if (!webhookUrl) { toast.error('Configure a URL do webhook'); return; }
     if (broadcastAthletes.length === 0) { toast.error('Nenhum atleta encontrado'); return; }
     setSending(true);
     let sent = 0, failed = 0;
     for (const r of broadcastAthletes as any[]) {
-      const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: event?.title || eventId };
-      const { ok, error } = await sendWebhook(broadcastUrl, payload, { maxAttempts: 2, retryDelay: 500 });
+      const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: event?.title || eventId, categoria: r.categories?.name || 'Sem Categoria' };
+      const { ok, error } = await sendWebhook(webhookUrl, payload, { maxAttempts: 2, retryDelay: 500 });
       if (ok) sent++; else failed++;
-      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: broadcastUrl, payload, status: ok ? 'sent' : 'failed', error_message: ok ? undefined : error });
+      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: webhookUrl, payload, status: ok ? 'sent' : 'failed', error_message: ok ? undefined : error });
       await new Promise(res => setTimeout(res, 350));
     }
     setSending(false);
@@ -1399,19 +1392,14 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">{value}</span>
   );
 
-  const TriggerRow = ({ label, ativo, onToggle, url, onUrl, triggerKey, triggerValue }: { label: string; ativo: boolean; onToggle: (v: boolean) => void; url: string; onUrl: (v: string) => void; triggerKey: string; triggerValue: string }) => (
-    <div className={`${cardClass} p-4 space-y-3`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Toggle value={ativo} onChange={onToggle} />
-          <span className="text-sm font-bold text-white">{label}</span>
-          <TriggerBadge value={triggerValue} />
-          {ativo && !url && <span className="text-[10px] text-yellow-500 font-bold">⚠ Sem URL</span>}
-          {ativo && url && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
-        </div>
-        <button onClick={() => testWebhook(url, triggerKey)} className="px-3 py-1 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors">Testar →</button>
+  const TriggerToggle = ({ label, ativo, onToggle, triggerValue }: { label: string; ativo: boolean; onToggle: (v: boolean) => void; triggerValue: string }) => (
+    <div className={`${cardClass} p-3.5 flex items-center justify-between`}>
+      <div className="flex items-center gap-3">
+        <Toggle value={ativo} onChange={onToggle} />
+        <span className="text-sm font-bold text-white">{label}</span>
+        <TriggerBadge value={triggerValue} />
       </div>
-      <input value={url} onChange={e => onUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
+      {ativo && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
     </div>
   );
 
@@ -1427,29 +1415,37 @@ function BotconversaTab({ eventId }: { eventId: string }) {
         </button>
       </div>
 
-      {/* Triggers 1, 2, 3 */}
-      <div className="space-y-3">
-        <p className={labelClass}>Triggers de Status</p>
-        <TriggerRow label="🔔 Inscrição Realizada" triggerKey="inscricao" triggerValue="inscricao" ativo={inscricaoAtivo} onToggle={setInscricaoAtivo} url={inscricaoUrl} onUrl={setInscricaoUrl} />
-        <TriggerRow label="✅ Pagamento Confirmado" triggerKey="confirmado" triggerValue="confirmado" ativo={confirmadoAtivo} onToggle={setConfirmadoAtivo} url={confirmadoUrl} onUrl={setConfirmadoUrl} />
-        <TriggerRow label="❌ Inscrição Cancelada" triggerKey="cancelado" triggerValue="cancelado" ativo={canceladoAtivo} onToggle={setCanceladoAtivo} url={canceladoUrl} onUrl={setCanceladoUrl} />
+      {/* Single Webhook URL */}
+      <div className={`${cardClass} p-4 space-y-3`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-white uppercase tracking-wider">🔗 Webhook URL</p>
+            <p className="text-[10px] text-zinc-500 mt-0.5">URL única do BotConversa usada por todos os triggers abaixo</p>
+          </div>
+          <button onClick={() => testWebhook(webhookUrl, 'test')} className="px-3 py-1 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors">Testar →</button>
+        </div>
+        <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
+        {!webhookUrl && <p className="text-[10px] text-yellow-500 font-bold">⚠ Configure a URL do webhook para ativar os triggers</p>}
       </div>
 
-      {/* Trigger 4: PIX Parcelado */}
-      <div className="space-y-3">
+      {/* Triggers de Status */}
+      <div className="space-y-2">
+        <p className={labelClass}>Triggers de Status</p>
+        <TriggerToggle label="🔔 Inscrição Realizada" triggerValue="inscricao" ativo={inscricaoAtivo} onToggle={setInscricaoAtivo} />
+        <TriggerToggle label="✅ Pagamento Confirmado" triggerValue="confirmado" ativo={confirmadoAtivo} onToggle={setConfirmadoAtivo} />
+        <TriggerToggle label="❌ Inscrição Cancelada" triggerValue="cancelado" ativo={canceladoAtivo} onToggle={setCanceladoAtivo} />
+      </div>
+
+      {/* Trigger PIX Parcelado */}
+      <div className="space-y-2">
         <p className={labelClass}>PIX Parcelado — Régua de Cobranças</p>
         <div className={`${cardClass} p-4 space-y-4`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Toggle value={pixAtivo} onChange={setPixAtivo} />
-              <span className="text-sm font-bold text-white">💰 PIX Parcelado</span>
-              <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">pix2 · pix0 · pix-1 · pix-5</span>
-              {pixAtivo && !pixUrl && <span className="text-[10px] text-yellow-500 font-bold">⚠ Sem URL</span>}
-              {pixAtivo && pixUrl && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
-            </div>
-            <button onClick={() => testWebhook(pixUrl, 'pix')} className="px-3 py-1 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors">Testar →</button>
+          <div className="flex items-center gap-3">
+            <Toggle value={pixAtivo} onChange={setPixAtivo} />
+            <span className="text-sm font-bold text-white">💰 PIX Parcelado</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">pix2 · pix0 · pix-1 · pix-5</span>
+            {pixAtivo && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
           </div>
-          <input value={pixUrl} onChange={e => setPixUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
           <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Disparos da régua:</p>
           <div className="grid grid-cols-2 gap-2">
             {([
@@ -1481,11 +1477,10 @@ function BotconversaTab({ eventId }: { eventId: string }) {
         </div>
       </div>
 
-      {/* Trigger 5: Broadcast */}
-      <div className="space-y-3">
+      {/* Broadcast Manual */}
+      <div className="space-y-2">
         <p className={labelClass}>Broadcast Manual</p>
         <div className={`${cardClass} p-4 space-y-4`}>
-          <input value={broadcastUrl} onChange={e => setBroadcastUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-xs text-zinc-400 font-bold">Filtrar:</p>
             {(['all', 'confirmed', 'pending'] as const).map(f => (
@@ -1495,7 +1490,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
             ))}
             <span className="ml-auto text-xs text-zinc-500 font-bold">{broadcastAthletes.length} atleta{broadcastAthletes.length !== 1 ? 's' : ''}</span>
           </div>
-          <button onClick={handleBroadcast} disabled={sending || broadcastAthletes.length === 0 || !broadcastUrl} className={`w-full py-3 rounded-lg text-sm font-black uppercase tracking-widest transition-all border border-[#EDAC02]/20 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 disabled:opacity-40 disabled:cursor-not-allowed`}>
+          <button onClick={handleBroadcast} disabled={sending || broadcastAthletes.length === 0 || !webhookUrl} className={`w-full py-3 rounded-lg text-sm font-black uppercase tracking-widest transition-all border border-[#EDAC02]/20 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 disabled:opacity-40 disabled:cursor-not-allowed`}>
             {sending ? 'Enviando... aguarde' : `📢 Disparar para ${broadcastAthletes.length} atleta${broadcastAthletes.length !== 1 ? 's' : ''}`}
           </button>
         </div>
@@ -2013,7 +2008,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             const aField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_ativo : bcfg?.trigger_cancelado_ativo;
             const uField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_url : bcfg?.trigger_cancelado_url;
             if (!aField || !uField) return;
-            const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: event?.title || eventId };
+            const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: event?.title || eventId, categoria: editingReg.categories?.name || 'Sem Categoria' };
             sendWebhook(uField, bcPayload).then(({ ok, error }) => {
               if (!ok) toast.warning(`Webhook BotConversa não entregue${error ? ` (${error})` : ''}`);
               supabase.from('botconversa_logs' as any).insert({
@@ -3474,6 +3469,7 @@ const TABS = [
   { key: 'kits', label: '🎽 Kits' },
   { key: 'despesas', label: '💸 Despesas' },
   { key: 'botconversa', label: '💬 BotConversa' },
+  { key: 'pix_parcelado', label: '💰 PIX Parcelado' },
   { key: 'espera', label: '⏳ Lista de Espera' },
 ];
 
@@ -3573,7 +3569,8 @@ export default function AdminEventConfig() {
         {activeTab === 'cupons' && <CuponsTab eventId={id!} />}
         {activeTab === 'kits' && <KitsTab eventId={id!} />}
         {activeTab === 'despesas' && <AdminEventExpensesTab eventId={id!} />}
-        {activeTab === 'botconversa' && <BotconversaTab eventId={id!} />}
+        { activeTab === 'botconversa' && <BotconversaTab eventId={id!} /> }
+        { activeTab === 'pix_parcelado' && <AdminPixParceladoTab eventId={id!} /> }
       </div>
     </div>
   );

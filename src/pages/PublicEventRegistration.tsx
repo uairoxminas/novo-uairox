@@ -942,6 +942,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               telefone: a1.phone.trim(),
               email: a1.email.trim(),
               evento: event?.title || eventId,
+              categoria: selectedCategory?.name || 'Sem Categoria',
               valor: totalPrice,
               payment_type: isInstallments ? 'installments' : 'full',
             };
@@ -954,6 +955,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             }).then(() => {});
           });
       }
+
+      // Auto-capture to marketing contacts base (fire and forget)
+      (supabase as any).from('marketing_contacts').upsert(
+        { name: a1.name.trim(), phone: a1.phone.trim().replace(/\D/g, ''), email: a1.email.trim() || undefined, source: 'registration', opt_out: false },
+        { onConflict: 'phone', ignoreDuplicates: false }
+      ).then(() => {});
 
       // Disparo automático do Email Via Edge Function (Fire and Forget)
       supabase.functions.invoke('send-registration-email', {

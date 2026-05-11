@@ -35,6 +35,7 @@ import AdminStore from './pages/admin/AdminStore';
 import AdminPhotos from './pages/admin/AdminPhotos';
 import AdminSquad from './pages/admin/AdminSquad';
 import AdminLocations from './pages/admin/AdminLocations';
+import AdminMarketingPage from './pages/admin/AdminMarketingPage';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 import PaymentPortal from './pages/PaymentPortal';
 import PartnerViewPage from './pages/PartnerViewPage';
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="photos" element={<AdminPhotos />} />
             <Route path="squad" element={<AdminSquad />} />
             <Route path="locations" element={<AdminLocations />} />
+            <Route path="marketing" element={<AdminMarketingPage />} />
           </Route>
 
           {/* 3. Judge — Marcação de Passagens */}

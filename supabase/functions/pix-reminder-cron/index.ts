@@ -48,7 +48,8 @@ serve(async (req) => {
         registrations!inner(
           id, athlete_name, athlete_phone, athlete_email,
           status, event_id,
-          events!inner(id, title)
+          events!inner(id, title),
+          categories(name)
         )
       `)
       .in('status', ['pending', 'overdue'])
@@ -129,6 +130,7 @@ serve(async (req) => {
         telefone: reg.athlete_phone,
         email: reg.athlete_email,
         evento: reg.events?.title || eventId,
+        categoria: reg.categories?.name || 'Sem Categoria',
         parcela_numero: inst.installment_number,
         parcela_valor: Number(inst.amount).toFixed(2),
         parcela_vencimento: due,
