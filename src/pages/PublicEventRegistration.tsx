@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { calcInstallmentAmounts, calcMaxInstallmentDate } from '@/hooks/useInstallments';
+import { sendWebhook } from '@/lib/botconversa';
 
 // ============ DATA HOOK ============
 function usePublicEvent(idOrSlug?: string) {
@@ -933,7 +934,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           .select('trigger_inscricao_ativo, trigger_inscricao_url')
           .eq('event_id', eventId)
           .maybeSingle()
-          .then(({ data: bcfg }: any) => {
+          .then(async ({ data: bcfg }: any) => {
             if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
             const payload = {
               trigger: 'inscricao',
@@ -944,22 +945,13 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               valor: totalPrice,
               payment_type: isInstallments ? 'installments' : 'full',
             };
-            fetch(bcfg.trigger_inscricao_url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-              .then(res => {
-                (supabase as any).from('botconversa_logs').insert({
-                  event_id: eventId, registration_id: data.id,
-                  trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
-                  payload, status: res.ok ? 'sent' : 'failed',
-                  error_message: res.ok ? null : `HTTP ${res.status}`,
-                }).then(() => {});
-              }).catch((err: any) => {
-                (supabase as any).from('botconversa_logs').insert({
-                  event_id: eventId, registration_id: data.id,
-                  trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
-                  payload, status: 'failed',
-                  error_message: err?.message || 'Network error',
-                }).then(() => {});
-              });
+            const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
+            (supabase as any).from('botconversa_logs').insert({
+              event_id: eventId, registration_id: data.id,
+              trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
+              payload, status: ok ? 'sent' : 'failed',
+              error_message: ok ? null : error,
+            }).then(() => {});
           });
       }
 

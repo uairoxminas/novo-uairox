@@ -19,6 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
+import { sendWebhook } from '@/lib/botconversa';
 
 // ============ Shared Components / Styles ============
 const GOLD = '#EDAC02';
@@ -1379,13 +1380,9 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     let sent = 0, failed = 0;
     for (const r of broadcastAthletes as any[]) {
       const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: event?.title || eventId };
-      let ok = false;
-      try {
-        const res = await fetch(broadcastUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        ok = res.ok;
-        if (ok) sent++; else failed++;
-      } catch { failed++; }
-      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: broadcastUrl, payload, status: ok ? 'sent' : 'failed' });
+      const { ok, error } = await sendWebhook(broadcastUrl, payload, { maxAttempts: 2, retryDelay: 500 });
+      if (ok) sent++; else failed++;
+      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: broadcastUrl, payload, status: ok ? 'sent' : 'failed', error_message: ok ? null : error });
       await new Promise(res => setTimeout(res, 350));
     }
     setSending(false);
@@ -2010,24 +2007,15 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             const uField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_url : bcfg?.trigger_cancelado_url;
             if (!aField || !uField) return;
             const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: event?.title || eventId };
-            fetch(uField, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bcPayload) })
-              .then(res => {
-                if (!res.ok) toast.warning(`Webhook BotConversa não entregue (HTTP ${res.status})`);
-                supabase.from('botconversa_logs' as any).insert({
-                  event_id: eventId, registration_id: editingReg.id,
-                  trigger_type: triggerKey, webhook_url: uField,
-                  payload: bcPayload, status: res.ok ? 'sent' : 'failed',
-                  error_message: res.ok ? null : `HTTP ${res.status}`,
-                }).then(() => {});
-              }).catch((err: any) => {
-                toast.warning('Webhook BotConversa não foi entregue');
-                supabase.from('botconversa_logs' as any).insert({
-                  event_id: eventId, registration_id: editingReg.id,
-                  trigger_type: triggerKey, webhook_url: uField,
-                  payload: bcPayload, status: 'failed',
-                  error_message: err?.message || 'Network error',
-                }).then(() => {});
-              });
+            sendWebhook(uField, bcPayload).then(({ ok, error }) => {
+              if (!ok) toast.warning(`Webhook BotConversa não entregue${error ? ` (${error})` : ''}`);
+              supabase.from('botconversa_logs' as any).insert({
+                event_id: eventId, registration_id: editingReg.id,
+                trigger_type: triggerKey, webhook_url: uField,
+                payload: bcPayload, status: ok ? 'sent' : 'failed',
+                error_message: ok ? null : error,
+              }).then(() => {});
+            });
           });
       }
     }
