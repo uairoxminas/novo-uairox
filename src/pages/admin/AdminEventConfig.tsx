@@ -1382,7 +1382,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
       const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: event?.title || eventId };
       const { ok, error } = await sendWebhook(broadcastUrl, payload, { maxAttempts: 2, retryDelay: 500 });
       if (ok) sent++; else failed++;
-      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: broadcastUrl, payload, status: ok ? 'sent' : 'failed', error_message: ok ? null : error });
+      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: broadcastUrl, payload, status: ok ? 'sent' : 'failed', error_message: ok ? undefined : error });
       await new Promise(res => setTimeout(res, 350));
     }
     setSending(false);
