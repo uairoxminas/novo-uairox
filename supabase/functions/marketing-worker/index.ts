@@ -127,12 +127,15 @@ serve(async (req) => {
       const variantIdx = item.variant_index % variantCount;
       const messageVariant = campaign.variants?.[variantIdx] || '';
 
+      const contactName = item.name || '';
+      const personalizedMessage = messageVariant.replace(/\{nome\}/gi, contactName);
+
       const payload: Record<string, any> = {
         trigger: campaign.trigger_name,
-        nome: item.name || '',
+        nome: contactName,
         telefone: item.phone,
         email: item.email || '',
-        mensagem: messageVariant,
+        mensagem: personalizedMessage,
       };
 
       // Send webhook (marketing_config)

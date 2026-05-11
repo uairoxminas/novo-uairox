@@ -33,7 +33,8 @@ Regras:
 - Máximo de 4 linhas cada
 - Use linguagem brasileira natural
 - NÃO mencione "clique aqui" ou links
-- O campo {nome} pode aparecer no início de algumas mensagens
+- Use o marcador {nome} em PELO MENOS 6 das 10 variações para personalizar (ex: "Oi {nome}!", "E aí {nome},", "{nome}, você...")
+- Preserve exatamente o marcador {nome} onde aparecer — nunca substitua por um nome real
 - Contexto do evento: ${context || 'Evento de CrossFit/Fitness'}
 
 Mensagem base:

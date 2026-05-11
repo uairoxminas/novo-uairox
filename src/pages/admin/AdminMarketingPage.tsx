@@ -361,15 +361,23 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
           {step === 'variants' && (
             <div className="space-y-4">
               <div className="space-y-1">
-                <p className={labelClass}>Mensagem base</p>
+                <div className="flex items-center justify-between">
+                  <p className={labelClass}>Mensagem base</p>
+                  <button
+                    onClick={() => setBaseMessage(prev => prev + '{nome}')}
+                    className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[10px] font-mono font-bold hover:bg-zinc-700 transition-colors"
+                  >
+                    + inserir {'{nome}'}
+                  </button>
+                </div>
                 <textarea
                   value={baseMessage}
                   onChange={e => setBaseMessage(e.target.value)}
-                  placeholder="Escreva a mensagem que o Gemini vai usar como base para gerar as 10 variações..."
+                  placeholder="Ex: Olá {nome}, temos novidades sobre a próxima edição da UAIROX..."
                   rows={4}
                   className={`${inputClass} resize-none`}
                 />
-                <p className="text-[10px] text-zinc-600">Inclua o objetivo principal. O Gemini vai criar 10 versões diferentes.</p>
+                <p className="text-[10px] text-zinc-600">Use <code className="font-mono text-[#EDAC02]">{'{nome}'}</code> para personalizar com o nome de cada contato. O Gemini vai manter o marcador nas variações.</p>
               </div>
 
               <button onClick={handleGenerateVariants} disabled={generating || !baseMessage.trim()} className={`${btnGold} w-full`}>
@@ -378,19 +386,33 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
               {variants.length > 0 && (
                 <div className="space-y-3">
-                  <p className={labelClass}>{variants.length} variações geradas — revise e edite</p>
+                  <div className="flex items-center justify-between">
+                    <p className={labelClass}>{variants.length} variações geradas — revise e edite</p>
+                    <span className="text-[10px] text-zinc-600"><code className="font-mono text-[#EDAC02]">{'{nome}'}</code> será substituído automaticamente no envio</span>
+                  </div>
                   {variants.map((v, i) => (
                     <div key={i} className={`${cardClass} p-3 space-y-2`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Variação #{i + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Variação #{i + 1}</span>
+                          {v.includes('{nome}') && <span className="px-1.5 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] text-[9px] font-mono border border-[#EDAC02]/20">personalizada</span>}
+                        </div>
                         <button onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))} className="text-zinc-700 hover:text-red-400 text-xs font-bold transition-colors">✕ Remover</button>
                       </div>
-                      <textarea
-                        value={v}
-                        onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                        rows={3}
-                        className={`${inputClass} resize-none text-xs text-zinc-300`}
-                      />
+                      <div className="relative">
+                        <textarea
+                          value={v}
+                          onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                          rows={3}
+                          className={`${inputClass} resize-none text-xs text-zinc-300`}
+                        />
+                        <button
+                          onClick={() => setVariants(prev => prev.map((x, j) => j === i ? x + '{nome}' : x))}
+                          className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors"
+                        >
+                          + {'{nome}'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                   <button onClick={() => setStep('contacts')} className={`${btnGold} w-full`}>
