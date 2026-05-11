@@ -1395,12 +1395,17 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     </button>
   );
 
-  const TriggerRow = ({ label, ativo, onToggle, url, onUrl, triggerKey }: { label: string; ativo: boolean; onToggle: (v: boolean) => void; url: string; onUrl: (v: string) => void; triggerKey: string }) => (
+  const TriggerBadge = ({ value }: { value: string }) => (
+    <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">{value}</span>
+  );
+
+  const TriggerRow = ({ label, ativo, onToggle, url, onUrl, triggerKey, triggerValue }: { label: string; ativo: boolean; onToggle: (v: boolean) => void; url: string; onUrl: (v: string) => void; triggerKey: string; triggerValue: string }) => (
     <div className={`${cardClass} p-4 space-y-3`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Toggle value={ativo} onChange={onToggle} />
           <span className="text-sm font-bold text-white">{label}</span>
+          <TriggerBadge value={triggerValue} />
           {ativo && !url && <span className="text-[10px] text-yellow-500 font-bold">⚠ Sem URL</span>}
           {ativo && url && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
         </div>
@@ -1425,9 +1430,9 @@ function BotconversaTab({ eventId }: { eventId: string }) {
       {/* Triggers 1, 2, 3 */}
       <div className="space-y-3">
         <p className={labelClass}>Triggers de Status</p>
-        <TriggerRow label="🔔 Inscrição Realizada" triggerKey="inscricao" ativo={inscricaoAtivo} onToggle={setInscricaoAtivo} url={inscricaoUrl} onUrl={setInscricaoUrl} />
-        <TriggerRow label="✅ Pagamento Confirmado" triggerKey="confirmado" ativo={confirmadoAtivo} onToggle={setConfirmadoAtivo} url={confirmadoUrl} onUrl={setConfirmadoUrl} />
-        <TriggerRow label="❌ Inscrição Cancelada" triggerKey="cancelado" ativo={canceladoAtivo} onToggle={setCanceladoAtivo} url={canceladoUrl} onUrl={setCanceladoUrl} />
+        <TriggerRow label="🔔 Inscrição Realizada" triggerKey="inscricao" triggerValue="inscricao" ativo={inscricaoAtivo} onToggle={setInscricaoAtivo} url={inscricaoUrl} onUrl={setInscricaoUrl} />
+        <TriggerRow label="✅ Pagamento Confirmado" triggerKey="confirmado" triggerValue="confirmado" ativo={confirmadoAtivo} onToggle={setConfirmadoAtivo} url={confirmadoUrl} onUrl={setConfirmadoUrl} />
+        <TriggerRow label="❌ Inscrição Cancelada" triggerKey="cancelado" triggerValue="cancelado" ativo={canceladoAtivo} onToggle={setCanceladoAtivo} url={canceladoUrl} onUrl={setCanceladoUrl} />
       </div>
 
       {/* Trigger 4: PIX Parcelado */}
@@ -1438,6 +1443,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
             <div className="flex items-center gap-3">
               <Toggle value={pixAtivo} onChange={setPixAtivo} />
               <span className="text-sm font-bold text-white">💰 PIX Parcelado</span>
+              <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">pix2 · pix0 · pix-1 · pix-5</span>
               {pixAtivo && !pixUrl && <span className="text-[10px] text-yellow-500 font-bold">⚠ Sem URL</span>}
               {pixAtivo && pixUrl && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
             </div>
@@ -1447,14 +1453,15 @@ function BotconversaTab({ eventId }: { eventId: string }) {
           <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Disparos da régua:</p>
           <div className="grid grid-cols-2 gap-2">
             {([
-              { label: '📅 2 dias antes do vencimento', val: pix2dAtivo, set: setPix2dAtivo },
-              { label: '⏰ No dia do vencimento', val: pixVencAtivo, set: setPixVencAtivo },
-              { label: '🚨 1 dia de atraso', val: pix1dAtivo, set: setPix1dAtivo },
-              { label: '🛑 5 dias — cancelamento', val: pix5dAtivo, set: setPix5dAtivo },
-            ] as { label: string; val: boolean; set: (v: boolean) => void }[]).map(({ label, val, set }) => (
+              { label: '📅 2 dias antes do vencimento', trigger: 'pix2', val: pix2dAtivo, set: setPix2dAtivo },
+              { label: '⏰ No dia do vencimento', trigger: 'pix0', val: pixVencAtivo, set: setPixVencAtivo },
+              { label: '🚨 1 dia de atraso', trigger: 'pix-1', val: pix1dAtivo, set: setPix1dAtivo },
+              { label: '🛑 5 dias — cancelamento', trigger: 'pix-5', val: pix5dAtivo, set: setPix5dAtivo },
+            ] as { label: string; trigger: string; val: boolean; set: (v: boolean) => void }[]).map(({ label, trigger, val, set }) => (
               <button key={label} onClick={() => set(!val)} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-all text-left ${val ? 'border-[#EDAC02]/40 bg-[#EDAC02]/10 text-white' : 'border-zinc-800 bg-[#050505] text-zinc-600'}`}>
                 <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${val ? 'bg-[#EDAC02] border-[#EDAC02] text-black' : 'border-zinc-600'}`}>{val && '✓'}</span>
                 {label}
+                <span className="ml-auto px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500 text-[9px] font-mono border border-zinc-700 flex-shrink-0">{trigger}</span>
               </button>
             ))}
           </div>
