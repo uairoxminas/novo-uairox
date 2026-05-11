@@ -2012,12 +2012,22 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: event?.title || eventId };
             fetch(uField, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bcPayload) })
               .then(res => {
+                if (!res.ok) toast.warning(`Webhook BotConversa não entregue (HTTP ${res.status})`);
                 supabase.from('botconversa_logs' as any).insert({
                   event_id: eventId, registration_id: editingReg.id,
                   trigger_type: triggerKey, webhook_url: uField,
                   payload: bcPayload, status: res.ok ? 'sent' : 'failed',
+                  error_message: res.ok ? null : `HTTP ${res.status}`,
                 }).then(() => {});
-              }).catch(() => {});
+              }).catch((err: any) => {
+                toast.warning('Webhook BotConversa não foi entregue');
+                supabase.from('botconversa_logs' as any).insert({
+                  event_id: eventId, registration_id: editingReg.id,
+                  trigger_type: triggerKey, webhook_url: uField,
+                  payload: bcPayload, status: 'failed',
+                  error_message: err?.message || 'Network error',
+                }).then(() => {});
+              });
           });
       }
     }

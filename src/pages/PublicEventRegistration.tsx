@@ -950,8 +950,16 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                   event_id: eventId, registration_id: data.id,
                   trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
                   payload, status: res.ok ? 'sent' : 'failed',
+                  error_message: res.ok ? null : `HTTP ${res.status}`,
                 }).then(() => {});
-              }).catch(() => {});
+              }).catch((err: any) => {
+                (supabase as any).from('botconversa_logs').insert({
+                  event_id: eventId, registration_id: data.id,
+                  trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
+                  payload, status: 'failed',
+                  error_message: err?.message || 'Network error',
+                }).then(() => {});
+              });
           });
       }
 
