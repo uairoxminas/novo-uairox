@@ -1305,6 +1305,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const { data: logs } = useBotconversaLogs(eventId);
   const createLog = useCreateBotconversaLog();
   const { data: registrations } = useEventRegistrations(eventId);
+  const { data: event } = useEvent(eventId);
 
   const [inscricaoAtivo, setInscricaoAtivo] = useState(false);
   const [inscricaoUrl, setInscricaoUrl] = useState('');
@@ -1377,7 +1378,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     setSending(true);
     let sent = 0, failed = 0;
     for (const r of broadcastAthletes as any[]) {
-      const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: eventId };
+      const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: event?.title || eventId };
       let ok = false;
       try {
         const res = await fetch(broadcastUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -2008,7 +2009,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             const aField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_ativo : bcfg?.trigger_cancelado_ativo;
             const uField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_url : bcfg?.trigger_cancelado_url;
             if (!aField || !uField) return;
-            const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: eventId };
+            const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: event?.title || eventId };
             fetch(uField, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bcPayload) })
               .then(res => {
                 supabase.from('botconversa_logs' as any).insert({
