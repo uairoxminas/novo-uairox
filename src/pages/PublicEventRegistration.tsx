@@ -927,6 +927,34 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         await (supabase as any).from('registration_installments').insert(installments);
       }
       
+      // BotConversa: trigger inscrição realizada (fire and forget)
+      if (data.status === 'pending') {
+        (supabase as any).from('botconversa_config')
+          .select('trigger_inscricao_ativo, trigger_inscricao_url')
+          .eq('event_id', eventId)
+          .maybeSingle()
+          .then(({ data: bcfg }: any) => {
+            if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
+            const payload = {
+              trigger: 'inscricao',
+              nome: a1.name.trim(),
+              telefone: a1.phone.trim(),
+              email: a1.email.trim(),
+              evento: event?.title || eventId,
+              valor: totalPrice,
+              payment_type: isInstallments ? 'installments' : 'full',
+            };
+            fetch(bcfg.trigger_inscricao_url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+              .then(res => {
+                (supabase as any).from('botconversa_logs').insert({
+                  event_id: eventId, registration_id: data.id,
+                  trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
+                  payload, status: res.ok ? 'sent' : 'failed',
+                }).then(() => {});
+              }).catch(() => {});
+          });
+      }
+
       // Disparo automático do Email Via Edge Function (Fire and Forget)
       supabase.functions.invoke('send-registration-email', {
         body: { 

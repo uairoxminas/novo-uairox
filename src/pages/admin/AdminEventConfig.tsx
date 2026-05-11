@@ -12,6 +12,7 @@ import {
   useHeats, useCreateHeat, useUpdateHeat, useDeleteHeat,
   useLaneAssignments, useAssignLane, useCreateLaneAssignments, useAutoGenerateHeats, useCategoryRegCounts,
   useUnassignedRegistrations,
+  useBotconversaConfig, useUpsertBotconversaConfig, useBotconversaLogs, useCreateBotconversaLog,
 } from '@/hooks/useEventConfig';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -1286,6 +1287,251 @@ function CuponsTab({ eventId }: { eventId: string }) {
   );
 }
 
+// ============ TAB: BOTCONVERSA ============
+const TRIGGER_LABELS: Record<string, string> = {
+  inscricao: '🔔 Inscrição Realizada',
+  confirmado: '✅ Pagamento Confirmado',
+  cancelado: '❌ Inscrição Cancelada',
+  pix_lembrete_2d: '📅 Lembrete 2 dias antes',
+  pix_lembrete_venc: '⏰ Lembrete no vencimento',
+  pix_atraso_1d: '🚨 1 dia de atraso',
+  pix_cancelamento_5d: '🛑 5 dias — cancelamento',
+  broadcast: '📢 Broadcast',
+};
+
+function BotconversaTab({ eventId }: { eventId: string }) {
+  const { data: cfg } = useBotconversaConfig(eventId);
+  const upsert = useUpsertBotconversaConfig();
+  const { data: logs } = useBotconversaLogs(eventId);
+  const createLog = useCreateBotconversaLog();
+  const { data: registrations } = useEventRegistrations(eventId);
+
+  const [inscricaoAtivo, setInscricaoAtivo] = useState(false);
+  const [inscricaoUrl, setInscricaoUrl] = useState('');
+  const [confirmadoAtivo, setConfirmadoAtivo] = useState(false);
+  const [confirmadoUrl, setConfirmadoUrl] = useState('');
+  const [canceladoAtivo, setCanceladoAtivo] = useState(false);
+  const [canceladoUrl, setCanceladoUrl] = useState('');
+  const [pixAtivo, setPixAtivo] = useState(false);
+  const [pixUrl, setPixUrl] = useState('');
+  const [pix2dAtivo, setPix2dAtivo] = useState(true);
+  const [pixVencAtivo, setPixVencAtivo] = useState(true);
+  const [pix1dAtivo, setPix1dAtivo] = useState(true);
+  const [pix5dAtivo, setPix5dAtivo] = useState(true);
+  const [pixCancelarAuto, setPixCancelarAuto] = useState(false);
+  const [broadcastUrl, setBroadcastUrl] = useState('');
+  const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!cfg) return;
+    setInscricaoAtivo(cfg.trigger_inscricao_ativo ?? false);
+    setInscricaoUrl(cfg.trigger_inscricao_url ?? '');
+    setConfirmadoAtivo(cfg.trigger_confirmado_ativo ?? false);
+    setConfirmadoUrl(cfg.trigger_confirmado_url ?? '');
+    setCanceladoAtivo(cfg.trigger_cancelado_ativo ?? false);
+    setCanceladoUrl(cfg.trigger_cancelado_url ?? '');
+    setPixAtivo(cfg.trigger_pix_ativo ?? false);
+    setPixUrl(cfg.trigger_pix_url ?? '');
+    setPix2dAtivo(cfg.pix_lembrete_2d_ativo ?? true);
+    setPixVencAtivo(cfg.pix_lembrete_venc_ativo ?? true);
+    setPix1dAtivo(cfg.pix_atraso_1d_ativo ?? true);
+    setPix5dAtivo(cfg.pix_cancelamento_5d_ativo ?? true);
+    setPixCancelarAuto(cfg.pix_cancelar_automatico ?? false);
+    setBroadcastUrl(cfg.trigger_broadcast_url ?? '');
+  }, [cfg]);
+
+  const handleSave = () => upsert.mutate({
+    event_id: eventId,
+    trigger_inscricao_ativo: inscricaoAtivo, trigger_inscricao_url: inscricaoUrl || null,
+    trigger_confirmado_ativo: confirmadoAtivo, trigger_confirmado_url: confirmadoUrl || null,
+    trigger_cancelado_ativo: canceladoAtivo, trigger_cancelado_url: canceladoUrl || null,
+    trigger_pix_ativo: pixAtivo, trigger_pix_url: pixUrl || null,
+    pix_lembrete_2d_ativo: pix2dAtivo, pix_lembrete_venc_ativo: pixVencAtivo,
+    pix_atraso_1d_ativo: pix1dAtivo, pix_cancelamento_5d_ativo: pix5dAtivo,
+    pix_cancelar_automatico: pixCancelarAuto,
+    trigger_broadcast_url: broadcastUrl || null,
+  });
+
+  const testWebhook = async (url: string, triggerKey: string) => {
+    if (!url) { toast.error('Configure a URL primeiro'); return; }
+    const payload = { trigger: triggerKey, teste: true, nome: 'Atleta Teste', telefone: '5531999999999', email: 'teste@uairox.com.br', evento: 'UAIROX Test' };
+    let ok = false;
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      ok = res.ok;
+      toast[ok ? 'success' : 'error'](ok ? 'Webhook testado com sucesso!' : `Webhook retornou ${res.status}`);
+    } catch (e: any) {
+      toast.error('Erro ao testar: ' + e.message);
+    }
+    createLog.mutate({ event_id: eventId, trigger_type: `test_${triggerKey}`, webhook_url: url, payload, status: ok ? 'sent' : 'failed' });
+  };
+
+  const broadcastAthletes = (registrations || []).filter((r: any) =>
+    broadcastFiltro === 'all' ? true : r.status === broadcastFiltro
+  );
+
+  const handleBroadcast = async () => {
+    if (!broadcastUrl) { toast.error('Configure a URL de broadcast'); return; }
+    if (broadcastAthletes.length === 0) { toast.error('Nenhum atleta encontrado'); return; }
+    setSending(true);
+    let sent = 0, failed = 0;
+    for (const r of broadcastAthletes as any[]) {
+      const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: eventId };
+      let ok = false;
+      try {
+        const res = await fetch(broadcastUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        ok = res.ok;
+        if (ok) sent++; else failed++;
+      } catch { failed++; }
+      await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: broadcastUrl, payload, status: ok ? 'sent' : 'failed' });
+      await new Promise(res => setTimeout(res, 350));
+    }
+    setSending(false);
+    toast.success(`Broadcast: ${sent} enviados, ${failed} falha${failed !== 1 ? 's' : ''}`);
+  };
+
+  const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
+    <button onClick={() => onChange(!value)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-[#EDAC02]' : 'bg-zinc-700'}`}>
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${value ? 'left-5' : 'left-0.5'}`} />
+    </button>
+  );
+
+  const TriggerRow = ({ label, ativo, onToggle, url, onUrl, triggerKey }: { label: string; ativo: boolean; onToggle: (v: boolean) => void; url: string; onUrl: (v: string) => void; triggerKey: string }) => (
+    <div className={`${cardClass} p-4 space-y-3`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Toggle value={ativo} onChange={onToggle} />
+          <span className="text-sm font-bold text-white">{label}</span>
+          {ativo && !url && <span className="text-[10px] text-yellow-500 font-bold">⚠ Sem URL</span>}
+          {ativo && url && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
+        </div>
+        <button onClick={() => testWebhook(url, triggerKey)} className="px-3 py-1 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors">Testar →</button>
+      </div>
+      <input value={url} onChange={e => onUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-white">Integração BotConversa</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">Webhooks para envio automático de mensagens WhatsApp</p>
+        </div>
+        <button onClick={handleSave} disabled={upsert.isPending} className={`${btnGold} disabled:opacity-60`}>
+          {upsert.isPending ? 'Salvando...' : 'Salvar Configurações'}
+        </button>
+      </div>
+
+      {/* Triggers 1, 2, 3 */}
+      <div className="space-y-3">
+        <p className={labelClass}>Triggers de Status</p>
+        <TriggerRow label="🔔 Inscrição Realizada" triggerKey="inscricao" ativo={inscricaoAtivo} onToggle={setInscricaoAtivo} url={inscricaoUrl} onUrl={setInscricaoUrl} />
+        <TriggerRow label="✅ Pagamento Confirmado" triggerKey="confirmado" ativo={confirmadoAtivo} onToggle={setConfirmadoAtivo} url={confirmadoUrl} onUrl={setConfirmadoUrl} />
+        <TriggerRow label="❌ Inscrição Cancelada" triggerKey="cancelado" ativo={canceladoAtivo} onToggle={setCanceladoAtivo} url={canceladoUrl} onUrl={setCanceladoUrl} />
+      </div>
+
+      {/* Trigger 4: PIX Parcelado */}
+      <div className="space-y-3">
+        <p className={labelClass}>PIX Parcelado — Régua de Cobranças</p>
+        <div className={`${cardClass} p-4 space-y-4`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Toggle value={pixAtivo} onChange={setPixAtivo} />
+              <span className="text-sm font-bold text-white">💰 PIX Parcelado</span>
+              {pixAtivo && !pixUrl && <span className="text-[10px] text-yellow-500 font-bold">⚠ Sem URL</span>}
+              {pixAtivo && pixUrl && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
+            </div>
+            <button onClick={() => testWebhook(pixUrl, 'pix')} className="px-3 py-1 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors">Testar →</button>
+          </div>
+          <input value={pixUrl} onChange={e => setPixUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Disparos da régua:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { label: '📅 2 dias antes do vencimento', val: pix2dAtivo, set: setPix2dAtivo },
+              { label: '⏰ No dia do vencimento', val: pixVencAtivo, set: setPixVencAtivo },
+              { label: '🚨 1 dia de atraso', val: pix1dAtivo, set: setPix1dAtivo },
+              { label: '🛑 5 dias — cancelamento', val: pix5dAtivo, set: setPix5dAtivo },
+            ] as { label: string; val: boolean; set: (v: boolean) => void }[]).map(({ label, val, set }) => (
+              <button key={label} onClick={() => set(!val)} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-all text-left ${val ? 'border-[#EDAC02]/40 bg-[#EDAC02]/10 text-white' : 'border-zinc-800 bg-[#050505] text-zinc-600'}`}>
+                <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${val ? 'bg-[#EDAC02] border-[#EDAC02] text-black' : 'border-zinc-600'}`}>{val && '✓'}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 pt-2 border-t border-[#1a1a1a]">
+            <button onClick={() => setPixCancelarAuto(!pixCancelarAuto)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${pixCancelarAuto ? 'bg-red-500' : 'bg-zinc-700'}`}>
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${pixCancelarAuto ? 'left-5' : 'left-0.5'}`} />
+            </button>
+            <div>
+              <p className="text-xs font-bold text-white">Cancelar inscrição automaticamente após 5 dias</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">A inscrição será marcada como cancelada pelo cron diário</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-blue-500/20 bg-blue-500/5">
+            <span className="text-blue-400 text-xs mt-0.5">ℹ</span>
+            <p className="text-[10px] text-blue-400 leading-relaxed">Cron diário às 9h via Edge Function <code className="font-mono bg-blue-500/10 px-1 rounded">pix-reminder-cron</code>. Datas calculadas a partir do campo <code className="font-mono bg-blue-500/10 px-1 rounded">due_date</code> de cada parcela em <code className="font-mono bg-blue-500/10 px-1 rounded">registration_installments</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Trigger 5: Broadcast */}
+      <div className="space-y-3">
+        <p className={labelClass}>Broadcast Manual</p>
+        <div className={`${cardClass} p-4 space-y-4`}>
+          <input value={broadcastUrl} onChange={e => setBroadcastUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} text-xs font-mono`} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-xs text-zinc-400 font-bold">Filtrar:</p>
+            {(['all', 'confirmed', 'pending'] as const).map(f => (
+              <button key={f} onClick={() => setBroadcastFiltro(f)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${broadcastFiltro === f ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]' : 'border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}>
+                {f === 'all' ? 'Todos' : f === 'confirmed' ? '✅ Confirmados' : '⏳ Pendentes'}
+              </button>
+            ))}
+            <span className="ml-auto text-xs text-zinc-500 font-bold">{broadcastAthletes.length} atleta{broadcastAthletes.length !== 1 ? 's' : ''}</span>
+          </div>
+          <button onClick={handleBroadcast} disabled={sending || broadcastAthletes.length === 0 || !broadcastUrl} className={`w-full py-3 rounded-lg text-sm font-black uppercase tracking-widest transition-all border border-[#EDAC02]/20 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 disabled:opacity-40 disabled:cursor-not-allowed`}>
+            {sending ? 'Enviando... aguarde' : `📢 Disparar para ${broadcastAthletes.length} atleta${broadcastAthletes.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
+
+      {/* Logs */}
+      <div className="space-y-3">
+        <p className={labelClass}>Histórico de Disparos</p>
+        {(!logs || (logs as any[]).length === 0) ? emptyState('Nenhum disparo registrado') : (
+          <div className={`${cardClass} overflow-hidden`}>
+            <div className="max-h-80 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-[#111] border-b border-[#1a1a1a]">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-zinc-500 font-bold uppercase tracking-wider">Trigger</th>
+                    <th className="text-left px-4 py-2 text-zinc-500 font-bold uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-2 text-zinc-500 font-bold uppercase tracking-wider">Data/Hora</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#0f0f0f]">
+                  {(logs as any[]).map((log: any) => (
+                    <tr key={log.id} className="hover:bg-[#0f0f0f]">
+                      <td className="px-4 py-2 text-zinc-300">{TRIGGER_LABELS[log.trigger_type] || log.trigger_type}</td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[10px] uppercase ${log.status === 'sent' ? 'bg-[#25D366]/10 text-[#25D366]' : 'bg-red-500/10 text-red-400'}`}>
+                          {log.status === 'sent' ? '✓ Enviado' : '✗ Falhou'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-zinc-600">{new Date(log.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ============ TAB: KITS ============
 function KitsTab({ eventId }: { eventId: string }) {
   const { data: kits } = useAthleteKits(eventId);
@@ -1739,13 +1985,39 @@ function InscricoesTab({ eventId }: { eventId: string }) {
 
       if (!error && editingReg.status !== 'confirmed' && editStatus === 'confirmed' && a1.email) {
         supabase.functions.invoke('send-confirmation-email', {
-          body: { 
-            athlete_name: a1.name || 'Atleta', 
+          body: {
+            athlete_name: a1.name || 'Atleta',
             athlete_email: a1.email,
             event_image_url: event?.image_url || null,
             whatsapp_link: (event as any)?.whatsapp_group_link || null
           }
         }).catch(err => console.error('Erro no envio de email:', err));
+      }
+
+      // BotConversa: triggers de status (fire and forget)
+      if (!error && editingReg.status !== editStatus && (editStatus === 'confirmed' || editStatus === 'cancelled')) {
+        const triggerKey = editStatus === 'confirmed' ? 'confirmado' : 'cancelado';
+        const cfgField = editStatus === 'confirmed'
+          ? 'trigger_confirmado_ativo,trigger_confirmado_url'
+          : 'trigger_cancelado_ativo,trigger_cancelado_url';
+        supabase.from('botconversa_config' as any)
+          .select(cfgField)
+          .eq('event_id', eventId)
+          .maybeSingle()
+          .then(({ data: bcfg }: any) => {
+            const aField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_ativo : bcfg?.trigger_cancelado_ativo;
+            const uField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_url : bcfg?.trigger_cancelado_url;
+            if (!aField || !uField) return;
+            const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: eventId };
+            fetch(uField, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bcPayload) })
+              .then(res => {
+                supabase.from('botconversa_logs' as any).insert({
+                  event_id: eventId, registration_id: editingReg.id,
+                  trigger_type: triggerKey, webhook_url: uField,
+                  payload: bcPayload, status: res.ok ? 'sent' : 'failed',
+                }).then(() => {});
+              }).catch(() => {});
+          });
       }
     }
     
@@ -3195,6 +3467,7 @@ const TABS = [
   { key: 'cupons', label: '🏷️ Cupons' },
   { key: 'kits', label: '🎽 Kits' },
   { key: 'despesas', label: '💸 Despesas' },
+  { key: 'botconversa', label: '💬 BotConversa' },
   { key: 'espera', label: '⏳ Lista de Espera' },
 ];
 
@@ -3294,6 +3567,7 @@ export default function AdminEventConfig() {
         {activeTab === 'cupons' && <CuponsTab eventId={id!} />}
         {activeTab === 'kits' && <KitsTab eventId={id!} />}
         {activeTab === 'despesas' && <AdminEventExpensesTab eventId={id!} />}
+        {activeTab === 'botconversa' && <BotconversaTab eventId={id!} />}
       </div>
     </div>
   );

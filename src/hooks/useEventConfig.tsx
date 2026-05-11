@@ -302,6 +302,82 @@ export function useDeleteCouponBatchRule() {
   });
 }
 
+// ============ BOTCONVERSA ============
+
+export function useBotconversaConfig(eventId?: string) {
+  return useQuery({
+    queryKey: ["botconversa-config", eventId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("botconversa_config")
+        .select("*")
+        .eq("event_id", eventId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useUpsertBotconversaConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (config: Record<string, any> & { event_id: string }) => {
+      const { data, error } = await (supabase as any)
+        .from("botconversa_config")
+        .upsert({ ...config, updated_at: new Date().toISOString() }, { onConflict: "event_id" })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["botconversa-config", vars.event_id] });
+      toast.success("Configuração salva!");
+    },
+    onError: (e: any) => toast.error("Erro ao salvar: " + e.message),
+  });
+}
+
+export function useBotconversaLogs(eventId?: string) {
+  return useQuery({
+    queryKey: ["botconversa-logs", eventId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("botconversa_logs")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useCreateBotconversaLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (log: {
+      event_id: string;
+      registration_id?: string;
+      trigger_type: string;
+      webhook_url?: string;
+      payload?: Record<string, any>;
+      status: "sent" | "failed";
+      error_message?: string;
+    }) => {
+      const { error } = await (supabase as any).from("botconversa_logs").insert(log);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["botconversa-logs", vars.event_id] });
+    },
+  });
+}
+
 // ============ ATHLETE KITS ============
 export function useAthleteKits(eventId?: string) {
   return useQuery({
