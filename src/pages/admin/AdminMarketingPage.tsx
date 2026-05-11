@@ -119,7 +119,7 @@ function ContactsTab() {
         <p className={labelClass}>🔗 Webhook BotConversa</p>
         <div className="flex gap-3">
           <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} font-mono text-xs flex-1`} />
-          <button onClick={async () => { await saveConfig.mutateAsync(webhookUrl); toast.success('Salvo'); }} disabled={saveConfig.isPending} className={`${btnGold} whitespace-nowrap`}>Salvar</button>
+          <button onClick={async () => { await saveConfig.mutateAsync({ webhook_url: webhookUrl }); toast.success('Salvo'); }} disabled={saveConfig.isPending} className={`${btnGold} whitespace-nowrap`}>Salvar</button>
         </div>
         {!webhookUrl && <p className="text-[10px] text-yellow-500 font-bold">⚠ Configure o webhook para habilitar campanhas</p>}
       </div>
@@ -233,12 +233,35 @@ function CampaignQueueModal({ campaignId, name, onClose }: { campaignId: string;
   );
 }
 
+// ─── EmailPreview ─────────────────────────────────────────────────────────────
+function EmailPreview({ imageUrl, title, body, ctaText, ctaUrl }: { imageUrl: string; title: string; body: string; ctaText: string; ctaUrl: string }) {
+  return (
+    <div className="bg-[#f4f4f4] rounded-xl overflow-hidden border border-zinc-700 text-left" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <div className="bg-white rounded-xl overflow-hidden max-w-full">
+        {imageUrl && <img src={imageUrl} alt="" className="w-full object-cover max-h-48" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+        <div className="p-6 space-y-3">
+          {title && <h2 className="text-lg font-black text-gray-900 leading-tight">{title.replace(/\{nome\}/gi, 'João')}</h2>}
+          {body && <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{body.replace(/\{nome\}/gi, 'João')}</p>}
+          {ctaText && ctaUrl && (
+            <div className="pt-2">
+              <span className="inline-block bg-[#EDAC02] text-black font-black text-xs px-6 py-3 rounded-lg uppercase tracking-wider">{ctaText}</span>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-3 border-t border-gray-100">
+          <p className="text-[10px] text-gray-400">Para não receber mais emails, responda com "SAIR".</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── NewCampaignModal ─────────────────────────────────────────────────────────
 function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const { data: contacts } = useMarketingContacts();
   const createCampaign = useCreateCampaign();
 
-  const [step, setStep] = useState<'config' | 'variants' | 'contacts'>('config');
+  const [step, setStep] = useState<'config' | 'whatsapp' | 'email' | 'contacts'>('config');
   const [name, setName] = useState('');
   const [triggerName, setTriggerName] = useState('marketing');
   const [baseMessage, setBaseMessage] = useState('');
@@ -246,6 +269,17 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [autoContinue, setAutoContinue] = useState(true);
   const [variants, setVariants] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+
+  // Email state
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailImageUrl, setEmailImageUrl] = useState('');
+  const [emailTitle, setEmailTitle] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [emailCtaText, setEmailCtaText] = useState('');
+  const [emailCtaUrl, setEmailCtaUrl] = useState('');
+  const [emailPreview, setEmailPreview] = useState(false);
+
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState('');
 
@@ -281,7 +315,8 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   const handleCreate = async () => {
     if (!name.trim()) { toast.error('Nome da campanha obrigatório'); return; }
-    if (variants.length === 0) { toast.error('Gere as variações de mensagem primeiro'); return; }
+    if (variants.length === 0) { toast.error('Gere as variações de WhatsApp primeiro'); return; }
+    if (emailEnabled && !emailSubject.trim()) { toast.error('Assunto do email é obrigatório quando email está ativo'); return; }
     if (selectedContacts.size === 0) { toast.error('Selecione ao menos um contato'); return; }
     try {
       await createCampaign.mutateAsync({
@@ -292,6 +327,9 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
         contact_ids: Array.from(selectedContacts),
+        email_enabled: emailEnabled,
+        email_subject: emailEnabled ? emailSubject : undefined,
+        email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
       });
       toast.success('Campanha criada! Ative-a para iniciar os envios.');
       onClose();
@@ -300,10 +338,13 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const insertNome = (val: string, set: (v: string) => void) => set(val + '{nome}');
+
   const steps = [
-    { id: 'config', label: '1. Configuração' },
-    { id: 'variants', label: '2. Mensagens' },
-    { id: 'contacts', label: '3. Contatos' },
+    { id: 'config',   label: '1. Config' },
+    { id: 'whatsapp', label: '2. WhatsApp' },
+    { id: 'email',    label: '3. Email' },
+    { id: 'contacts', label: '4. Contatos' },
   ];
 
   return (
@@ -353,77 +394,139 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   <p className="text-[10px] text-zinc-500">Se desativado, a campanha pausa ao fim de cada janela e precisa ser reativada manualmente</p>
                 </div>
               </div>
-              <button onClick={() => setStep('variants')} className={`${btnGold} w-full`}>Próximo →</button>
+              <button onClick={() => setStep('whatsapp')} className={`${btnGold} w-full`}>Próximo →</button>
             </div>
           )}
 
-          {/* Step 2: Variants */}
-          {step === 'variants' && (
+          {/* Step 2: WhatsApp */}
+          {step === 'whatsapp' && (
             <div className="space-y-4">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <p className={labelClass}>Mensagem base</p>
-                  <button
-                    onClick={() => setBaseMessage(prev => prev + '{nome}')}
-                    className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[10px] font-mono font-bold hover:bg-zinc-700 transition-colors"
-                  >
+                  <button onClick={() => setBaseMessage(prev => prev + '{nome}')} className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[10px] font-mono font-bold hover:bg-zinc-700 transition-colors">
                     + inserir {'{nome}'}
                   </button>
                 </div>
-                <textarea
-                  value={baseMessage}
-                  onChange={e => setBaseMessage(e.target.value)}
-                  placeholder="Ex: Olá {nome}, temos novidades sobre a próxima edição da UAIROX..."
-                  rows={4}
-                  className={`${inputClass} resize-none`}
-                />
-                <p className="text-[10px] text-zinc-600">Use <code className="font-mono text-[#EDAC02]">{'{nome}'}</code> para personalizar com o nome de cada contato. O Gemini vai manter o marcador nas variações.</p>
+                <textarea value={baseMessage} onChange={e => setBaseMessage(e.target.value)} placeholder="Ex: Olá {nome}, temos novidades sobre a próxima edição da UAIROX..." rows={4} className={`${inputClass} resize-none`} />
+                <p className="text-[10px] text-zinc-600">Use <code className="font-mono text-[#EDAC02]">{'{nome}'}</code> para personalizar. O Gemini vai manter o marcador nas variações.</p>
               </div>
-
               <button onClick={handleGenerateVariants} disabled={generating || !baseMessage.trim()} className={`${btnGold} w-full`}>
                 {generating ? '✨ Gerando variações...' : '✨ Gerar 10 variações com Gemini'}
               </button>
-
               {variants.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className={labelClass}>{variants.length} variações geradas — revise e edite</p>
-                    <span className="text-[10px] text-zinc-600"><code className="font-mono text-[#EDAC02]">{'{nome}'}</code> será substituído automaticamente no envio</span>
+                    <p className={labelClass}>{variants.length} variações — revise e edite</p>
+                    <span className="text-[10px] text-zinc-600"><code className="font-mono text-[#EDAC02]">{'{nome}'}</code> substituído no envio</span>
                   </div>
                   {variants.map((v, i) => (
                     <div key={i} className={`${cardClass} p-3 space-y-2`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Variação #{i + 1}</span>
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">#{i + 1}</span>
                           {v.includes('{nome}') && <span className="px-1.5 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] text-[9px] font-mono border border-[#EDAC02]/20">personalizada</span>}
                         </div>
-                        <button onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))} className="text-zinc-700 hover:text-red-400 text-xs font-bold transition-colors">✕ Remover</button>
+                        <button onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))} className="text-zinc-700 hover:text-red-400 text-xs font-bold transition-colors">✕</button>
                       </div>
                       <div className="relative">
-                        <textarea
-                          value={v}
-                          onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                          rows={3}
-                          className={`${inputClass} resize-none text-xs text-zinc-300`}
-                        />
-                        <button
-                          onClick={() => setVariants(prev => prev.map((x, j) => j === i ? x + '{nome}' : x))}
-                          className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors"
-                        >
+                        <textarea value={v} onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))} rows={3} className={`${inputClass} resize-none text-xs text-zinc-300`} />
+                        <button onClick={() => setVariants(prev => prev.map((x, j) => j === i ? x + '{nome}' : x))} className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">
                           + {'{nome}'}
                         </button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => setStep('contacts')} className={`${btnGold} w-full`}>
-                    Aprovado — Selecionar Contatos →
+                  <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Aprovado — Configurar Email →</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Email */}
+          {step === 'email' && (
+            <div className="space-y-4">
+              {/* Toggle */}
+              <div className="flex items-center gap-3 p-4 rounded-xl border border-[#1a1a1a]">
+                <button onClick={() => setEmailEnabled(!emailEnabled)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${emailEnabled ? 'bg-[#EDAC02]' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${emailEnabled ? 'left-5' : 'left-0.5'}`} />
+                </button>
+                <div>
+                  <p className="text-xs font-bold text-white">Enviar email junto com o WhatsApp</p>
+                  <p className="text-[10px] text-zinc-500">Requer RESEND_API_KEY configurada no Supabase</p>
+                </div>
+                {emailEnabled && (
+                  <button onClick={() => setStep('contacts')} className="ml-auto px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 text-xs font-bold hover:text-white transition-colors">Pular →</button>
+                )}
+              </div>
+
+              {!emailEnabled && (
+                <button onClick={() => setStep('contacts')} className={`${btnGold} w-full`}>Pular — Ir para Contatos →</button>
+              )}
+
+              {emailEnabled && (
+                <div className="space-y-4">
+                  {/* Subject */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className={labelClass}>Assunto do email</p>
+                      <button onClick={() => insertNome(emailSubject, setEmailSubject)} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
+                    </div>
+                    <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Ex: {nome}, a UAIROX está chegando! 🏆" className={inputClass} />
+                  </div>
+
+                  {/* Template editor / preview toggle */}
+                  <div className="flex items-center justify-between">
+                    <p className={labelClass}>Template</p>
+                    <button onClick={() => setEmailPreview(!emailPreview)} className={`px-3 py-1 rounded-lg border text-xs font-bold transition-colors ${emailPreview ? 'border-[#EDAC02] text-[#EDAC02] bg-[#EDAC02]/10' : 'border-zinc-700 text-zinc-400 hover:text-white'}`}>
+                      {emailPreview ? '✏ Editar' : '👁 Preview'}
+                    </button>
+                  </div>
+
+                  {emailPreview ? (
+                    <EmailPreview imageUrl={emailImageUrl} title={emailTitle} body={emailBody} ctaText={emailCtaText} ctaUrl={emailCtaUrl} />
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <p className={labelClass}>Imagem do topo (URL)</p>
+                        <input value={emailImageUrl} onChange={e => setEmailImageUrl(e.target.value)} placeholder="https://... (JPG ou PNG, largura 600px recomendada)" className={`${inputClass} font-mono text-xs`} />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className={labelClass}>Título</p>
+                          <button onClick={() => insertNome(emailTitle, setEmailTitle)} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
+                        </div>
+                        <input value={emailTitle} onChange={e => setEmailTitle(e.target.value)} placeholder="Ex: {nome}, chegou sua hora de competir!" className={inputClass} />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className={labelClass}>Corpo do email</p>
+                          <button onClick={() => insertNome(emailBody, setEmailBody)} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
+                        </div>
+                        <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Escreva o conteúdo principal do email..." rows={5} className={`${inputClass} resize-none`} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <p className={labelClass}>Texto do botão CTA</p>
+                          <input value={emailCtaText} onChange={e => setEmailCtaText(e.target.value)} placeholder="Ex: Garantir minha vaga" className={inputClass} />
+                        </div>
+                        <div className="space-y-1">
+                          <p className={labelClass}>Link do botão CTA</p>
+                          <input value={emailCtaUrl} onChange={e => setEmailCtaUrl(e.target.value)} placeholder="https://uairox.com.br/evento/..." className={`${inputClass} font-mono text-xs`} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => setStep('contacts')} disabled={!emailSubject.trim()} className={`${btnGold} w-full`}>
+                    Próximo — Selecionar Contatos →
                   </button>
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 3: Contacts */}
+          {/* Step 4: Contacts */}
           {step === 'contacts' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -457,7 +560,6 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   ))
                 }
               </div>
-
               <button onClick={handleCreate} disabled={createCampaign.isPending || selectedContacts.size === 0} className={`${btnGold} w-full py-3`}>
                 {createCampaign.isPending ? 'Criando...' : `Criar campanha para ${selectedContacts.size} contatos`}
               </button>

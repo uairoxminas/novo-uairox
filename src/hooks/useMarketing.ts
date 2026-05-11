@@ -92,7 +92,7 @@ export function useMarketingConfig() {
 export function useSaveMarketingConfig() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (webhook_url: string) => {
+    mutationFn: async (cfg: { webhook_url?: string; email_from?: string; resend_api_key?: string }) => {
       const { data: existing } = await (supabase as any)
         .from('marketing_config')
         .select('id')
@@ -100,13 +100,13 @@ export function useSaveMarketingConfig() {
       if (existing?.id) {
         const { error } = await (supabase as any)
           .from('marketing_config')
-          .update({ webhook_url, updated_at: new Date().toISOString() })
+          .update({ ...cfg, updated_at: new Date().toISOString() })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { error } = await (supabase as any)
           .from('marketing_config')
-          .insert({ webhook_url });
+          .insert(cfg);
         if (error) throw error;
       }
     },
@@ -142,6 +142,9 @@ export function useCreateCampaign() {
       daily_limit: number;
       auto_continue: boolean;
       contact_ids: string[];
+      email_enabled: boolean;
+      email_subject?: string;
+      email_template?: { image_url?: string; title?: string; body?: string; cta_text?: string; cta_url?: string };
     }) => {
       // Create campaign
       const { data: camp, error: campErr } = await (supabase as any)
@@ -153,6 +156,9 @@ export function useCreateCampaign() {
           variants: campaign.variants,
           daily_limit: campaign.daily_limit,
           auto_continue: campaign.auto_continue,
+          email_enabled: campaign.email_enabled,
+          email_subject: campaign.email_subject || null,
+          email_template: campaign.email_template || null,
           status: 'draft',
           total_contacts: campaign.contact_ids.length,
         })
