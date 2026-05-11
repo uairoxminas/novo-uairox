@@ -105,13 +105,13 @@ serve(async (req) => {
       let triggerType: string | null = null;
 
       if (due === in2days && cfg.pix_lembrete_2d_ativo) {
-        triggerType = 'pix_lembrete_2d';
+        triggerType = 'pix2';
       } else if (due === today && cfg.pix_lembrete_venc_ativo) {
-        triggerType = 'pix_lembrete_venc';
+        triggerType = 'pix0';
       } else if (due === minus1day && cfg.pix_atraso_1d_ativo) {
-        triggerType = 'pix_atraso_1d';
+        triggerType = 'pix-1';
       } else if (due <= minus5days && cfg.pix_cancelamento_5d_ativo) {
-        triggerType = 'pix_cancelamento_5d';
+        triggerType = 'pix-5';
       }
 
       if (!triggerType) continue;
@@ -162,7 +162,7 @@ serve(async (req) => {
       });
 
       // Auto-cancelar inscrição se 5 dias de atraso e opção ativada
-      if (triggerType === 'pix_cancelamento_5d' && cfg.pix_cancelar_automatico) {
+      if (triggerType === 'pix-5' && cfg.pix_cancelar_automatico) {
         await supabase
           .from('registrations')
           .update({ status: 'cancelled' } as any)

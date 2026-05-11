@@ -1293,10 +1293,10 @@ const TRIGGER_LABELS: Record<string, string> = {
   inscricao: '🔔 Inscrição Realizada',
   confirmado: '✅ Pagamento Confirmado',
   cancelado: '❌ Inscrição Cancelada',
-  pix_lembrete_2d: '📅 Lembrete 2 dias antes',
-  pix_lembrete_venc: '⏰ Lembrete no vencimento',
-  pix_atraso_1d: '🚨 1 dia de atraso',
-  pix_cancelamento_5d: '🛑 5 dias — cancelamento',
+  pix2: '📅 2 dias antes do vencimento',
+  pix0: '⏰ No dia do vencimento',
+  'pix-1': '🚨 1 dia de atraso',
+  'pix-5': '🛑 5 dias — cancelamento',
   broadcast: '📢 Broadcast',
 };
 
