@@ -80,6 +80,32 @@ function ContactsTab() {
     XLSX.writeFile(wb, 'contatos_marketing.xlsx');
   };
 
+  const handleExportMetaAds = () => {
+    const active = (contacts || []).filter((c: any) => !c.opt_out);
+    if (!active.length) { toast.error('Nenhum contato ativo para exportar'); return; }
+
+    const toE164 = (phone: string) => {
+      const digits = phone.replace(/\D/g, '');
+      if (digits.startsWith('55') && digits.length >= 12) return '+' + digits;
+      if (digits.length === 11 || digits.length === 10) return '+55' + digits;
+      return '+55' + digits;
+    };
+
+    const firstName = (name: string) => (name || '').trim().split(/\s+/)[0] || '';
+
+    const rows = active.map((c: any) => ({
+      phone: toE164(c.phone),
+      email: c.email || '',
+      fn: firstName(c.name),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'MetaAds');
+    XLSX.writeFile(wb, 'meta_ads_audience.csv', { bookType: 'csv' });
+    toast.success(`${rows.length} contatos exportados para Meta Ads`);
+  };
+
   const filtered = (contacts || []).filter((c: any) => {
     const matchSearch = !search || [c.name, c.phone, c.email].some(v => v?.toLowerCase().includes(search.toLowerCase()));
     const matchFilter = filterOptOut === 'all' || (filterOptOut === 'active' ? !c.opt_out : c.opt_out);
@@ -92,8 +118,14 @@ function ContactsTab() {
   return (
     <div className="space-y-6">
       {/* Actions */}
-      <div className="flex items-center gap-2 justify-end">
+      <div className="flex items-center gap-2 justify-end flex-wrap">
         <button onClick={handleExport} disabled={!contacts?.length} className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs font-bold hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-40">↓ Exportar XLSX</button>
+        <button onClick={handleExportMetaAds} disabled={!activeCount} className="px-3 py-2 rounded-lg border border-blue-500/40 text-blue-400 text-xs font-bold hover:bg-blue-500/10 hover:border-blue-500/60 transition-colors disabled:opacity-40">
+          <span className="flex items-center gap-1.5">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            Exportar para Meta Ads
+          </span>
+        </button>
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
         <button onClick={() => fileRef.current?.click()} disabled={importContacts.isPending} className={btnGold}>
           {importContacts.isPending ? 'Importando...' : '↑ Importar CSV/XLSX'}
@@ -122,6 +154,21 @@ function ContactsTab() {
           <button onClick={async () => { await saveConfig.mutateAsync({ webhook_url: webhookUrl }); toast.success('Salvo'); }} disabled={saveConfig.isPending} className={`${btnGold} whitespace-nowrap`}>Salvar</button>
         </div>
         {!webhookUrl && <p className="text-[10px] text-yellow-500 font-bold">⚠ Configure o webhook para habilitar campanhas</p>}
+      </div>
+
+      {/* Meta Ads instructions */}
+      <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-blue-500/20 bg-blue-500/5">
+        <svg viewBox="0 0 24 24" className="w-4 h-4 fill-blue-400 flex-shrink-0 mt-0.5"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        <div className="text-[10px] text-blue-300 leading-relaxed space-y-1">
+          <p className="font-bold text-blue-200">Como usar no Meta Ads (Instagram + Facebook):</p>
+          <ol className="space-y-0.5 list-decimal list-inside text-blue-300/80">
+            <li>Clique em <strong className="text-blue-200">Exportar para Meta Ads</strong> — gera um CSV com telefone (E.164), email e nome</li>
+            <li>No <strong className="text-blue-200">Gerenciador de Anúncios</strong> → Públicos → Criar Público → Lista de Clientes</li>
+            <li>Faça upload do arquivo <code className="font-mono bg-blue-500/10 px-1 rounded">meta_ads_audience.csv</code></li>
+            <li>O Meta cruza com perfis do Facebook/Instagram e cria o público para anúncios</li>
+          </ol>
+          <p className="text-blue-400/60 pt-0.5">Apenas contatos ativos (sem opt-out) são exportados. O Meta não permite DM proativo via API.</p>
+        </div>
       </div>
 
       {/* Table */}
