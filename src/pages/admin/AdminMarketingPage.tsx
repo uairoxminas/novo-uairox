@@ -14,6 +14,7 @@ import {
   useUpdateCampaignStatus,
   useDeleteCampaign,
   useCampaignQueue,
+  useSyncRegistrationsToMarketing,
 } from '@/hooks/useMarketing';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -37,15 +38,23 @@ function ContactsTab() {
   const toggleOptOut = useToggleOptOut();
   const deleteContact = useDeleteMarketingContact();
   const saveConfig = useSaveMarketingConfig();
+  const syncRegistrations = useSyncRegistrationsToMarketing();
 
   const [search, setSearch] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [filterOptOut, setFilterOptOut] = useState<'all' | 'active' | 'optout'>('active');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Column mapping state
+  const [mappingData, setMappingData] = useState<{ headers: string[]; rows: any[]; fileName: string } | null>(null);
+  const [colName, setColName] = useState('');
+  const [colPhone, setColPhone] = useState('');
+  const [colEmail, setColEmail] = useState('');
+
   useEffect(() => { if (config?.webhook_url) setWebhookUrl(config.webhook_url); }, [config]);
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Step 1: parse file and show mapping modal
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -53,19 +62,44 @@ function ContactsTab() {
       const wb = XLSX.read(buf);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      const parsed = rows.map((r: any) => {
-        const name = String(r['Nome'] || r['name'] || r['NOME'] || '').trim() || undefined;
-        const rawPhone = String(r['Telefone'] || r['phone'] || r['TELEFONE'] || r['Celular'] || r['celular'] || '').trim();
-        const phone = rawPhone.replace(/\D/g, '');
-        const email = String(r['Email'] || r['email'] || r['EMAIL'] || r['E-mail'] || '').trim() || undefined;
-        return { name, phone, email };
-      }).filter(c => c.phone.length >= 8);
-      if (!parsed.length) { toast.error('Nenhum contato válido. Verifique as colunas: Nome, Telefone, Email'); return; }
-      const count = await importContacts.mutateAsync(parsed);
-      toast.success(`${count} contatos importados`);
-    } catch (err: any) { toast.error('Erro ao importar: ' + err.message); }
+      if (!rows.length) { toast.error('Arquivo vazio'); return; }
+      const headers = Object.keys(rows[0]);
+      if (!headers.length) { toast.error('Nenhuma coluna encontrada'); return; }
+
+      // Auto-detect best guesses
+      const guess = (patterns: string[]) => headers.find(h => patterns.some(p => h.toLowerCase().includes(p))) || '';
+      setColName(guess(['nome', 'name']));
+      setColPhone(guess(['telefone', 'phone', 'celular', 'fone', 'whatsapp', 'tel']));
+      setColEmail(guess(['email', 'e-mail', 'mail']));
+      setMappingData({ headers, rows, fileName: file.name });
+    } catch (err: any) { toast.error('Erro ao ler arquivo: ' + err.message); }
     finally { e.target.value = ''; }
   };
+
+  // Step 2: confirm mapping and import
+  const handleConfirmImport = async () => {
+    if (!mappingData || !colPhone) { toast.error('Selecione pelo menos a coluna de Telefone'); return; }
+    try {
+      const parsed = mappingData.rows.map((r: any) => {
+        const name = colName ? String(r[colName] || '').trim() || undefined : undefined;
+        const rawPhone = String(r[colPhone] || '').trim();
+        const phone = rawPhone.replace(/\D/g, '');
+        const email = colEmail ? String(r[colEmail] || '').trim() || undefined : undefined;
+        return { name, phone, email };
+      }).filter(c => c.phone.length >= 8);
+      if (!parsed.length) { toast.error('Nenhum contato com telefone válido encontrado'); return; }
+      const count = await importContacts.mutateAsync(parsed);
+      toast.success(`${count} contatos importados`);
+      setMappingData(null);
+    } catch (err: any) { toast.error('Erro ao importar: ' + err.message); }
+  };
+
+  // Preview of mapped data
+  const mappedPreview = mappingData ? mappingData.rows.slice(0, 5).map((r: any) => ({
+    name: colName ? String(r[colName] || '').trim() : '—',
+    phone: colPhone ? String(r[colPhone] || '').trim() : '—',
+    email: colEmail ? String(r[colEmail] || '').trim() : '—',
+  })) : [];
 
   const handleExport = () => {
     if (!contacts?.length) return;
@@ -119,6 +153,20 @@ function ContactsTab() {
     <div className="space-y-6">
       {/* Actions */}
       <div className="flex items-center gap-2 justify-end flex-wrap">
+        <button
+          onClick={async () => {
+            try {
+              const count = await syncRegistrations.mutateAsync();
+              toast.success(`${count} contato(s) sincronizados das inscrições`);
+            } catch (err: any) {
+              toast.error('Erro ao sincronizar: ' + err.message);
+            }
+          }}
+          disabled={syncRegistrations.isPending}
+          className="px-3 py-2 rounded-lg border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/10 hover:border-[#25D366]/60 transition-colors disabled:opacity-40"
+        >
+          {syncRegistrations.isPending ? '⏳ Sincronizando...' : '🔄 Sincronizar Inscritos'}
+        </button>
         <button onClick={handleExport} disabled={!contacts?.length} className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs font-bold hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-40">↓ Exportar XLSX</button>
         <button onClick={handleExportMetaAds} disabled={!activeCount} className="px-3 py-2 rounded-lg border border-blue-500/40 text-blue-400 text-xs font-bold hover:bg-blue-500/10 hover:border-blue-500/60 transition-colors disabled:opacity-40">
           <span className="flex items-center gap-1.5">
@@ -126,11 +174,104 @@ function ContactsTab() {
             Exportar para Meta Ads
           </span>
         </button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFileSelect} className="hidden" />
         <button onClick={() => fileRef.current?.click()} disabled={importContacts.isPending} className={btnGold}>
           {importContacts.isPending ? 'Importando...' : '↑ Importar CSV/XLSX'}
         </button>
       </div>
+
+      {/* Column Mapping Modal */}
+      {mappingData && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setMappingData(null)}>
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-[#1a1a1a]">
+              <div>
+                <h3 className="text-sm font-black text-white">Mapear Colunas</h3>
+                <p className="text-[10px] text-zinc-500 mt-0.5">📄 {mappingData.fileName} — {mappingData.rows.length} linhas · {mappingData.headers.length} colunas</p>
+              </div>
+              <button onClick={() => setMappingData(null)} className="text-zinc-500 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Column selectors */}
+              <div className="grid grid-cols-3 gap-4">
+                {([
+                  { label: 'Nome', value: colName, setter: setColName, icon: '👤', required: false },
+                  { label: 'Telefone', value: colPhone, setter: setColPhone, icon: '📱', required: true },
+                  { label: 'Email', value: colEmail, setter: setColEmail, icon: '📧', required: false },
+                ] as const).map(col => (
+                  <div key={col.label} className="space-y-1.5">
+                    <p className={`${labelClass} flex items-center gap-1`}>
+                      {col.icon} {col.label}
+                      {col.required && <span className="text-red-400">*</span>}
+                    </p>
+                    <select
+                      value={col.label === 'Nome' ? colName : col.label === 'Telefone' ? colPhone : colEmail}
+                      onChange={e => col.setter(e.target.value)}
+                      className={`${inputClass} cursor-pointer`}
+                    >
+                      <option value="">— Não mapear —</option>
+                      {mappingData.headers.map(h => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Preview */}
+              {colPhone && (
+                <div className="space-y-2">
+                  <p className={labelClass}>📋 Preview (primeiros 5 contatos)</p>
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <table className="w-full text-xs">
+                      <thead className="bg-[#111] border-b border-[#1a1a1a]">
+                        <tr>
+                          {['Nome', 'Telefone', 'Email'].map(h => (
+                            <th key={h} className="text-left px-4 py-2 text-zinc-500 font-bold uppercase tracking-wider">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#0f0f0f]">
+                        {mappedPreview.map((row, i) => (
+                          <tr key={i} className="hover:bg-[#0f0f0f]">
+                            <td className="px-4 py-2 text-zinc-200">{row.name || <span className="text-zinc-600">—</span>}</td>
+                            <td className="px-4 py-2 text-zinc-400 font-mono">{row.phone || <span className="text-zinc-600">—</span>}</td>
+                            <td className="px-4 py-2 text-zinc-500">{row.email || <span className="text-zinc-600">—</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[10px] text-zinc-600">Telefones com menos de 8 dígitos serão ignorados. Duplicatas por telefone serão mescladas automaticamente.</p>
+                </div>
+              )}
+
+              {!colPhone && (
+                <div className="p-6 text-center rounded-xl border border-red-500/20 bg-red-500/5">
+                  <p className="text-sm text-red-400 font-bold">Selecione pelo menos a coluna de Telefone</p>
+                  <p className="text-xs text-zinc-500 mt-1">O telefone é obrigatório para identificar cada contato</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 border-t border-[#1a1a1a] flex items-center justify-between">
+              <button onClick={() => setMappingData(null)} className="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs font-bold hover:text-white transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                disabled={!colPhone || importContacts.isPending}
+                className={`${btnGold} px-6 py-2.5`}
+              >
+                {importContacts.isPending ? '⏳ Importando...' : `✓ Importar ${mappingData.rows.length} contatos`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -321,6 +462,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailImageUrl, setEmailImageUrl] = useState('');
+  const [emailImageUploading, setEmailImageUploading] = useState(false);
   const [emailTitle, setEmailTitle] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [emailCtaText, setEmailCtaText] = useState('');
@@ -328,6 +470,29 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [emailPreview, setEmailPreview] = useState(false);
   const [testEmailTo, setTestEmailTo] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
+  const emailImageRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem (JPG, PNG, etc.)'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return; }
+    setEmailImageUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/upload-image', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro no upload');
+      setEmailImageUrl(data.url);
+      toast.success('Imagem carregada!');
+    } catch (err: any) {
+      toast.error('Erro ao enviar imagem: ' + err.message);
+    } finally {
+      setEmailImageUploading(false);
+      e.target.value = '';
+    }
+  };
 
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState('');
@@ -340,10 +505,13 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
     if (!baseMessage.trim()) { toast.error('Escreva a mensagem base primeiro'); return; }
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('marketing-generate-variants', {
-        body: { base_message: baseMessage, context: 'Evento de CrossFit/Fitness UAIROX' },
+      const res = await fetch('/api/marketing-generate-variants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_message: baseMessage, context: 'Evento de CrossFit/Fitness UAIROX' })
       });
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro na API');
       if (!data?.variants?.length) throw new Error('Nenhuma variação gerada');
       setVariants(data.variants);
       toast.success(`${data.variants.length} variações geradas!`);
@@ -556,9 +724,26 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                     <EmailPreview imageUrl={emailImageUrl} title={emailTitle} body={emailBody} ctaText={emailCtaText} ctaUrl={emailCtaUrl} />
                   ) : (
                     <div className="space-y-3">
-                      <div className="space-y-1">
-                        <p className={labelClass}>Imagem do topo (URL)</p>
-                        <input value={emailImageUrl} onChange={e => setEmailImageUrl(e.target.value)} placeholder="https://... (JPG ou PNG, largura 600px recomendada)" className={`${inputClass} font-mono text-xs`} />
+                      <div className="space-y-1.5">
+                        <p className={labelClass}>Imagem do topo</p>
+                        <input ref={emailImageRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        {emailImageUrl ? (
+                          <div className="relative rounded-xl overflow-hidden border border-zinc-700 group">
+                            <img src={emailImageUrl} alt="Header" className="w-full max-h-40 object-cover" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                              <button onClick={() => emailImageRef.current?.click()} className="px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-600 text-white text-xs font-bold hover:bg-zinc-700 transition-colors">🔄 Trocar</button>
+                              <button onClick={() => setEmailImageUrl('')} className="px-3 py-1.5 rounded-lg bg-red-900/60 border border-red-600/40 text-red-300 text-xs font-bold hover:bg-red-900 transition-colors">✕ Remover</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => emailImageRef.current?.click()}
+                            disabled={emailImageUploading}
+                            className="w-full py-6 rounded-xl border-2 border-dashed border-zinc-700 text-zinc-500 text-xs font-bold hover:border-[#EDAC02]/40 hover:text-[#EDAC02] transition-colors disabled:opacity-40"
+                          >
+                            {emailImageUploading ? '⏳ Enviando imagem...' : '📷 Clique para enviar imagem JPG/PNG (máx 5MB)'}
+                          </button>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">

@@ -956,11 +956,25 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           });
       }
 
-      // Auto-capture to marketing contacts base (fire and forget)
-      (supabase as any).from('marketing_contacts').upsert(
-        { name: a1.name.trim(), phone: a1.phone.trim().replace(/\D/g, ''), email: a1.email.trim() || undefined, source: 'registration', opt_out: false },
-        { onConflict: 'phone', ignoreDuplicates: false }
-      ).then(() => {});
+      // Auto-capture to marketing contacts base via API (uses service_role)
+      const marketingRows = [
+        { name: a1.name.trim(), phone: a1.phone.trim().replace(/\D/g, ''), email: a1.email.trim() || undefined },
+        ...(teamMembersData || []).filter((m: any) => m.phone).map((m: any) => ({
+          name: m.name?.trim() || undefined,
+          phone: m.phone.trim().replace(/\D/g, ''),
+          email: m.email?.trim() || undefined,
+        })),
+      ].filter(r => r.phone.length >= 8);
+      if (marketingRows.length > 0) {
+        fetch('/api/marketing-contacts?action=import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contacts: marketingRows }),
+        }).then(res => {
+          if (!res.ok) console.error('[Marketing Auto-Capture] API error:', res.status);
+          else console.log(`[Marketing Auto-Capture] ${marketingRows.length} contato(s) sincronizado(s)`);
+        }).catch(err => console.error('[Marketing Auto-Capture] Fetch error:', err.message));
+      }
 
       // Disparo automático do Email Via Edge Function (Fire and Forget)
       supabase.functions.invoke('send-registration-email', {

@@ -1,18 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// ─── API helpers (use serverless API with service_role for marketing tables) ──
+
+const API_BASE = '/api';
+
+async function apiFetch(path: string, opts?: RequestInit) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...opts?.headers },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error || 'API error');
+  }
+  return res.json();
+}
+
 // ─── Contacts ────────────────────────────────────────────────────────────────
 
 export function useMarketingContacts() {
   return useQuery({
     queryKey: ['marketing-contacts'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('marketing_contacts')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data as any[];
+      return await apiFetch('/marketing-contacts') as any[];
     },
   });
 }
@@ -21,10 +32,10 @@ export function useUpsertMarketingContact() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (contact: { name?: string; phone: string; email?: string; source?: string }) => {
-      const { error } = await (supabase as any)
-        .from('marketing_contacts')
-        .upsert({ ...contact, opt_out: false }, { onConflict: 'phone', ignoreDuplicates: false });
-      if (error) throw error;
+      await apiFetch('/marketing-contacts?action=import', {
+        method: 'POST',
+        body: JSON.stringify({ contacts: [{ ...contact }] }),
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),
   });
@@ -34,12 +45,11 @@ export function useImportMarketingContacts() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (contacts: { name?: string; phone: string; email?: string }[]) => {
-      const rows = contacts.map(c => ({ ...c, source: 'csv', opt_out: false }));
-      const { error } = await (supabase as any)
-        .from('marketing_contacts')
-        .upsert(rows, { onConflict: 'phone', ignoreDuplicates: false });
-      if (error) throw error;
-      return rows.length;
+      const result = await apiFetch('/marketing-contacts?action=import', {
+        method: 'POST',
+        body: JSON.stringify({ contacts }),
+      });
+      return result.count;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),
   });
@@ -49,11 +59,10 @@ export function useToggleOptOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, opt_out }: { id: string; opt_out: boolean }) => {
-      const { error } = await (supabase as any)
-        .from('marketing_contacts')
-        .update({ opt_out })
-        .eq('id', id);
-      if (error) throw error;
+      await apiFetch('/marketing-contacts?action=toggle-optout', {
+        method: 'PUT',
+        body: JSON.stringify({ id, opt_out }),
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),
   });
@@ -63,11 +72,9 @@ export function useDeleteMarketingContact() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
-        .from('marketing_contacts')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      await apiFetch(`/marketing-contacts?action=delete&id=${id}`, {
+        method: 'DELETE',
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),
   });
@@ -79,12 +86,7 @@ export function useMarketingConfig() {
   return useQuery({
     queryKey: ['marketing-config'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('marketing_config')
-        .select('*')
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id?: string; webhook_url?: string } | null;
+      return await apiFetch('/marketing-contacts?action=config') as { id?: string; webhook_url?: string } | null;
     },
   });
 }
@@ -93,22 +95,10 @@ export function useSaveMarketingConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cfg: { webhook_url?: string; email_from?: string; resend_api_key?: string }) => {
-      const { data: existing } = await (supabase as any)
-        .from('marketing_config')
-        .select('id')
-        .maybeSingle();
-      if (existing?.id) {
-        const { error } = await (supabase as any)
-          .from('marketing_config')
-          .update({ ...cfg, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any)
-          .from('marketing_config')
-          .insert(cfg);
-        if (error) throw error;
-      }
+      await apiFetch('/marketing-contacts?action=save-config', {
+        method: 'POST',
+        body: JSON.stringify(cfg),
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-config'] }),
   });
@@ -166,17 +156,15 @@ export function useCreateCampaign() {
         .single();
       if (campErr) throw campErr;
 
-      // Load contacts
-      const { data: contacts, error: contactErr } = await (supabase as any)
-        .from('marketing_contacts')
-        .select('id, name, phone, email')
-        .in('id', campaign.contact_ids)
-        .eq('opt_out', false);
-      if (contactErr) throw contactErr;
+      // Load contacts via API (service_role)
+      const allContacts = await apiFetch('/marketing-contacts') as any[];
+      const contacts = allContacts.filter((c: any) =>
+        campaign.contact_ids.includes(c.id) && !c.opt_out
+      );
 
       // Create queue entries with variant rotation
       const variantCount = campaign.variants.length || 1;
-      const queueRows = (contacts as any[]).map((c, i) => ({
+      const queueRows = contacts.map((c: any, i: number) => ({
         campaign_id: camp.id,
         contact_id: c.id,
         phone: c.phone,
@@ -241,5 +229,19 @@ export function useCampaignQueue(campaignId: string | null) {
     },
     enabled: !!campaignId,
     refetchInterval: 10000,
+  });
+}
+
+// ─── Sync Registrations → Marketing ──────────────────────────────────────────
+
+export function useSyncRegistrationsToMarketing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      // Use the serverless API endpoint which uses service_role
+      const result = await apiFetch('/marketing-sync', { method: 'POST' });
+      return result.synced as number;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),
   });
 }
