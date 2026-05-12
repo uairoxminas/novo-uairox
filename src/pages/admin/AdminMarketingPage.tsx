@@ -279,6 +279,8 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [emailCtaText, setEmailCtaText] = useState('');
   const [emailCtaUrl, setEmailCtaUrl] = useState('');
   const [emailPreview, setEmailPreview] = useState(false);
+  const [testEmailTo, setTestEmailTo] = useState('');
+  const [sendingTest, setSendingTest] = useState(false);
 
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState('');
@@ -335,6 +337,26 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
       onClose();
     } catch (err: any) {
       toast.error('Erro ao criar: ' + err.message);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmailTo.trim()) { toast.error('Informe o email de destino'); return; }
+    setSendingTest(true);
+    try {
+      const { error } = await supabase.functions.invoke('marketing-test-email', {
+        body: {
+          to: testEmailTo.trim(),
+          subject: emailSubject || 'Teste de Email — UAIROX',
+          template: { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl },
+        },
+      });
+      if (error) throw error;
+      toast.success('Email de teste enviado para ' + testEmailTo.trim());
+    } catch (err: any) {
+      toast.error('Erro ao enviar teste: ' + err.message);
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -517,6 +539,19 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       </div>
                     </div>
                   )}
+
+                  {/* Test email */}
+                  <div className="flex gap-2 p-3 rounded-xl border border-zinc-800 bg-zinc-900/40">
+                    <input
+                      value={testEmailTo}
+                      onChange={e => setTestEmailTo(e.target.value)}
+                      placeholder="seu@email.com — ver layout"
+                      className={`${inputClass} flex-1 text-xs`}
+                    />
+                    <button onClick={handleTestEmail} disabled={sendingTest || !testEmailTo.trim()} className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold whitespace-nowrap hover:border-[#EDAC02]/40 hover:text-[#EDAC02] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      {sendingTest ? 'Enviando...' : '📧 Testar'}
+                    </button>
+                  </div>
 
                   <button onClick={() => setStep('contacts')} disabled={!emailSubject.trim()} className={`${btnGold} w-full`}>
                     Próximo — Selecionar Contatos →
