@@ -759,6 +759,14 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [registrationId, setRegistrationId] = useState<string | null>(null);
 
   const [categoryId, setCategoryId] = useState(initialCategoryId);
+  
+  // Sincroniza a categoria quando o usuário clica em "Inscrever" no card
+  useEffect(() => {
+    if (initialCategoryId) {
+      setCategoryId(initialCategoryId);
+    }
+  }, [initialCategoryId]);
+
   const [kitId, setKitId] = useState('');
 
   // Auto-select mandatory kit se for o primeiro render e existir kit obrigatório
@@ -1399,7 +1407,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     );
   }
 
-  if (event.status !== 'open') return null;
+  if (!isInviteMode && event.status !== 'open') return null;
 
   const steps = [
     { title: 'Categoria', subtitle: 'Escolha sua modalidade' },
