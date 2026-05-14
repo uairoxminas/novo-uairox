@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { calcInstallmentAmounts, calcMaxInstallmentDate } from '@/hooks/useInstallments';
@@ -236,10 +236,42 @@ function LotProgress({ batches, activeBatch, categoryId }: { batches: any[]; act
 // ============ MAIN PAGE ============
 export default function PublicEventRegistration() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('convite');
   const { event, categories, batches, kits, stages, registrationCount, confirmedCount, loading, resolvedId } = usePublicEvent(id);
   const [showRegistration, setShowRegistration] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const registrationRef = useRef<HTMLDivElement>(null);
+
+  // ============ INVITE LINK VALIDATION ============
+  const [inviteLink, setInviteLink] = useState<any>(null);
+  const [inviteValid, setInviteValid] = useState(false);
+  const [inviteChecking, setInviteChecking] = useState(!!inviteToken);
+
+  useEffect(() => {
+    if (!inviteToken || !resolvedId) return;
+    setInviteChecking(true);
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('event_invite_links')
+        .select('*')
+        .eq('token', inviteToken)
+        .eq('event_id', resolvedId)
+        .is('revoked_at', null)
+        .maybeSingle();
+      if (data) {
+        const now = new Date();
+        const expired = data.expires_at && new Date(data.expires_at) < now;
+        const usedUp = data.max_uses && data.current_uses >= data.max_uses;
+        if (!expired && !usedUp) {
+          setInviteLink(data);
+          setInviteValid(true);
+          setShowRegistration(true); // Auto-show form
+        }
+      }
+      setInviteChecking(false);
+    })();
+  }, [inviteToken, resolvedId]);
 
   const globalActiveBatch = getActiveBatch(batches);
   // Check if ANY batch is active (global or category-specific)
@@ -254,9 +286,9 @@ export default function PublicEventRegistration() {
   });
   const globalIsSoldOut = batches.length > 0 && !anyBatchActive;
 
-  // Capacity logic
+  // Capacity logic — invite bypasses capacity
   const maxCapacity = event?.max_capacity as number | null;
-  const isEventFull = maxCapacity != null && registrationCount >= maxCapacity;
+  const isEventFull = inviteValid ? false : (maxCapacity != null && registrationCount >= maxCapacity);
   const spotsRemaining = maxCapacity != null ? Math.max(0, maxCapacity - registrationCount) : null;
 
   const scrollToRegistration = () => {
@@ -312,19 +344,25 @@ export default function PublicEventRegistration() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
           <div className="max-w-3xl">
             {/* Status badge */}
-            {event.status === 'open' && !globalIsSoldOut && !isEventFull && (
+            {inviteValid && (
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-600 text-white font-black uppercase tracking-widest text-xs mb-6 border border-emerald-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                🎟️ CONVITE ESPECIAL — INSCRIÇÃO GARANTIDA
+              </span>
+            )}
+            {!inviteValid && event.status === 'open' && !globalIsSoldOut && !isEventFull && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#EDAC02] text-black font-black uppercase tracking-widest text-xs mb-6">
                 <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse"></span>
                 Inscrições Abertas
               </span>
             )}
-            {event.status === 'open' && isEventFull && (
+            {!inviteValid && event.status === 'open' && isEventFull && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white font-black uppercase tracking-widest text-xs mb-6 border border-red-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-white opacity-50"></span>
                 EVENTO LOTADO — LISTA DE ESPERA ABERTA
               </span>
             )}
-            {event.status === 'open' && globalIsSoldOut && !isEventFull && (
+            {!inviteValid && event.status === 'open' && globalIsSoldOut && !isEventFull && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white font-black uppercase tracking-widest text-xs mb-6 border border-red-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-white opacity-50"></span>
                 INSCRIÇÕES ESGOTADAS
@@ -596,17 +634,17 @@ export default function PublicEventRegistration() {
                           })()}
                           {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
                         </div>
-                        {event.status === 'open' && !localIsSoldOut && !isEventFull && (
+                        {(inviteValid || (event.status === 'open' && !localIsSoldOut && !isEventFull)) && (
                           <button onClick={() => { setCategoryId(cat.id); scrollToRegistration(); }} className="px-6 py-3 bg-white text-black font-black uppercase tracking-widest text-xs skew-x-[-10deg] hover:bg-[#EDAC02] transition-colors">
                             <span className="inline-block skew-x-[10deg]">Inscrever</span>
                           </button>
                         )}
-                        {event.status === 'open' && isEventFull && !localIsSoldOut && (
+                        {!inviteValid && event.status === 'open' && isEventFull && !localIsSoldOut && (
                           <button onClick={() => { setCategoryId(cat.id); scrollToRegistration(); }} className="px-6 py-3 bg-amber-500/10 text-amber-400 border border-amber-500/30 font-black uppercase tracking-widest text-xs skew-x-[-10deg] hover:bg-amber-500/20 transition-colors">
                             <span className="inline-block skew-x-[10deg]">📋 Lista de Espera</span>
                           </button>
                         )}
-                        {event.status === 'open' && localIsSoldOut && (
+                        {!inviteValid && event.status === 'open' && localIsSoldOut && (
                           <div className="px-6 py-3 border border-red-500/30 text-red-500 bg-[#111] font-black uppercase tracking-widest text-xs skew-x-[-10deg]">
                             <span className="inline-block skew-x-[10deg]">Esgotado</span>
                           </div>
@@ -622,14 +660,17 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ CTA REGISTRATION ============ */}
-      {event.status === 'open' && !showRegistration && !isEventFull && (
-        <section className="py-20 bg-[#EDAC02] text-center">
+      {(inviteValid || (event.status === 'open' && !isEventFull)) && !showRegistration && (
+        <section className={`py-20 text-center ${inviteValid ? 'bg-emerald-600' : 'bg-[#EDAC02]'}`}>
           <div className="max-w-3xl mx-auto px-4">
             <h2 className="text-4xl md:text-6xl font-black text-black uppercase tracking-tighter italic mb-4">
-              Pronto Para o Desafio?
+              {inviteValid ? 'Você foi Convidado! 🎟️' : 'Pronto Para o Desafio?'}
             </h2>
             <p className="text-black/60 text-lg mb-8">
-              {spotsRemaining != null ? `Restam ${spotsRemaining} vagas!` : 'Vagas limitadas.'} Garanta a sua agora e faça parte da comunidade UAIROX.
+              {inviteValid
+                ? 'Você tem um convite especial para se inscrever neste evento. Garanta sua vaga agora!'
+                : (spotsRemaining != null ? `Restam ${spotsRemaining} vagas!` : 'Vagas limitadas.') + ' Garanta a sua agora e faça parte da comunidade UAIROX.'
+              }
             </p>
             <button onClick={scrollToRegistration} className="bg-black text-white px-12 py-5 font-black text-lg uppercase tracking-widest skew-x-[-10deg] hover:bg-[#111] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]">
               <span className="inline-block skew-x-[10deg]">Inscrever Agora →</span>
@@ -639,7 +680,7 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ CTA WAITLIST (when event is full) ============ */}
-      {event.status === 'open' && !showRegistration && isEventFull && (
+      {!inviteValid && event.status === 'open' && !showRegistration && isEventFull && (
         <section className="py-20 bg-gradient-to-b from-red-600/20 to-[#050505] text-center border-y border-red-500/20">
           <div className="max-w-3xl mx-auto px-4">
             <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6">
@@ -662,7 +703,7 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ REGISTRATION FORM ============ */}
-      {(showRegistration || event.status !== 'open') && (
+      {(showRegistration || inviteValid || event.status !== 'open') && (
         <div ref={registrationRef}>
           <RegistrationForm
             eventId={resolvedId!}
@@ -673,6 +714,8 @@ export default function PublicEventRegistration() {
             initialCategoryId={categoryId}
             isEventFull={isEventFull}
             confirmedCount={confirmedCount}
+            isInviteMode={inviteValid}
+            inviteLinkId={inviteLink?.id || null}
           />
         </div>
       )}
@@ -707,8 +750,8 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 }
 
 // ============ REGISTRATION FORM ============
-function RegistrationForm({ eventId, event, categories, batches, kits, initialCategoryId, isEventFull, confirmedCount }: {
-  eventId: string; event: any; categories: any[]; batches: any[]; kits: any[]; initialCategoryId: string; isEventFull: boolean; confirmedCount: number;
+function RegistrationForm({ eventId, event, categories, batches, kits, initialCategoryId, isEventFull, confirmedCount, isInviteMode = false, inviteLinkId = null }: {
+  eventId: string; event: any; categories: any[]; batches: any[]; kits: any[]; initialCategoryId: string; isEventFull: boolean; confirmedCount: number; isInviteMode?: boolean; inviteLinkId?: string | null;
 }) {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -747,7 +790,10 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [installmentDate3, setInstallmentDate3] = useState('');
 
   // Installment helpers
-  const pixInstallmentsAvailable = !isEventFull && event?.pix_installments_enabled && (() => {
+  // Invite mode overrides: treat as normal registration even if event is "full"
+  const effectiveIsEventFull = isInviteMode ? false : isEventFull;
+
+  const pixInstallmentsAvailable = !effectiveIsEventFull && event?.pix_installments_enabled && (() => {
     const deadline = event?.pix_installments_deadline;
     if (!deadline) return true;
     return new Date() <= new Date(deadline + 'T23:59:59');
@@ -893,14 +939,14 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         gym: m.gym.trim(), photo_url: m.photo_url || null,
       })) : null;
 
-      const isInstallments = paymentType === 'installments' && !isEventFull;
+      const isInstallments = paymentType === 'installments' && !effectiveIsEventFull;
 
       const { data, error } = await supabase.from('registrations').insert({
-        event_id: eventId, category_id: categoryId, kit_id: isEventFull ? null : (kitId || null),
-        batch_id: isEventFull ? null : (formActiveBatch?.id || null), coupon_id: isEventFull ? null : (couponDiscount?.id || null),
-        status: isEventFull ? 'waitlist' : 'pending', 
-        total_paid: isEventFull ? 0 : (isInstallments ? 0 : totalPrice),
-        payment_method: isEventFull ? null : (isInstallments ? 'pix' : (formActiveBatch?.payment_link ? 'link' : 'pix')),
+        event_id: eventId, category_id: categoryId, kit_id: effectiveIsEventFull ? null : (kitId || null),
+        batch_id: effectiveIsEventFull ? null : (formActiveBatch?.id || null), coupon_id: effectiveIsEventFull ? null : (couponDiscount?.id || null),
+        status: effectiveIsEventFull ? 'waitlist' : 'pending', 
+        total_paid: effectiveIsEventFull ? 0 : (isInstallments ? 0 : totalPrice),
+        payment_method: effectiveIsEventFull ? null : (isInstallments ? 'pix' : (formActiveBatch?.payment_link ? 'link' : 'pix')),
         payment_type: isInstallments ? 'installments' : 'full',
         athlete_name: a1.name.trim(), athlete_email: a1.email.trim(),
         athlete_phone: a1.phone.trim(), athlete_birth_date: a1.birth_date || null,
@@ -913,6 +959,21 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       if (error) throw error;
       if (couponDiscount) {
         await supabase.from('discount_coupons').update({ current_uses: (couponDiscount.current_uses || 0) + 1 }).eq('id', couponDiscount.id);
+      }
+
+      // Increment invite link usage counter
+      if (isInviteMode && inviteLinkId) {
+        const { data: linkData } = await (supabase as any)
+          .from('event_invite_links')
+          .select('current_uses')
+          .eq('id', inviteLinkId)
+          .single();
+        if (linkData) {
+          await (supabase as any)
+            .from('event_invite_links')
+            .update({ current_uses: (linkData.current_uses || 0) + 1 })
+            .eq('id', inviteLinkId);
+        }
       }
       setRegistrationId(data.id);
 
@@ -1036,7 +1097,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   // ============ SUCCESS ============
   if (success) {
     // Waitlist success screen
-    if (isEventFull) {
+    if (effectiveIsEventFull) {
       return (
         <section className="py-20 bg-[#050505]">
           <div className="max-w-xl mx-auto px-4">

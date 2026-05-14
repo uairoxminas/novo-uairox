@@ -2045,6 +2045,8 @@ function InscricoesTab({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-4">
+      <InviteLinksManager eventId={eventId} />
+
       <div className="flex items-center gap-2 flex-wrap">
         {[
           ['all', `Todos (${registrations?.length || 0})`],
@@ -3199,6 +3201,170 @@ function CronogramaTab({ eventId }: { eventId: string }) {
 }
 
 import AdminEventExpensesTab from './AdminEventExpensesTab';
+
+// ============ INVITE LINKS MANAGER (Bypass) ============
+function InviteLinksManager({ eventId }: { eventId: string }) {
+  const [links, setLinks] = useState<any[]>([]);
+  const [newLabel, setNewLabel] = useState('Convite VIP');
+  const [newMaxUses, setNewMaxUses] = useState<number | ''>(1);
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const fetchLinks = async () => {
+    const { data } = await (supabase as any)
+      .from('event_invite_links')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false });
+    setLinks(data || []);
+  };
+
+  useEffect(() => { fetchLinks(); }, [eventId]);
+
+  const handleCreate = async () => {
+    setLoading(true);
+    const { error } = await (supabase as any)
+      .from('event_invite_links')
+      .insert({ 
+        event_id: eventId, 
+        label: newLabel.trim() || 'Convite',
+        max_uses: newMaxUses === '' ? null : newMaxUses
+      });
+    if (error) { toast.error('Erro: ' + error.message); }
+    else { 
+      toast.success('Link de convite criado!'); 
+      setShowForm(false); 
+      setNewLabel('Convite VIP');
+      setNewMaxUses(1);
+    }
+    setLoading(false);
+    fetchLinks();
+  };
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Revogar este link? Ninguém mais conseguirá usar.')) return;
+    await (supabase as any)
+      .from('event_invite_links')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('id', id);
+    toast.success('Convite revogado!');
+    fetchLinks();
+  };
+
+  const copyLink = (token: string, eventSlugOrId: string) => {
+    const url = `https://www.uairox.com.br/evento/${eventSlugOrId}?convite=${token}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link de convite copiado!');
+  };
+
+  const activeLinks = links.filter(l => !l.revoked_at);
+  const revokedLinks = links.filter(l => !!l.revoked_at);
+
+  return (
+    <div className={`${cardClass} p-5 mb-6 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.05)]`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">🎟️ Convites Especiais</h3>
+          <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded font-bold border border-emerald-500/20 uppercase tracking-wider">
+            Bypass de Lote/Capacidade
+          </span>
+        </div>
+        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 bg-emerald-600 text-white font-black rounded-lg hover:bg-emerald-500 transition-colors text-xs uppercase tracking-wider">
+          + Gerar Convite
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500 mb-4">
+        Crie links exclusivos para atletas ou equipes se inscreverem mesmo que as inscrições normais estejam encerradas ou esgotadas.
+      </p>
+
+      {showForm && (
+        <div className="flex items-end gap-3 mb-4 p-3 bg-[#050505] rounded-lg border border-[#262626]">
+          <div className="flex-1">
+            <label className={labelClass}>Referência</label>
+            <input
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              placeholder="Ex: Vaga do João"
+              className={inputClass}
+            />
+          </div>
+          <div className="w-32">
+            <label className={labelClass}>Usos Limite</label>
+            <input
+              type="number"
+              min="1"
+              value={newMaxUses}
+              onChange={e => setNewMaxUses(e.target.value === '' ? '' : parseInt(e.target.value))}
+              placeholder="Ilimitado"
+              className={inputClass}
+            />
+          </div>
+          <button onClick={handleCreate} disabled={loading} className={`px-4 py-3 bg-emerald-600 text-white font-black rounded-lg hover:bg-emerald-500 transition-colors text-sm disabled:opacity-50`}>
+            {loading ? '...' : 'Gerar'}
+          </button>
+          <button onClick={() => setShowForm(false)} className={btnOutline}>
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {activeLinks.length > 0 && (
+        <div className="space-y-2">
+          {activeLinks.map(link => {
+            const isUsedUp = link.max_uses && link.current_uses >= link.max_uses;
+            return (
+              <div key={link.id} className={`flex flex-col md:flex-row md:items-center gap-3 p-3 bg-[#050505] rounded-lg border group ${isUsedUp ? 'border-amber-500/30 opacity-60' : 'border-[#262626]'}`}>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isUsedUp ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-white font-bold">{link.label}</span>
+                      {isUsedUp && <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded font-bold uppercase tracking-wider">Esgotado</span>}
+                    </div>
+                    <span className="text-[10px] text-zinc-600 font-mono block truncate mt-0.5">
+                      ?convite={link.token}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Usos</p>
+                    <p className={`text-sm font-black ${isUsedUp ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {link.current_uses} <span className="text-zinc-600 font-medium">/ {link.max_uses || '∞'}</span>
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => copyLink(link.token, eventId)}
+                      disabled={isUsedUp}
+                      className="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold rounded-lg hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-emerald-500/10 disabled:hover:text-emerald-400"
+                    >
+                      📋 Copiar Link
+                    </button>
+                    <button
+                      onClick={() => handleRevoke(link.id)}
+                      className="px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-bold rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      Revogar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {links.length === 0 && (
+        <div className="text-center py-6 text-zinc-600 text-sm">
+          Nenhum convite especial gerado.
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ============ PARTNER LINKS MANAGER ============
 function PartnerLinksManager({ eventId }: { eventId: string }) {
