@@ -850,12 +850,25 @@ export default function PublicEventRegistration() {
         <section className="py-24 bg-[#050505]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-16 border-b border-[#1a1a1a] pb-8">
-              <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
-                Escolha Sua <span className="text-[#EDAC02]">Categoria</span>
-              </h2>
-              <p className="text-zinc-500 text-lg mt-2">
-                Encontre a modalidade ideal para o seu nível.
-              </p>
+              {event?.slug === 'selecao' ? (
+                <>
+                  <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                    A Convocação Está <span className="text-[#EDAC02]">Oficialmente Aberta</span>
+                  </h2>
+                  <p className="text-zinc-400 text-lg mt-2">
+                    As vagas são estritamente limitadas devido à confecção das camisas oficiais.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                    Escolha Sua <span className="text-[#EDAC02]">Categoria</span>
+                  </h2>
+                  <p className="text-zinc-500 text-lg mt-2">
+                    Encontre a modalidade ideal para o seu nível.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
