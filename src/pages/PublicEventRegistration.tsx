@@ -1378,66 +1378,77 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   };
 
   const sendConfirmationMessages = () => {
-    const a1 = athletes[0];
-    if (!a1) return;
+    if (!athletes.length) return;
 
-    // Email
-    supabase.functions.invoke('send-registration-email', {
-      body: {
-        athlete_name: a1.name.trim(),
-        athlete_email: a1.email.trim(),
-        event_name: event?.title || 'UAIROX Evento',
-        event_slug: event?.slug || null,
-        whatsapp_link: event?.whatsapp_group_link || null,
-        registration_code: registrationId?.slice(0, 8) || null,
-        category_name: selectedCategory?.name || null,
-        shirt_size: a1.shirt_size || null,
-        total_price: totalPrice,
-        pix_key: effectivePixKey || null,
-        payment_type: paymentType === 'installments' ? 'installments' : 'full',
-        ...(event?.slug === 'selecao' && selectedFreight ? {
-          freight_service: selectedFreight.name,
-          freight_amount: selectedFreight.price,
-          freight_days: selectedFreight.delivery_time,
-          shipping_address: `${shippingAddress.rua}, ${shippingAddress.numero}${shippingAddress.complemento ? ` — ${shippingAddress.complemento}` : ''}, ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado} · CEP ${shippingAddress.cep}`,
-        } : {}),
-      }
-    }).catch(err => console.error('Erro ao enviar email:', err));
+    const sharedFields = {
+      event_name: event?.title || 'UAIROX Evento',
+      event_slug: event?.slug || null,
+      whatsapp_link: event?.whatsapp_group_link || null,
+      registration_code: registrationId?.slice(0, 8) || null,
+      category_name: selectedCategory?.name || null,
+      total_price: totalPrice,
+      pix_key: effectivePixKey || null,
+      payment_type: paymentType === 'installments' ? 'installments' : 'full',
+      team_name: isTeam ? teamName.trim() || null : null,
+      ...(event?.slug === 'selecao' && selectedFreight ? {
+        freight_service: selectedFreight.name,
+        freight_amount: selectedFreight.price,
+        freight_days: selectedFreight.delivery_time,
+        shipping_address: `${shippingAddress.rua}, ${shippingAddress.numero}${shippingAddress.complemento ? ` — ${shippingAddress.complemento}` : ''}, ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado} · CEP ${shippingAddress.cep}`,
+      } : {}),
+    };
 
-    // WhatsApp webhook
+    // Email para cada membro da equipe (ou atleta individual)
+    athletes.forEach(athlete => {
+      if (!athlete.email?.trim()) return;
+      supabase.functions.invoke('send-registration-email', {
+        body: {
+          ...sharedFields,
+          athlete_name: athlete.name.trim(),
+          athlete_email: athlete.email.trim(),
+          shirt_size: athlete.shirt_size || null,
+        }
+      }).catch(err => console.error('Erro ao enviar email:', err));
+    });
+
+    // WhatsApp webhook para cada membro
     (supabase as any).from('botconversa_config')
       .select('trigger_inscricao_ativo, trigger_inscricao_url')
       .eq('event_id', eventId)
       .maybeSingle()
       .then(async ({ data: bcfg }: any) => {
         if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
-        const payload = {
-          trigger: 'inscricao',
-          nome: a1.name.trim(),
-          telefone: a1.phone.trim(),
-          email: a1.email.trim(),
-          evento: event?.title || eventId,
-          categoria: selectedCategory?.name || 'Sem Categoria',
-          valor: totalPrice,
-          valor_formatado: `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
-          payment_type: paymentType === 'installments' ? 'installments' : 'full',
-          chave_pix: effectivePixKey || null,
-          codigo_inscricao: registrationId?.slice(0, 8) || null,
-          tamanho_camisa: a1.shirt_size || null,
-          grupo_whatsapp: event?.whatsapp_group_link || null,
-          ...(event?.slug === 'selecao' && selectedFreight ? {
-            frete_servico: selectedFreight.name,
-            frete_valor: selectedFreight.price,
-            endereco_entrega: `${shippingAddress.rua}, ${shippingAddress.numero} — ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado}`,
-          } : {}),
-        };
-        const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
-        (supabase as any).from('botconversa_logs').insert({
-          event_id: eventId, registration_id: registrationId,
-          trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
-          payload, status: ok ? 'sent' : 'failed',
-          error_message: ok ? null : error,
-        }).then(() => {});
+        for (const athlete of athletes) {
+          if (!athlete.phone?.trim()) continue;
+          const payload = {
+            trigger: 'inscricao',
+            nome: athlete.name.trim(),
+            telefone: athlete.phone.trim(),
+            email: athlete.email.trim(),
+            evento: event?.title || eventId,
+            categoria: selectedCategory?.name || 'Sem Categoria',
+            equipe: isTeam ? (teamName.trim() || null) : null,
+            valor: totalPrice,
+            valor_formatado: `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
+            payment_type: paymentType === 'installments' ? 'installments' : 'full',
+            chave_pix: effectivePixKey || null,
+            codigo_inscricao: registrationId?.slice(0, 8) || null,
+            tamanho_camisa: athlete.shirt_size || null,
+            grupo_whatsapp: event?.whatsapp_group_link || null,
+            ...(event?.slug === 'selecao' && selectedFreight ? {
+              frete_servico: selectedFreight.name,
+              frete_valor: selectedFreight.price,
+              endereco_entrega: `${shippingAddress.rua}, ${shippingAddress.numero} — ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado}`,
+            } : {}),
+          };
+          const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
+          (supabase as any).from('botconversa_logs').insert({
+            event_id: eventId, registration_id: registrationId,
+            trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
+            payload, status: ok ? 'sent' : 'failed',
+            error_message: ok ? null : error,
+          }).then(() => {});
+        }
       });
   };
 
