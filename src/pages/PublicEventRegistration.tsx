@@ -410,15 +410,23 @@ export default function PublicEventRegistration() {
       {stages.length > 0 && (
         <section className="py-24 bg-[#050505] border-y border-[#1a1a1a]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Header */}
+            {(() => {
+              const isTemplated = stages.some((s: any) => s.name.startsWith('RUN ') || s.name.startsWith('🏃'));
+              return (
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-16 border-b border-[#1a1a1a] pb-8 gap-6">
               <div>
-                <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
-                  O <span className="text-[#EDAC02]">Percurso</span>
-                </h2>
-                <p className="text-zinc-500 text-lg mt-2">
-                  Corrida + Funcional · 8 UaiZones
-                </p>
+                {isTemplated ? (
+                  <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                    O <span className="text-[#EDAC02]">Percurso</span>
+                  </h2>
+                ) : (
+                  <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                    A <span className="text-[#EDAC02]">Missão Diária</span>
+                  </h2>
+                )}
+                {isTemplated && (
+                  <p className="text-zinc-500 text-lg mt-2">Corrida + Funcional · 8 UaiZones</p>
+                )}
               </div>
               {event.status === 'open' && (
                 <button onClick={scrollToRegistration} className="px-8 py-4 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest skew-x-[-10deg] hover:bg-white transition-colors flex-shrink-0">
@@ -426,6 +434,8 @@ export default function PublicEventRegistration() {
                 </button>
               )}
             </div>
+              );
+            })()}
 
             {(() => {
               const isTemplated = stages.some((s: any) => s.name.startsWith('RUN ') || s.name.startsWith('🏃'));
