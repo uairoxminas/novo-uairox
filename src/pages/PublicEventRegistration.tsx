@@ -1427,26 +1427,40 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
         for (const athlete of athletes) {
           if (!athlete.phone?.trim()) continue;
+          const valorFmt = `R$ ${totalPrice.toFixed(2).replace('.', ',')}`;
+          const codigo = registrationId?.slice(0, 8) || '';
+          const isSelecaoSlug = event?.slug === 'selecao';
+
+          const lines: string[] = [];
+          lines.push(`✅ *INSCRIÇÃO RECEBIDA — ${(event?.title || '').toUpperCase()}*`);
+          lines.push('');
+          lines.push(`Olá, *${athlete.name.trim()}*! Sua inscrição foi registrada com sucesso.`);
+          lines.push('');
+          lines.push(`📋 *Detalhes*`);
+          lines.push(`• Categoria: ${selectedCategory?.name || 'Sem Categoria'}`);
+          if (isTeam && teamName.trim()) lines.push(`• Equipe: ${teamName.trim()}`);
+          if (athlete.shirt_size) lines.push(`• Camisa: ${athlete.shirt_size}`);
+          if (isSelecaoSlug && selectedFreight) {
+            lines.push(`• Frete: ${selectedFreight.name} · ${selectedFreight.delivery_time} dias úteis`);
+          }
+          lines.push('');
+          lines.push(`💰 *Total: ${valorFmt}*`);
+          if (effectivePixKey && paymentType !== 'installments') {
+            lines.push('');
+            lines.push(`🔑 *Chave PIX:*`);
+            lines.push(effectivePixKey);
+            lines.push('Copie a chave, abra seu banco e realize o pagamento.');
+          }
+          if (codigo) lines.push(`\n🔖 Código: ${codigo}`);
+          if (event?.whatsapp_group_link) {
+            lines.push('');
+            lines.push(`📲 *Entre no grupo oficial:*`);
+            lines.push(event.whatsapp_group_link);
+          }
+
           const payload = {
-            trigger: 'inscricao',
-            nome: athlete.name.trim(),
             telefone: athlete.phone.trim(),
-            email: athlete.email.trim(),
-            evento: event?.title || eventId,
-            categoria: selectedCategory?.name || 'Sem Categoria',
-            equipe: isTeam ? (teamName.trim() || null) : null,
-            valor: totalPrice,
-            valor_formatado: `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
-            payment_type: paymentType === 'installments' ? 'installments' : 'full',
-            chave_pix: effectivePixKey || null,
-            codigo_inscricao: registrationId?.slice(0, 8) || null,
-            tamanho_camisa: athlete.shirt_size || null,
-            grupo_whatsapp: event?.whatsapp_group_link || null,
-            ...(event?.slug === 'selecao' && selectedFreight ? {
-              frete_servico: selectedFreight.name,
-              frete_valor: selectedFreight.price,
-              endereco_entrega: `${shippingAddress.rua}, ${shippingAddress.numero} — ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado}`,
-            } : {}),
+            message: lines.join('\n'),
           };
           const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
           (supabase as any).from('botconversa_logs').insert({
