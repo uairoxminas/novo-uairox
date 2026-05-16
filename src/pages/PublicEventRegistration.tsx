@@ -635,6 +635,91 @@ export default function PublicEventRegistration() {
         </section>
       )}
 
+      {/* ============ VALIDAÇÃO DIGITAL — only for selecao event ============ */}
+      {event.slug === 'selecao' && (
+        <section className="py-24 bg-[#080808] border-y border-[#1a1a1a]">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            {/* Header */}
+            <div className="text-center mb-16">
+              <p className="text-[10px] font-black text-[#EDAC02] tracking-[.3em] uppercase mb-3">Como comprovar</p>
+              <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic">
+                Validação <span className="text-[#EDAC02]">Digital</span>
+              </h2>
+              {/* connector line */}
+              <div className="flex items-center justify-center gap-3 mt-8">
+                <div className="h-px flex-1 max-w-[120px] bg-[#1a1a1a]" />
+                <div className="w-2 h-2 bg-[#EDAC02] rotate-45" />
+                <div className="h-px flex-1 max-w-[120px] bg-[#1a1a1a]" />
+              </div>
+            </div>
+
+            {/* 3 Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+              {/* Card 01 — GPS */}
+              <div className="group relative bg-[#0a0a0a] border border-[#1a1a1a] hover:border-[#EDAC02]/40 transition-all duration-300 p-8 flex flex-col">
+                <div className="flex items-start justify-between mb-6">
+                  <span className="text-6xl font-black text-[#EDAC02]/15 leading-none select-none italic" style={{ fontStyle: 'italic' }}>01</span>
+                  <span className="text-3xl">🏃</span>
+                </div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-3">GPS + 1 km</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed flex-1">
+                  Corra <strong className="text-white">1 km ou mais</strong> usando o app de sua preferência para registrar com GPS.
+                </p>
+                <div className="mt-5 pt-5 border-t border-[#1a1a1a]">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#EDAC02] uppercase tracking-widest">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#EDAC02]" />
+                    Velocidade mínima média 6 km/h
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 02 — Instagram */}
+              <div className="group relative bg-[#0a0a0a] border border-[#1a1a1a] hover:border-[#EDAC02]/40 transition-all duration-300 p-8 flex flex-col">
+                <div className="flex items-start justify-between mb-6">
+                  <span className="text-6xl font-black text-[#EDAC02]/15 leading-none select-none italic" style={{ fontStyle: 'italic' }}>02</span>
+                  <span className="text-3xl">📸</span>
+                </div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-3">Instagram Stories</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed flex-1">
+                  Poste as repetições do movimento funcional do dia nos Stories, marque <strong className="text-white">@uairox.hybridrun</strong> e salve no Destaque <strong className="text-white">"UAIROX"</strong> no seu perfil.
+                </p>
+                <div className="mt-5 pt-5 border-t border-[#1a1a1a]">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#EDAC02] uppercase tracking-widest">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#EDAC02]" />
+                    Criar destaque "UAIROX" no perfil
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 03 — App */}
+              <div className="group relative bg-[#0a0a0a] border border-[#EDAC02]/20 hover:border-[#EDAC02]/60 transition-all duration-300 p-8 flex flex-col">
+                {/* highlight corner */}
+                <div className="absolute top-0 right-0 w-12 h-12 overflow-hidden">
+                  <div className="absolute top-0 right-0 w-0 h-0" style={{ borderLeft: '48px solid transparent', borderTop: '48px solid #EDAC02' }} />
+                </div>
+                <div className="flex items-start justify-between mb-6">
+                  <span className="text-6xl font-black text-[#EDAC02]/20 leading-none select-none italic" style={{ fontStyle: 'italic' }}>03</span>
+                  <span className="text-3xl">📱</span>
+                </div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-3">App Exclusivo</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed flex-1">
+                  Acesse nosso App exclusivo da Seleção e cole sua <strong className="text-[#EDAC02]">"figurinha do dia"</strong> em 3 segundos com o <strong className="text-white">Check-in de Honra</strong>.
+                </p>
+                <div className="mt-5 pt-5 border-t border-[#EDAC02]/20">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#EDAC02] uppercase tracking-widest">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#EDAC02]" />
+                    3 segundos · Check-in de Honra
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ============ KITS ============ */}
       {kits.length > 0 && (
         <section className="py-24 bg-[#080808] border-y border-[#1a1a1a]">
