@@ -1592,12 +1592,23 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             </div>
           </div>
 
-          <button
-            onClick={() => setShowSuccessOverlay(false)}
-            className="w-full py-4 bg-[#EDAC02] text-black font-black text-base uppercase tracking-widest rounded-xl hover:bg-[#d4980a] transition-colors"
-          >
-            Ver Detalhes do Pagamento →
-          </button>
+          {event?.whatsapp_group_link ? (
+            <a
+              href={event.whatsapp_group_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-4 bg-[#25D366] text-black font-black text-base uppercase tracking-widest rounded-xl hover:bg-[#1db954] transition-colors text-center block"
+            >
+              📲 Entrar no Grupo de Atletas
+            </a>
+          ) : (
+            <button
+              onClick={() => setShowSuccessOverlay(false)}
+              className="w-full py-4 bg-[#EDAC02] text-black font-black text-base uppercase tracking-widest rounded-xl hover:bg-[#d4980a] transition-colors"
+            >
+              Ver Detalhes do Pagamento →
+            </button>
+          )}
           <p className="text-xs text-zinc-600 mt-3">Um email de confirmação foi enviado para {athletes[0]?.email}</p>
         </div>
       </div>
