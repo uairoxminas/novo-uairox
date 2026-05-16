@@ -498,6 +498,37 @@ export default function PublicEventRegistration() {
               }
 
               // Simple List (non-templated / manual stages)
+              const hasAnyImage = stages.some((s: any) => s.image_url);
+
+              if (hasAnyImage) {
+                // Grid layout with photos
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                    {[...stages].sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)).map((stage: any, idx: number) => (
+                      <div key={stage.id} className="flex flex-col group">
+                        <div className="relative aspect-[4/3] bg-zinc-950 overflow-hidden mb-3 border border-[#1a1a1a]">
+                          {stage.image_url ? (
+                            <img src={stage.image_url} alt={stage.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-100 group-hover:scale-110" />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]">
+                              <span className="text-5xl opacity-10">🏋️</span>
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 bg-[#EDAC02] text-black w-10 h-10 flex items-center justify-center text-base font-black shadow-[3px_3px_0_0_#000]">
+                            {String(idx + 1).padStart(2, '0')}
+                          </div>
+                        </div>
+                        <h3 className="text-white text-sm md:text-base font-black uppercase tracking-tight leading-tight mb-1">{stage.name}</h3>
+                        {stage.metric_text && <p className="text-[#EDAC02] font-mono font-bold text-sm uppercase">{stage.metric_text}</p>}
+                        {stage.distance_meters && <p className="text-[#EDAC02] font-mono font-bold text-sm uppercase">{stage.distance_meters >= 1000 ? `${(stage.distance_meters/1000).toFixed(0)}km` : `${stage.distance_meters}m`}</p>}
+                        {stage.weight_load && <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold">{stage.weight_load}</p>}
+                        {stage.description && !stage.metric_text && !stage.distance_meters && <p className="text-zinc-500 text-xs mt-0.5">{stage.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
               return (
                 <div className="max-w-4xl mx-auto space-y-3">
                   {stages.map((stage: any, idx: number) => (
