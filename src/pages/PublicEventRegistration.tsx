@@ -1087,6 +1087,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card' | null>(null);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
   // Installment state
   const [paymentType, setPaymentType] = useState<'full' | 'card' | 'installments'>('full');
@@ -1365,7 +1366,16 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               evento: event?.title || eventId,
               categoria: selectedCategory?.name || 'Sem Categoria',
               valor: totalPrice,
+              valor_formatado: `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
               payment_type: isInstallments ? 'installments' : 'full',
+              chave_pix: effectivePixKey || null,
+              codigo_inscricao: data.id?.slice(0, 8) || null,
+              tamanho_camisa: a1.shirt_size || null,
+              ...(event?.slug === 'selecao' && selectedFreight ? {
+                frete_servico: selectedFreight.name,
+                frete_valor: selectedFreight.price,
+                endereco_entrega: `${shippingAddress.rua}, ${shippingAddress.numero} — ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado}`,
+              } : {}),
             };
             const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
             (supabase as any).from('botconversa_logs').insert({
@@ -1399,15 +1409,29 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
       // Disparo automático do Email Via Edge Function (Fire and Forget)
       supabase.functions.invoke('send-registration-email', {
-        body: { 
-          athlete_name: a1.name.trim(), 
-          athlete_email: a1.email.trim(), 
+        body: {
+          athlete_name: a1.name.trim(),
+          athlete_email: a1.email.trim(),
           event_name: event?.title || 'UAIROX Evento',
-          whatsapp_link: event?.whatsapp_group_link || null
+          event_slug: event?.slug || null,
+          whatsapp_link: event?.whatsapp_group_link || null,
+          registration_code: data.id?.slice(0, 8) || null,
+          category_name: selectedCategory?.name || null,
+          shirt_size: a1.shirt_size || null,
+          total_price: totalPrice,
+          pix_key: effectivePixKey || null,
+          payment_type: isInstallments ? 'installments' : 'full',
+          ...(event?.slug === 'selecao' && selectedFreight ? {
+            freight_service: selectedFreight.name,
+            freight_amount: selectedFreight.price,
+            freight_days: selectedFreight.delivery_time,
+            shipping_address: `${shippingAddress.rua}, ${shippingAddress.numero}${shippingAddress.complemento ? ` — ${shippingAddress.complemento}` : ''}, ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado} · CEP ${shippingAddress.cep}`,
+          } : {}),
         }
       }).catch(err => console.error("Erro ao enviar email:", err));
 
       setSuccess(true);
+      setShowSuccessOverlay(true);
     } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }
     finally { setSubmitting(false); }
   };
@@ -1453,6 +1477,84 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
   const inputClass = "w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors";
   const labelClass = "block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5";
+
+  // ============ SUCCESS OVERLAY ============
+  if (success && showSuccessOverlay) {
+    const isSelecao = event?.slug === 'selecao';
+    return (
+      <div className="fixed inset-0 z-50 bg-[#020202] flex flex-col items-center justify-center overflow-hidden">
+        <style>{`
+          @keyframes rise-particle { 0%{transform:translateY(0) scale(1);opacity:.9} 100%{transform:translateY(-140px) scale(0.2);opacity:0} }
+          .rise-p { animation: rise-particle linear infinite; position:absolute; border-radius:50%; background:#EDAC02; }
+        `}</style>
+        <div className="rise-p w-1.5 h-1.5" style={{bottom:'18%',left:'12%',animationDuration:'3.2s',animationDelay:'0s'}} />
+        <div className="rise-p w-1 h-1" style={{bottom:'22%',left:'28%',animationDuration:'2.6s',animationDelay:'0.6s'}} />
+        <div className="rise-p w-2 h-2" style={{bottom:'14%',left:'50%',animationDuration:'3.8s',animationDelay:'1.1s'}} />
+        <div className="rise-p w-1 h-1" style={{bottom:'28%',left:'68%',animationDuration:'2.2s',animationDelay:'0.3s'}} />
+        <div className="rise-p w-1.5 h-1.5" style={{bottom:'16%',left:'84%',animationDuration:'4s',animationDelay:'0.9s'}} />
+        <div className="rise-p w-1 h-1" style={{bottom:'10%',left:'42%',animationDuration:'2.9s',animationDelay:'1.7s'}} />
+        <div className="rise-p w-1 h-1" style={{bottom:'20%',left:'90%',animationDuration:'3.5s',animationDelay:'0.4s'}} />
+        <div className="rise-p w-2 h-2" style={{bottom:'12%',left:'8%',animationDuration:'4.2s',animationDelay:'1.3s'}} />
+
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(237,172,2,0.10)_0%,transparent_65%)]" />
+
+        <div className="relative z-10 text-center px-6 max-w-sm w-full">
+          <div className="w-24 h-24 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-12 h-12 text-[#EDAC02]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+
+          <p className="text-[10px] font-bold text-[#EDAC02]/50 uppercase tracking-[0.35em] mb-2">Inscrição Recebida</p>
+          <h1 className="text-4xl font-black text-white uppercase tracking-tighter italic leading-none">
+            {isSelecao ? 'Você Está' : 'Inscrição'}
+          </h1>
+          <h1 className="text-5xl font-black text-[#EDAC02] uppercase tracking-tighter italic leading-none mb-8">
+            {isSelecao ? 'Convocado!' : 'Confirmada!'}
+          </h1>
+
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-5 mb-6 space-y-2.5 text-sm text-left">
+            <div className="flex justify-between items-center">
+              <span className="text-zinc-500">Atleta</span>
+              <span className="text-white font-bold truncate ml-4 max-w-[55%] text-right">{athletes[0]?.name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-zinc-500">Categoria</span>
+              <span className="text-white">{selectedCategory?.name}</span>
+            </div>
+            {athletes[0]?.shirt_size && (
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Camisa</span>
+                <span className="text-white">{athletes[0].shirt_size}</span>
+              </div>
+            )}
+            {freightAmount > 0 && selectedFreight && (
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Frete</span>
+                <span className="text-white">{selectedFreight.name} · {selectedFreight.delivery_time} dias úteis</span>
+              </div>
+            )}
+            <div className="border-t border-[#262626] pt-2.5 flex justify-between items-center">
+              <span className="text-zinc-400 font-bold">Total</span>
+              <span className="text-[#EDAC02] font-black text-xl">{formatCurrency(totalPrice)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-zinc-600 text-xs">Código</span>
+              <span className="text-zinc-400 font-mono text-xs">{registrationId?.slice(0, 8)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowSuccessOverlay(false)}
+            className="w-full py-4 bg-[#EDAC02] text-black font-black text-base uppercase tracking-widest rounded-xl hover:bg-[#d4980a] transition-colors"
+          >
+            Ver Detalhes do Pagamento →
+          </button>
+          <p className="text-xs text-zinc-600 mt-3">Um email de confirmação foi enviado para {athletes[0]?.email}</p>
+        </div>
+      </div>
+    );
+  }
 
   // ============ SUCCESS ============
   if (success) {
