@@ -721,7 +721,7 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ KITS ============ */}
-      {kits.length > 0 && (
+      {kits.length > 0 && event.slug !== 'selecao' && (
         <section className="py-24 bg-[#080808] border-y border-[#1a1a1a]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-12 border-b border-[#1a1a1a] pb-8">
@@ -729,15 +729,12 @@ export default function PublicEventRegistration() {
                 Kits de <span className="text-[#EDAC02]">Atleta</span>
               </h2>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {kits.map((kit: any) => (
                 <div key={kit.id} className="relative bg-[#050505] border border-[#1a1a1a] rounded-2xl overflow-hidden group hover:border-[#EDAC02]/30 transition-all shadow-xl">
-                  {/* Badge */}
                   <div className={`absolute top-4 right-4 px-3 py-1 text-[10px] shadow-lg font-black tracking-widest uppercase rounded z-10 ${kit.is_optional === false ? 'bg-[#25D366] text-black' : 'bg-black text-[#EDAC02] border border-[#EDAC02]/30'}`}>
                     {kit.is_optional === false ? 'Incluso na Inscrição' : 'Kit de Upgrade'}
                   </div>
-                  
                   {kit.image_url ? (
                     <div className="relative w-full aspect-[4/3] bg-[#0a0a0a] border-b border-[#1a1a1a]">
                        <img src={kit.image_url} alt={kit.name} className="absolute inset-0 w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" />
@@ -760,6 +757,93 @@ export default function PublicEventRegistration() {
           </div>
         </section>
       )}
+
+      {/* ============ A RECOMPENSA — selecao event ============ */}
+      {event.slug === 'selecao' && kits.length > 0 && (() => {
+        const prize = kits.find((k: any) => k.is_optional !== false) || kits[kits.length - 1];
+        const included = kits.find((k: any) => k.is_optional === false) || kits[0];
+        return (
+          <section className="bg-[#020202]">
+            {/* Section header */}
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 text-center">
+              <p className="text-[10px] font-black text-[#EDAC02] tracking-[.3em] uppercase mb-3">Você vai ganhar</p>
+              <h2 className="text-5xl md:text-6xl font-black text-white uppercase tracking-tighter italic">
+                A <span className="text-[#EDAC02]">Recompensa</span>
+              </h2>
+            </div>
+
+            {/* PRIZE — Esteira (full hero) */}
+            <div className="relative overflow-hidden border-y border-[#1a1a1a]" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, #1a1200 0%, #020202 70%)' }}>
+              {/* gold glow */}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 40% at 50% 50%, rgba(237,172,2,0.08) 0%, transparent 70%)' }} />
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col lg:flex-row items-center gap-12">
+                {/* Image */}
+                <div className="flex-1 flex justify-center">
+                  <div className="relative w-full max-w-lg">
+                    <div className="absolute -inset-4 rounded-2xl" style={{ background: 'radial-gradient(ellipse at center, rgba(237,172,2,0.15) 0%, transparent 70%)' }} />
+                    {prize?.image_url ? (
+                      <img src={prize.image_url} alt={prize.name} className="relative w-full object-contain max-h-80 drop-shadow-2xl" />
+                    ) : (
+                      <div className="relative w-full aspect-video bg-[#0a0a0a] border border-[#EDAC02]/20 flex items-center justify-center rounded-xl">
+                        <span className="text-7xl">🏃</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* Text */}
+                <div className="flex-1 max-w-lg">
+                  <div className="inline-flex items-center gap-2 bg-[#EDAC02] text-black px-4 py-1.5 text-[10px] font-black uppercase tracking-widest mb-6">
+                    ⭐ Grande Sorteio
+                  </div>
+                  <h3 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight italic leading-tight mb-4">
+                    {prize?.name || 'Esteira Curva Brave'}
+                  </h3>
+                  {prize?.description && <p className="text-zinc-400 text-sm leading-relaxed mb-6">{prize.description}</p>}
+                  <div className="border border-[#EDAC02]/30 bg-[#EDAC02]/5 px-5 py-4 flex items-start gap-3">
+                    <span className="text-[#EDAC02] text-xl flex-shrink-0 mt-0.5">🏆</span>
+                    <div>
+                      <p className="text-[10px] font-black text-[#EDAC02] uppercase tracking-widest mb-1">Condição</p>
+                      <p className="text-sm text-white font-bold leading-snug">Cole as <span className="text-[#EDAC02]">30 figurinhas</span> no álbum seguindo as regras de validação e concorra ao sorteio.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* INCLUDED — Camisa (large featured strip) */}
+            <div className="border-b border-[#1a1a1a]" style={{ background: 'linear-gradient(135deg, #0a0800 0%, #050300 100%)' }}>
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col lg:flex-row items-center gap-12">
+                {/* Text */}
+                <div className="flex-1 max-w-lg order-2 lg:order-1">
+                  <div className="inline-flex items-center gap-2 bg-[#25D366] text-black px-4 py-1.5 text-[10px] font-black uppercase tracking-widest mb-6">
+                    ✓ Garantido para todos
+                  </div>
+                  <h3 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight italic leading-tight mb-4">
+                    {included?.name || 'Camisa Oficial Seleção UAIROX'}
+                  </h3>
+                  {included?.description && <p className="text-zinc-400 text-sm leading-relaxed mb-6">{included.description}</p>}
+                  <p className="text-sm text-zinc-500 leading-relaxed">
+                    Todos os participantes inscritos recebem a Camisa Oficial <strong className="text-white">SELEÇÃO UAIROX</strong> — independentemente de completar os 30 dias.
+                  </p>
+                </div>
+                {/* Image */}
+                <div className="flex-1 flex justify-center order-1 lg:order-2">
+                  <div className="relative w-full max-w-lg">
+                    <div className="absolute -inset-4 rounded-2xl" style={{ background: 'radial-gradient(ellipse at center, rgba(37,211,102,0.06) 0%, transparent 70%)' }} />
+                    {included?.image_url ? (
+                      <img src={included.image_url} alt={included.name} className="relative w-full object-contain max-h-72 drop-shadow-2xl" />
+                    ) : (
+                      <div className="relative w-full aspect-video bg-[#0a0a0a] border border-[#25D366]/20 flex items-center justify-center rounded-xl">
+                        <span className="text-7xl">👕</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* ============ CATEGORIAS & PREÇO ============ */}
       {categories.length > 0 && (
