@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { DEFAULT_MESSAGES } from '@/lib/botconversaMessages';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvent, useUpdateEvent, EVENT_STATUS_MAP, type EventStatus } from '@/hooks/useEvents';
@@ -1302,6 +1302,44 @@ const TRIGGER_LABELS: Record<string, string> = {
   broadcast: '📢 Broadcast',
 };
 
+function MsgEditor({
+  label, value, onChange, vars, defaultMsg,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  vars: string[]; defaultMsg: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 border border-[#1a1a1a] rounded-lg overflow-hidden">
+      <button onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between px-3 py-2 bg-[#0a0a0a] text-xs text-zinc-400 hover:text-white transition-colors">
+        <span>✏️ {label}</span>
+        <span className="text-zinc-600">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="p-3 space-y-2 bg-[#050505]">
+          <textarea
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            rows={8}
+            className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-zinc-600 resize-y focus:outline-none focus:border-[#EDAC02]/40"
+          />
+          <div className="flex flex-wrap gap-1">
+            {vars.map(v => (
+              <button key={v} onClick={() => onChange(value + `{{${v}}}`)}
+                className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] font-mono text-zinc-400 hover:text-[#EDAC02] hover:border-[#EDAC02]/40 transition-colors">
+                {`{{${v}}}`}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => onChange(defaultMsg)} className="text-[10px] text-zinc-600 hover:text-zinc-400 underline transition-colors">
+            ↺ Restaurar mensagem padrão
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BotconversaTab({ eventId }: { eventId: string }) {
   const { data: cfg } = useBotconversaConfig(eventId);
   const upsert = useUpsertBotconversaConfig();
@@ -1414,44 +1452,6 @@ function BotconversaTab({ eventId }: { eventId: string }) {
       <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${value ? 'left-5' : 'left-0.5'}`} />
     </button>
   );
-
-  const MsgEditor = ({
-    label, value, onChange, vars, defaultMsg,
-  }: {
-    label: string; value: string; onChange: (v: string) => void;
-    vars: string[]; defaultMsg: string;
-  }) => {
-    const [open, setOpen] = useState(false);
-    return (
-      <div className="mt-2 border border-[#1a1a1a] rounded-lg overflow-hidden">
-        <button onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between px-3 py-2 bg-[#0a0a0a] text-xs text-zinc-400 hover:text-white transition-colors">
-          <span>✏️ {label}</span>
-          <span className="text-zinc-600">{open ? '▲' : '▼'}</span>
-        </button>
-        {open && (
-          <div className="p-3 space-y-2 bg-[#050505]">
-            <textarea
-              value={value}
-              onChange={e => onChange(e.target.value)}
-              rows={8}
-              className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-zinc-600 resize-y focus:outline-none focus:border-[#EDAC02]/40"
-            />
-            <div className="flex flex-wrap gap-1">
-              {vars.map(v => (
-                <button key={v} onClick={() => onChange(value + `{{${v}}}`)}
-                  className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] font-mono text-zinc-400 hover:text-[#EDAC02] hover:border-[#EDAC02]/40 transition-colors">
-                  {`{{${v}}}`}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => onChange(defaultMsg)} className="text-[10px] text-zinc-600 hover:text-zinc-400 underline transition-colors">
-              ↺ Restaurar mensagem padrão
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const TriggerBadge = ({ value }: { value: string }) => (
     <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">{value}</span>
