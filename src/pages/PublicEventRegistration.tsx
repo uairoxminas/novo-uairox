@@ -1401,14 +1401,21 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     // Email para cada membro da equipe (ou atleta individual)
     athletes.forEach(athlete => {
       if (!athlete.email?.trim()) return;
-      supabase.functions.invoke('send-registration-email', {
-        body: {
+      fetch('/api/send-registration-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           ...sharedFields,
           athlete_name: athlete.name.trim(),
           athlete_email: athlete.email.trim(),
           shirt_size: athlete.shirt_size || null,
+        }),
+      }).then(async res => {
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          console.error('Erro ao enviar email:', d.error || res.status);
         }
-      }).catch(err => console.error('Erro ao enviar email:', err));
+      }).catch(err => console.error('Erro ao enviar email:', err.message));
     });
 
     // WhatsApp webhook para cada membro
