@@ -1320,6 +1320,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const [pix5dAtivo, setPix5dAtivo] = useState(true);
   const [pixCancelarAuto, setPixCancelarAuto] = useState(false);
   const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -1350,7 +1351,10 @@ function BotconversaTab({ eventId }: { eventId: string }) {
 
   const testWebhook = async (url: string, triggerKey: string) => {
     if (!url) { toast.error('Configure a URL primeiro'); return; }
-    const payload = { trigger: triggerKey, teste: true, nome: 'Atleta Teste', telefone: '5531999999999', email: 'teste@uairox.com.br', evento: 'UAIROX Test', categoria: 'Categoria Teste' };
+    const payload = {
+      telefone: '5531999999999',
+      message: `✅ *MENSAGEM DE TESTE — UAIROX*\n\nOlá, *Atleta Teste*! Esta é uma mensagem de teste do webhook.\n\n📋 *Detalhes*\n• Categoria: Categoria Teste\n• Camisa: M\n\n💰 *Total: R$ 99,00*\n\n🔖 Código: abc12345`,
+    };
     let ok = false;
     try {
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -1368,11 +1372,12 @@ function BotconversaTab({ eventId }: { eventId: string }) {
 
   const handleBroadcast = async () => {
     if (!webhookUrl) { toast.error('Configure a URL do webhook'); return; }
+    if (!broadcastMessage.trim()) { toast.error('Digite a mensagem antes de disparar'); return; }
     if (broadcastAthletes.length === 0) { toast.error('Nenhum atleta encontrado'); return; }
     setSending(true);
     let sent = 0, failed = 0;
     for (const r of broadcastAthletes as any[]) {
-      const payload = { trigger: 'broadcast', nome: r.athlete_name, telefone: r.athlete_phone, email: r.athlete_email, evento: event?.title || eventId, categoria: r.categories?.name || 'Sem Categoria' };
+      const payload = { telefone: r.athlete_phone, message: broadcastMessage.trim() };
       const { ok, error } = await sendWebhook(webhookUrl, payload, { maxAttempts: 2, retryDelay: 500 });
       if (ok) sent++; else failed++;
       await createLog.mutateAsync({ event_id: eventId, registration_id: r.id, trigger_type: 'broadcast', webhook_url: webhookUrl, payload, status: ok ? 'sent' : 'failed', error_message: ok ? undefined : error });
@@ -1490,7 +1495,18 @@ function BotconversaTab({ eventId }: { eventId: string }) {
             ))}
             <span className="ml-auto text-xs text-zinc-500 font-bold">{broadcastAthletes.length} atleta{broadcastAthletes.length !== 1 ? 's' : ''}</span>
           </div>
-          <button onClick={handleBroadcast} disabled={sending || broadcastAthletes.length === 0 || !webhookUrl} className={`w-full py-3 rounded-lg text-sm font-black uppercase tracking-widest transition-all border border-[#EDAC02]/20 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 disabled:opacity-40 disabled:cursor-not-allowed`}>
+          <div className="space-y-1">
+            <p className="text-xs text-zinc-400 font-bold">Mensagem</p>
+            <textarea
+              value={broadcastMessage}
+              onChange={e => setBroadcastMessage(e.target.value)}
+              placeholder="Digite a mensagem que será enviada para todos os atletas filtrados..."
+              rows={4}
+              className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 resize-none focus:outline-none focus:border-[#EDAC02]/50"
+            />
+            <p className="text-[10px] text-zinc-600">Use *negrito*, _itálico_. O BotConversa mapeia apenas o campo <code className="font-mono">message</code>.</p>
+          </div>
+          <button onClick={handleBroadcast} disabled={sending || broadcastAthletes.length === 0 || !webhookUrl || !broadcastMessage.trim()} className={`w-full py-3 rounded-lg text-sm font-black uppercase tracking-widest transition-all border border-[#EDAC02]/20 bg-[#EDAC02]/10 text-[#EDAC02] hover:bg-[#EDAC02]/20 disabled:opacity-40 disabled:cursor-not-allowed`}>
             {sending ? 'Enviando... aguarde' : `📢 Disparar para ${broadcastAthletes.length} atleta${broadcastAthletes.length !== 1 ? 's' : ''}`}
           </button>
         </div>
