@@ -1088,6 +1088,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card' | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [processingConfirmation, setProcessingConfirmation] = useState(false);
 
   // Installment state
   const [paymentType, setPaymentType] = useState<'full' | 'card' | 'installments'>('full');
@@ -1351,43 +1352,6 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         await (supabase as any).from('registration_installments').insert(installments);
       }
       
-      // BotConversa: trigger inscrição realizada (fire and forget)
-      if (data.status === 'pending') {
-        (supabase as any).from('botconversa_config')
-          .select('trigger_inscricao_ativo, trigger_inscricao_url')
-          .eq('event_id', eventId)
-          .maybeSingle()
-          .then(async ({ data: bcfg }: any) => {
-            if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
-            const payload = {
-              trigger: 'inscricao',
-              nome: a1.name.trim(),
-              telefone: a1.phone.trim(),
-              email: a1.email.trim(),
-              evento: event?.title || eventId,
-              categoria: selectedCategory?.name || 'Sem Categoria',
-              valor: totalPrice,
-              valor_formatado: `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
-              payment_type: isInstallments ? 'installments' : 'full',
-              chave_pix: effectivePixKey || null,
-              codigo_inscricao: data.id?.slice(0, 8) || null,
-              tamanho_camisa: a1.shirt_size || null,
-              ...(event?.slug === 'selecao' && selectedFreight ? {
-                frete_servico: selectedFreight.name,
-                frete_valor: selectedFreight.price,
-                endereco_entrega: `${shippingAddress.rua}, ${shippingAddress.numero} — ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado}`,
-              } : {}),
-            };
-            const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
-            (supabase as any).from('botconversa_logs').insert({
-              event_id: eventId, registration_id: data.id,
-              trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
-              payload, status: ok ? 'sent' : 'failed',
-              error_message: ok ? null : error,
-            }).then(() => {});
-          });
-      }
-
       // Auto-capture to marketing contacts base via API (uses service_role)
       const marketingRows = [
         { name: a1.name.trim(), phone: a1.phone.trim().replace(/\D/g, ''), email: a1.email.trim() || undefined },
@@ -1408,33 +1372,73 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         }).catch(err => console.error('[Marketing Auto-Capture] Fetch error:', err.message));
       }
 
-      // Disparo automático do Email Via Edge Function (Fire and Forget)
-      supabase.functions.invoke('send-registration-email', {
-        body: {
-          athlete_name: a1.name.trim(),
-          athlete_email: a1.email.trim(),
-          event_name: event?.title || 'UAIROX Evento',
-          event_slug: event?.slug || null,
-          whatsapp_link: event?.whatsapp_group_link || null,
-          registration_code: data.id?.slice(0, 8) || null,
-          category_name: selectedCategory?.name || null,
-          shirt_size: a1.shirt_size || null,
-          total_price: totalPrice,
-          pix_key: effectivePixKey || null,
-          payment_type: isInstallments ? 'installments' : 'full',
-          ...(event?.slug === 'selecao' && selectedFreight ? {
-            freight_service: selectedFreight.name,
-            freight_amount: selectedFreight.price,
-            freight_days: selectedFreight.delivery_time,
-            shipping_address: `${shippingAddress.rua}, ${shippingAddress.numero}${shippingAddress.complemento ? ` — ${shippingAddress.complemento}` : ''}, ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado} · CEP ${shippingAddress.cep}`,
-          } : {}),
-        }
-      }).catch(err => console.error("Erro ao enviar email:", err));
-
       setSuccess(true);
-      setShowSuccessOverlay(true);
     } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }
     finally { setSubmitting(false); }
+  };
+
+  const sendConfirmationMessages = () => {
+    const a1 = athletes[0];
+    if (!a1) return;
+
+    // Email
+    supabase.functions.invoke('send-registration-email', {
+      body: {
+        athlete_name: a1.name.trim(),
+        athlete_email: a1.email.trim(),
+        event_name: event?.title || 'UAIROX Evento',
+        event_slug: event?.slug || null,
+        whatsapp_link: event?.whatsapp_group_link || null,
+        registration_code: registrationId?.slice(0, 8) || null,
+        category_name: selectedCategory?.name || null,
+        shirt_size: a1.shirt_size || null,
+        total_price: totalPrice,
+        pix_key: effectivePixKey || null,
+        payment_type: paymentType === 'installments' ? 'installments' : 'full',
+        ...(event?.slug === 'selecao' && selectedFreight ? {
+          freight_service: selectedFreight.name,
+          freight_amount: selectedFreight.price,
+          freight_days: selectedFreight.delivery_time,
+          shipping_address: `${shippingAddress.rua}, ${shippingAddress.numero}${shippingAddress.complemento ? ` — ${shippingAddress.complemento}` : ''}, ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado} · CEP ${shippingAddress.cep}`,
+        } : {}),
+      }
+    }).catch(err => console.error('Erro ao enviar email:', err));
+
+    // WhatsApp webhook
+    (supabase as any).from('botconversa_config')
+      .select('trigger_inscricao_ativo, trigger_inscricao_url')
+      .eq('event_id', eventId)
+      .maybeSingle()
+      .then(async ({ data: bcfg }: any) => {
+        if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
+        const payload = {
+          trigger: 'inscricao',
+          nome: a1.name.trim(),
+          telefone: a1.phone.trim(),
+          email: a1.email.trim(),
+          evento: event?.title || eventId,
+          categoria: selectedCategory?.name || 'Sem Categoria',
+          valor: totalPrice,
+          valor_formatado: `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
+          payment_type: paymentType === 'installments' ? 'installments' : 'full',
+          chave_pix: effectivePixKey || null,
+          codigo_inscricao: registrationId?.slice(0, 8) || null,
+          tamanho_camisa: a1.shirt_size || null,
+          grupo_whatsapp: event?.whatsapp_group_link || null,
+          ...(event?.slug === 'selecao' && selectedFreight ? {
+            frete_servico: selectedFreight.name,
+            frete_valor: selectedFreight.price,
+            endereco_entrega: `${shippingAddress.rua}, ${shippingAddress.numero} — ${shippingAddress.bairro}, ${shippingAddress.cidade}/${shippingAddress.estado}`,
+          } : {}),
+        };
+        const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
+        (supabase as any).from('botconversa_logs').insert({
+          event_id: eventId, registration_id: registrationId,
+          trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
+          payload, status: ok ? 'sent' : 'failed',
+          error_message: ok ? null : error,
+        }).then(() => {});
+      });
   };
 
   const handleUploadReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1459,7 +1463,6 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
       const url = urlData.publicUrl;
 
-      // Update registration record
       const { error: updateError } = await supabase
         .from('registrations')
         .update({ pix_receipt_url: url } as any)
@@ -1468,7 +1471,15 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       if (updateError) throw updateError;
 
       setReceiptUrl(url);
-      toast.success('Comprovante enviado com sucesso!');
+      toast.success('Comprovante recebido!');
+
+      // Trigger confirmation: show processing animation, fire messages, then open overlay
+      setProcessingConfirmation(true);
+      sendConfirmationMessages();
+      setTimeout(() => {
+        setProcessingConfirmation(false);
+        setShowSuccessOverlay(true);
+      }, 1500);
     } catch (err: any) {
       toast.error('Erro ao enviar comprovante: ' + err.message);
     } finally {
@@ -1478,6 +1489,24 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
   const inputClass = "w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors";
   const labelClass = "block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5";
+
+  // ============ PROCESSING OVERLAY ============
+  if (processingConfirmation) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#020202] flex flex-col items-center justify-center gap-6">
+        <div className="relative">
+          <div className="w-20 h-20 rounded-full border-2 border-[#EDAC02]/20 border-t-[#EDAC02] animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-2xl">📨</span>
+          </div>
+        </div>
+        <div className="text-center">
+          <p className="text-white font-black text-lg uppercase tracking-wider">Processando...</p>
+          <p className="text-zinc-500 text-sm mt-1">Enviando confirmação por email e WhatsApp</p>
+        </div>
+      </div>
+    );
+  }
 
   // ============ SUCCESS OVERLAY ============
   if (success && showSuccessOverlay) {
