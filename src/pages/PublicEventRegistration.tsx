@@ -1233,12 +1233,11 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     } else { toast.error('Cupom inválido'); }
   };
 
-  const handleCepBlur = async () => {
-    const cep = shippingAddress.cep.replace(/\D/g, '');
-    if (cep.length !== 8) return;
+  const handleCepLookup = async (digits: string) => {
+    if (digits.length !== 8) return;
     setCepLoading(true);
     try {
-      const viacepRes = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const viacepRes = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const viacepData = await viacepRes.json();
       if (!viacepData.erro) {
         setShippingAddress(prev => ({
@@ -1248,6 +1247,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           cidade: viacepData.localidade || '',
           estado: viacepData.uf || '',
         }));
+      } else {
+        toast.error('CEP não encontrado.');
       }
     } catch {}
     setCepLoading(false);
@@ -1258,7 +1259,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       const res = await fetch('/api/calculate-freight', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cep_destino: cep }),
+        body: JSON.stringify({ cep_destino: digits }),
       });
       const data = await res.json();
       if (data.options?.length > 0) {
@@ -2072,8 +2073,13 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                         <label className={labelClass}>CEP *</label>
                         <input
                           value={shippingAddress.cep}
-                          onChange={e => setShippingAddress(prev => ({ ...prev, cep: e.target.value }))}
-                          onBlur={handleCepBlur}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setShippingAddress(prev => ({ ...prev, cep: val }));
+                            const digits = val.replace(/\D/g, '');
+                            if (digits.length === 8) handleCepLookup(digits);
+                          }}
+                          onBlur={() => handleCepLookup(shippingAddress.cep.replace(/\D/g, ''))}
                           placeholder="00000-000"
                           maxLength={9}
                           className={inputClass}
