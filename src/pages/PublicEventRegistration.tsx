@@ -912,6 +912,9 @@ export default function PublicEventRegistration() {
                           <div className="mb-2">
                             <p className="text-xs text-zinc-400 font-bold mb-1">💲 Pix à vista:</p>
                             <p className={`text-3xl font-black italic tracking-tighter leading-none ${localIsSoldOut || isEventFull ? 'text-zinc-600' : 'text-[#EDAC02]'}`}>{formatCurrency(price)}</p>
+                            {event?.slug === 'selecao' && !localIsSoldOut && !isEventFull && (
+                              <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider">+ frete para envio da camisa</p>
+                            )}
                           </div>
                           {localActiveBatch?.price_card && Number(localActiveBatch.price_card) !== price && (
                             <p className="text-xs text-zinc-400 mt-1">💳 Cartão: <span className="text-white font-bold">{formatCurrency(Number(localActiveBatch.price_card))}</span></p>
