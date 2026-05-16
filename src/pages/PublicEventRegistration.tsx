@@ -406,6 +406,77 @@ export default function PublicEventRegistration() {
         </div>
       </section>
 
+      {/* ============ A REGRA 30/39 — only for selecao event ============ */}
+      {event.slug === 'selecao' && (
+        <section className="relative overflow-hidden bg-[#020202]">
+          <div className="flex flex-col lg:flex-row min-h-[520px]">
+
+            {/* LEFT — dark side: A REGRA + 30/39 + dates */}
+            <div className="relative flex-1 flex flex-col justify-center px-8 sm:px-14 lg:px-20 py-20 bg-[#020202] z-10">
+              {/* diagonal right edge */}
+              <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-24 z-20"
+                   style={{ background: 'linear-gradient(to bottom right, #020202 50%, transparent 50%)' }} />
+
+              <p className="text-[10px] font-black text-[#EDAC02] tracking-[.3em] uppercase mb-6">A Regra</p>
+
+              {/* Giant 30/39 */}
+              <div className="flex items-center gap-0 mb-8 select-none">
+                <span className="text-[clamp(96px,15vw,160px)] font-black text-white leading-none tracking-tighter" style={{ fontStyle: 'italic' }}>30</span>
+                <div className="flex flex-col mx-3 gap-2">
+                  <div className="w-10 h-[3px] bg-[#EDAC02]" />
+                  <div className="w-10 h-[3px] bg-zinc-700" />
+                </div>
+                <span className="text-[clamp(96px,15vw,160px)] font-black text-zinc-600 leading-none tracking-tighter" style={{ fontStyle: 'italic' }}>39</span>
+              </div>
+
+              {/* Dates */}
+              <div className="flex gap-8">
+                <div>
+                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Início</p>
+                  <p className="text-base font-black text-white font-mono">11/06/2026</p>
+                </div>
+                <div className="w-px bg-[#1a1a1a]" />
+                <div>
+                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Final</p>
+                  <p className="text-base font-black text-white font-mono">19/07/2026</p>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT — golden dark: explanation */}
+            <div className="relative flex-1 flex flex-col justify-center px-8 sm:px-14 lg:px-16 py-20"
+                 style={{ background: 'linear-gradient(135deg, #0a0800 0%, #0d0900 100%)' }}>
+              <div className="absolute inset-0 opacity-5"
+                   style={{ backgroundImage: 'repeating-linear-gradient(45deg, #EDAC02 0, #EDAC02 1px, transparent 0, transparent 50%)', backgroundSize: '12px 12px' }} />
+
+              <div className="relative z-10 max-w-lg">
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight italic mb-6 leading-tight">
+                  A matemática<br />
+                  <span className="text-[#EDAC02]">da constância</span>
+                </h3>
+
+                <p className="text-sm text-zinc-400 leading-relaxed mb-8">
+                  A Copa do Mundo dura exatamente <strong className="text-white">39 dias</strong> (de 11 de Junho a 19 de Julho). Sua missão é vencer o jogo mental e concluir a tarefa diária em pelo menos <strong className="text-[#EDAC02]">30 desses dias</strong>.
+                </p>
+
+                <p className="text-sm text-zinc-500 leading-relaxed mb-8">
+                  Isso significa que você tem <strong className="text-white">9 "dias de folga"</strong> estratégicos para usar quando o corpo pedir, quando a rotina apertar ou quando precisar descansar.
+                </p>
+
+                {/* Meta box */}
+                <div className="border border-[#EDAC02]/30 bg-[#EDAC02]/5 px-5 py-4 flex items-center gap-4">
+                  <span className="text-[#EDAC02] text-2xl font-black flex-shrink-0">🏆</span>
+                  <div>
+                    <p className="text-[10px] font-black text-[#EDAC02] uppercase tracking-widest mb-0.5">Meta Mínima</p>
+                    <p className="text-sm font-bold text-white leading-snug">30 dias concluídos = <span className="text-[#EDAC02]">Passaporte carimbado para o grande sorteio</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ============ PROVAS / STAGES ============ */}
       {stages.length > 0 && (
         <section className="py-24 bg-[#050505] border-y border-[#1a1a1a]">
