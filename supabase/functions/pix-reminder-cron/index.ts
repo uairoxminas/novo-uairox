@@ -6,6 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const DEFAULT_PIX_MESSAGES: Record<string, string> = {
+  'pix2': `⏰ *LEMBRETE — {{evento}}*\n\nOlá, *{{nome}}*! Sua parcela {{parcela}} vence em *2 dias* ({{vencimento}}).\n\n💰 Valor: *{{valor}}*\n🔑 Chave PIX: {{pix}}\n\nRealize o pagamento para garantir sua vaga!\n🔖 Código: {{codigo}}`,
+  'pix0': `🚨 *VENCE HOJE — {{evento}}*\n\nOlá, *{{nome}}*! Sua parcela {{parcela}} vence *hoje* ({{vencimento}}).\n\n💰 Valor: *{{valor}}*\n🔑 Chave PIX: {{pix}}\n\nPague agora para não perder sua vaga!\n🔖 Código: {{codigo}}`,
+  'pix-1': `⚠️ *EM ATRASO — {{evento}}*\n\nOlá, *{{nome}}*! Sua parcela {{parcela}} está em atraso (venceu em {{vencimento}}).\n\n💰 Valor: *{{valor}}*\n🔑 Chave PIX: {{pix}}\n\nRegularize para evitar o cancelamento.\n🔖 Código: {{codigo}}`,
+  'pix-5': `🔴 *ÚLTIMO AVISO — {{evento}}*\n\nOlá, *{{nome}}*! Sua inscrição será *cancelada* se o pagamento não for realizado hoje.\n\nParcela {{parcela}} em atraso desde {{vencimento}}.\n💰 Valor: *{{valor}}*\n🔑 Chave PIX: {{pix}}\n\n🔖 Código: {{codigo}}`,
+};
+
+function interpolate(template: string, vars: Record<string, string | number | null | undefined>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_: string, key: string) => {
+    const val = vars[key];
+    return val != null && val !== '' ? String(val) : '';
+  });
+}
+
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
@@ -49,7 +63,8 @@ serve(async (req) => {
           id, athlete_name, athlete_phone, athlete_email,
           status, event_id,
           events!inner(id, title),
-          categories(name)
+          categories(name),
+          price_batches(pix_key)
         )
       `)
       .in('status', ['pending', 'overdue'])
@@ -124,18 +139,18 @@ serve(async (req) => {
       alreadySent.add(key);
 
       const daysLate = diffDays(due, today);
-      const payload = {
-        trigger: triggerType,
+      const cfgMsgKey = triggerType === 'pix2' ? 'msg_pix_2d' : triggerType === 'pix0' ? 'msg_pix_0d' : triggerType === 'pix-1' ? 'msg_pix_1d' : 'msg_pix_5d';
+      const template = cfg[cfgMsgKey] || DEFAULT_PIX_MESSAGES[triggerType] || '';
+      const message = interpolate(template, {
         nome: reg.athlete_name,
-        telefone: reg.athlete_phone,
-        email: reg.athlete_email,
         evento: reg.events?.title || eventId,
-        categoria: reg.categories?.name || 'Sem Categoria',
-        parcela_numero: inst.installment_number,
-        parcela_valor: Number(inst.amount).toFixed(2),
-        parcela_vencimento: due,
-        dias_atraso: daysLate > 0 ? daysLate : 0,
-      };
+        parcela: inst.installment_number,
+        valor: `R$ ${Number(inst.amount).toFixed(2).replace('.', ',')}`,
+        vencimento: due,
+        pix: reg.price_batches?.pix_key || '',
+        codigo: reg.id?.slice(0, 8) || '',
+      });
+      const payload = { telefone: reg.athlete_phone, message };
 
       let ok = false;
       let errorMsg: string | undefined;

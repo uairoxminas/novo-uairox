@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { calcInstallmentAmounts, calcMaxInstallmentDate } from '@/hooks/useInstallments';
 import { sendWebhook } from '@/lib/botconversa';
+import { DEFAULT_MESSAGES, interpolate } from '@/lib/botconversaMessages';
 
 // ============ DATA HOOK ============
 function usePublicEvent(idOrSlug?: string) {
@@ -1420,48 +1421,28 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
     // WhatsApp webhook para cada membro
     (supabase as any).from('botconversa_config')
-      .select('trigger_inscricao_ativo, trigger_inscricao_url')
+      .select('trigger_inscricao_ativo, trigger_inscricao_url, msg_inscricao')
       .eq('event_id', eventId)
       .maybeSingle()
       .then(async ({ data: bcfg }: any) => {
         if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
+        const template = bcfg.msg_inscricao || DEFAULT_MESSAGES.inscricao;
+        const valorFmt = `R$ ${totalPrice.toFixed(2).replace('.', ',')}`;
+        const codigo = registrationId?.slice(0, 8) || '';
         for (const athlete of athletes) {
           if (!athlete.phone?.trim()) continue;
-          const valorFmt = `R$ ${totalPrice.toFixed(2).replace('.', ',')}`;
-          const codigo = registrationId?.slice(0, 8) || '';
-          const isSelecaoSlug = event?.slug === 'selecao';
-
-          const lines: string[] = [];
-          lines.push(`✅ *INSCRIÇÃO RECEBIDA — ${(event?.title || '').toUpperCase()}*`);
-          lines.push('');
-          lines.push(`Olá, *${athlete.name.trim()}*! Sua inscrição foi registrada com sucesso.`);
-          lines.push('');
-          lines.push(`📋 *Detalhes*`);
-          lines.push(`• Categoria: ${selectedCategory?.name || 'Sem Categoria'}`);
-          if (isTeam && teamName.trim()) lines.push(`• Equipe: ${teamName.trim()}`);
-          if (athlete.shirt_size) lines.push(`• Camisa: ${athlete.shirt_size}`);
-          if (isSelecaoSlug && selectedFreight) {
-            lines.push(`• Frete: ${selectedFreight.name} · ${selectedFreight.delivery_time} dias úteis`);
-          }
-          lines.push('');
-          lines.push(`💰 *Total: ${valorFmt}*`);
-          if (effectivePixKey && paymentType !== 'installments') {
-            lines.push('');
-            lines.push(`🔑 *Chave PIX:*`);
-            lines.push(effectivePixKey);
-            lines.push('Copie a chave, abra seu banco e realize o pagamento.');
-          }
-          if (codigo) lines.push(`\n🔖 Código: ${codigo}`);
-          if (event?.whatsapp_group_link) {
-            lines.push('');
-            lines.push(`📲 *Entre no grupo oficial:*`);
-            lines.push(event.whatsapp_group_link);
-          }
-
-          const payload = {
-            telefone: athlete.phone.trim(),
-            message: lines.join('\n'),
-          };
+          const message = interpolate(template, {
+            nome: athlete.name.trim(),
+            evento: event?.title || '',
+            categoria: selectedCategory?.name || '',
+            equipe: isTeam ? teamName.trim() : '',
+            camisa: athlete.shirt_size || '',
+            total: valorFmt,
+            pix: paymentType !== 'installments' ? (effectivePixKey || '') : '',
+            codigo,
+            grupo: event?.whatsapp_group_link || '',
+          });
+          const payload = { telefone: athlete.phone.trim(), message };
           const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
           (supabase as any).from('botconversa_logs').insert({
             event_id: eventId, registration_id: registrationId,

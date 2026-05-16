@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { DEFAULT_MESSAGES } from '@/lib/botconversaMessages';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvent, useUpdateEvent, EVENT_STATUS_MAP, type EventStatus } from '@/hooks/useEvents';
 import {
@@ -1319,6 +1320,13 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const [pix1dAtivo, setPix1dAtivo] = useState(true);
   const [pix5dAtivo, setPix5dAtivo] = useState(true);
   const [pixCancelarAuto, setPixCancelarAuto] = useState(false);
+  const [msgInscricao, setMsgInscricao] = useState(DEFAULT_MESSAGES.inscricao);
+  const [msgConfirmado, setMsgConfirmado] = useState(DEFAULT_MESSAGES.confirmado);
+  const [msgCancelado, setMsgCancelado] = useState(DEFAULT_MESSAGES.cancelado);
+  const [msgPix2d, setMsgPix2d] = useState(DEFAULT_MESSAGES.pix_2d);
+  const [msgPix0d, setMsgPix0d] = useState(DEFAULT_MESSAGES.pix_0d);
+  const [msgPix1d, setMsgPix1d] = useState(DEFAULT_MESSAGES.pix_1d);
+  const [msgPix5d, setMsgPix5d] = useState(DEFAULT_MESSAGES.pix_5d);
   const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -1335,6 +1343,13 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     setPix1dAtivo(cfg.pix_atraso_1d_ativo ?? true);
     setPix5dAtivo(cfg.pix_cancelamento_5d_ativo ?? true);
     setPixCancelarAuto(cfg.pix_cancelar_automatico ?? false);
+    if (cfg.msg_inscricao)  setMsgInscricao(cfg.msg_inscricao);
+    if (cfg.msg_confirmado) setMsgConfirmado(cfg.msg_confirmado);
+    if (cfg.msg_cancelado)  setMsgCancelado(cfg.msg_cancelado);
+    if (cfg.msg_pix_2d)     setMsgPix2d(cfg.msg_pix_2d);
+    if (cfg.msg_pix_0d)     setMsgPix0d(cfg.msg_pix_0d);
+    if (cfg.msg_pix_1d)     setMsgPix1d(cfg.msg_pix_1d);
+    if (cfg.msg_pix_5d)     setMsgPix5d(cfg.msg_pix_5d);
   }, [cfg]);
 
   const handleSave = () => upsert.mutate({
@@ -1347,7 +1362,14 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     pix_atraso_1d_ativo: pix1dAtivo, pix_cancelamento_5d_ativo: pix5dAtivo,
     pix_cancelar_automatico: pixCancelarAuto,
     trigger_broadcast_url: webhookUrl || null,
-  });
+    msg_inscricao:  msgInscricao  || null,
+    msg_confirmado: msgConfirmado || null,
+    msg_cancelado:  msgCancelado  || null,
+    msg_pix_2d:     msgPix2d      || null,
+    msg_pix_0d:     msgPix0d      || null,
+    msg_pix_1d:     msgPix1d      || null,
+    msg_pix_5d:     msgPix5d      || null,
+  } as any);
 
   const testWebhook = async (url: string, triggerKey: string) => {
     if (!url) { toast.error('Configure a URL primeiro'); return; }
@@ -1393,6 +1415,44 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     </button>
   );
 
+  const MsgEditor = ({
+    label, value, onChange, vars, defaultMsg,
+  }: {
+    label: string; value: string; onChange: (v: string) => void;
+    vars: string[]; defaultMsg: string;
+  }) => {
+    const [open, setOpen] = useState(false);
+    return (
+      <div className="mt-2 border border-[#1a1a1a] rounded-lg overflow-hidden">
+        <button onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between px-3 py-2 bg-[#0a0a0a] text-xs text-zinc-400 hover:text-white transition-colors">
+          <span>✏️ {label}</span>
+          <span className="text-zinc-600">{open ? '▲' : '▼'}</span>
+        </button>
+        {open && (
+          <div className="p-3 space-y-2 bg-[#050505]">
+            <textarea
+              value={value}
+              onChange={e => onChange(e.target.value)}
+              rows={8}
+              className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-zinc-600 resize-y focus:outline-none focus:border-[#EDAC02]/40"
+            />
+            <div className="flex flex-wrap gap-1">
+              {vars.map(v => (
+                <button key={v} onClick={() => onChange(value + `{{${v}}}`)}
+                  className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] font-mono text-zinc-400 hover:text-[#EDAC02] hover:border-[#EDAC02]/40 transition-colors">
+                  {`{{${v}}}`}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => onChange(defaultMsg)} className="text-[10px] text-zinc-600 hover:text-zinc-400 underline transition-colors">
+              ↺ Restaurar mensagem padrão
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const TriggerBadge = ({ value }: { value: string }) => (
     <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">{value}</span>
   );
@@ -1436,9 +1496,51 @@ function BotconversaTab({ eventId }: { eventId: string }) {
       {/* Triggers de Status */}
       <div className="space-y-2">
         <p className={labelClass}>Triggers de Status</p>
-        <TriggerToggle label="🔔 Inscrição Realizada" triggerValue="inscricao" ativo={inscricaoAtivo} onToggle={setInscricaoAtivo} />
-        <TriggerToggle label="✅ Pagamento Confirmado" triggerValue="confirmado" ativo={confirmadoAtivo} onToggle={setConfirmadoAtivo} />
-        <TriggerToggle label="❌ Inscrição Cancelada" triggerValue="cancelado" ativo={canceladoAtivo} onToggle={setCanceladoAtivo} />
+        <div className={cardClass}>
+          <div className="p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Toggle value={inscricaoAtivo} onChange={setInscricaoAtivo} />
+              <span className="text-sm font-bold text-white">🔔 Inscrição Realizada</span>
+              <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">inscricao</span>
+            </div>
+            {inscricaoAtivo && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
+          </div>
+          <div className="px-3.5 pb-3.5">
+            <MsgEditor label="Editar mensagem de inscrição" value={msgInscricao} onChange={setMsgInscricao}
+              defaultMsg={DEFAULT_MESSAGES.inscricao}
+              vars={['nome','evento','categoria','equipe','camisa','total','pix','codigo','grupo']} />
+          </div>
+        </div>
+        <div className={cardClass}>
+          <div className="p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Toggle value={confirmadoAtivo} onChange={setConfirmadoAtivo} />
+              <span className="text-sm font-bold text-white">✅ Pagamento Confirmado</span>
+              <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">confirmado</span>
+            </div>
+            {confirmadoAtivo && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
+          </div>
+          <div className="px-3.5 pb-3.5">
+            <MsgEditor label="Editar mensagem de confirmação" value={msgConfirmado} onChange={setMsgConfirmado}
+              defaultMsg={DEFAULT_MESSAGES.confirmado}
+              vars={['nome','evento','categoria','codigo','grupo']} />
+          </div>
+        </div>
+        <div className={cardClass}>
+          <div className="p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Toggle value={canceladoAtivo} onChange={setCanceladoAtivo} />
+              <span className="text-sm font-bold text-white">❌ Inscrição Cancelada</span>
+              <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">cancelado</span>
+            </div>
+            {canceladoAtivo && <span className="text-[10px] text-[#25D366] font-bold">● ATIVO</span>}
+          </div>
+          <div className="px-3.5 pb-3.5">
+            <MsgEditor label="Editar mensagem de cancelamento" value={msgCancelado} onChange={setMsgCancelado}
+              defaultMsg={DEFAULT_MESSAGES.cancelado}
+              vars={['nome','evento','categoria','codigo']} />
+          </div>
+        </div>
       </div>
 
       {/* Trigger PIX Parcelado */}
@@ -1474,6 +1576,17 @@ function BotconversaTab({ eventId }: { eventId: string }) {
               <p className="text-xs font-bold text-white">Cancelar inscrição automaticamente após 5 dias</p>
               <p className="text-[10px] text-zinc-500 mt-0.5">A inscrição será marcada como cancelada pelo cron diário</p>
             </div>
+          </div>
+          <div className="space-y-1 pt-2 border-t border-[#1a1a1a]">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Mensagens da régua:</p>
+            <MsgEditor label="2 dias antes do vencimento" value={msgPix2d} onChange={setMsgPix2d} defaultMsg={DEFAULT_MESSAGES.pix_2d}
+              vars={['nome','evento','parcela','valor','vencimento','pix','codigo']} />
+            <MsgEditor label="No dia do vencimento" value={msgPix0d} onChange={setMsgPix0d} defaultMsg={DEFAULT_MESSAGES.pix_0d}
+              vars={['nome','evento','parcela','valor','vencimento','pix','codigo']} />
+            <MsgEditor label="1 dia de atraso" value={msgPix1d} onChange={setMsgPix1d} defaultMsg={DEFAULT_MESSAGES.pix_1d}
+              vars={['nome','evento','parcela','valor','vencimento','pix','codigo']} />
+            <MsgEditor label="5 dias — cancelamento" value={msgPix5d} onChange={setMsgPix5d} defaultMsg={DEFAULT_MESSAGES.pix_5d}
+              vars={['nome','evento','parcela','valor','vencimento','pix','codigo']} />
           </div>
           <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-blue-500/20 bg-blue-500/5">
             <span className="text-blue-400 text-xs mt-0.5">ℹ</span>
