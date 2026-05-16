@@ -1855,6 +1855,35 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             </div>
             {kits.length > 0 && (() => {
               const mandatoryKits = kits.filter(k => k.is_optional === false);
+              if (event?.slug === 'selecao') {
+                return (
+                  <div className="mt-8 border-t border-[#1a1a1a] pt-6">
+                    <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">🎁 O Que Você Recebe</p>
+                    <div className="space-y-3">
+                      {kits.map(kit => (
+                        <div key={kit.id} className="w-full text-left p-4 rounded-xl border border-[#1a1a1a] bg-[#0a0a0a]">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase ${kit.is_optional === false ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20'}`}>
+                                  {kit.is_optional === false ? 'Incluso na Inscrição' : 'Sorteio'}
+                                </span>
+                              </div>
+                              <p className="font-black text-white text-base leading-tight">{kit.name}</p>
+                              {kit.description && <p className="text-xs text-zinc-500 mt-1">{kit.description}</p>}
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-4">
+                              <span className={`text-xl font-black italic tracking-tighter block ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                                {kit.is_optional === false ? 'Grátis' : '🏆'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
               return (
               <div className="mt-8 border-t border-[#1a1a1a] pt-6">
                 <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">ESCOLHA SEU KIT</p>
