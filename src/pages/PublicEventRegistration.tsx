@@ -1091,6 +1091,14 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [installmentDate2, setInstallmentDate2] = useState('');
   const [installmentDate3, setInstallmentDate3] = useState('');
 
+  // Shipping / freight (selecao event only)
+  type FreightOption = { id: number; name: string; company: string; price: number; delivery_time: number };
+  const [shippingAddress, setShippingAddress] = useState({ cep: '', rua: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' });
+  const [freightOptions, setFreightOptions] = useState<FreightOption[]>([]);
+  const [selectedFreight, setSelectedFreight] = useState<FreightOption | null>(null);
+  const [freightLoading, setFreightLoading] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+
   // Installment helpers
   // Invite mode overrides: treat as normal registration even if event is "full"
   const effectiveIsEventFull = isInviteMode ? false : isEventFull;
@@ -1128,6 +1136,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const basePrice = paymentType === 'installments' ? basePriceInstallments : paymentType === 'card' ? basePriceCard : basePricePix;
   
   const kitPrice = selectedKit ? Number(selectedKit.price) : 0;
+  const freightAmount = (event?.slug === 'selecao' && selectedFreight) ? selectedFreight.price : 0;
   // Coupon only for PIX à vista and Cartão — NOT for parcelado
   let discount = 0;
   if (couponDiscount && paymentType !== 'installments') {
@@ -1135,9 +1144,9 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       ? (basePrice * couponDiscount.discount_value) / 100
       : couponDiscount.discount_value;
   }
-  const totalPrice = Math.max(0, basePrice + kitPrice - discount);
-  const totalPriceCard = Math.max(0, basePriceCard + kitPrice - discount);
-  const totalPriceInstallmentsNoDiscount = Math.max(0, basePriceInstallments + kitPrice);
+  const totalPrice = Math.max(0, basePrice + kitPrice - discount + freightAmount);
+  const totalPriceCard = Math.max(0, basePriceCard + kitPrice - discount + freightAmount);
+  const totalPriceInstallmentsNoDiscount = Math.max(0, basePriceInstallments + kitPrice + freightAmount);
   const installmentAmounts = paymentType === 'installments' ? calcInstallmentAmounts(totalPrice, installmentCount) : [];
 
   // Helper to update a specific athlete field
@@ -1220,6 +1229,47 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     } else { toast.error('Cupom inválido'); }
   };
 
+  const handleCepBlur = async () => {
+    const cep = shippingAddress.cep.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const viacepRes = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const viacepData = await viacepRes.json();
+      if (!viacepData.erro) {
+        setShippingAddress(prev => ({
+          ...prev,
+          rua: viacepData.logradouro || '',
+          bairro: viacepData.bairro || '',
+          cidade: viacepData.localidade || '',
+          estado: viacepData.uf || '',
+        }));
+      }
+    } catch {}
+    setCepLoading(false);
+    setFreightLoading(true);
+    setFreightOptions([]);
+    setSelectedFreight(null);
+    try {
+      const res = await fetch('/api/calculate-freight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cep_destino: cep }),
+      });
+      const data = await res.json();
+      if (data.options?.length > 0) {
+        setFreightOptions(data.options);
+        if (data.options.length === 1) setSelectedFreight(data.options[0]);
+      } else {
+        toast.error(data.error || 'Não foi possível calcular o frete para este CEP.');
+      }
+    } catch (err: any) {
+      toast.error('Erro ao calcular frete: ' + err.message);
+    } finally {
+      setFreightLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const a1 = athletes[0];
     if (!categoryId || !a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.shirt_size || !a1.gym.trim()) { toast.error('Preencha os campos obrigatórios do Atleta 1.'); return; }
@@ -1257,6 +1307,11 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         athlete_gym: a1.gym.trim() || null,
         athlete_photo_url: a1.photo_url || null,
         team_name: isTeam ? teamName.trim() : null, team_members: teamMembersData,
+        ...(event?.slug === 'selecao' && selectedFreight ? {
+          shipping_address: shippingAddress,
+          shipping_service_name: selectedFreight.name,
+          shipping_freight_amount: selectedFreight.price,
+        } : {}),
       } as any).select().single();
       if (error) throw error;
       if (couponDiscount) {
@@ -1721,6 +1776,11 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.shirt_size || !m.gym.trim()) return false;
         }
       }
+      if (event?.slug === 'selecao') {
+        if (shippingAddress.cep.replace(/\D/g, '').length !== 8) return false;
+        if (!shippingAddress.rua.trim() || !shippingAddress.numero.trim() || !shippingAddress.bairro.trim() || !shippingAddress.cidade.trim() || !shippingAddress.estado.trim()) return false;
+        if (!selectedFreight) return false;
+      }
       return true;
     }
     return true;
@@ -1868,6 +1928,119 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                     <option value="EXG">EXG</option>
                   </select>
                 </div>
+
+                {/* Shipping address — selecao event, main athlete only */}
+                {event?.slug === 'selecao' && idx === 0 && (
+                  <div className="border-t border-[#1a1a1a] pt-4 space-y-3">
+                    <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider">📦 Endereço de Entrega da Camisa</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>CEP *</label>
+                        <input
+                          value={shippingAddress.cep}
+                          onChange={e => setShippingAddress(prev => ({ ...prev, cep: e.target.value }))}
+                          onBlur={handleCepBlur}
+                          placeholder="00000-000"
+                          maxLength={9}
+                          className={inputClass}
+                        />
+                        {cepLoading && <p className="text-xs text-zinc-500 mt-1 animate-pulse">Buscando endereço...</p>}
+                      </div>
+                      <div>
+                        <label className={labelClass}>Número *</label>
+                        <input
+                          value={shippingAddress.numero}
+                          onChange={e => setShippingAddress(prev => ({ ...prev, numero: e.target.value }))}
+                          placeholder="123"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Rua / Logradouro *</label>
+                      <input
+                        value={shippingAddress.rua}
+                        onChange={e => setShippingAddress(prev => ({ ...prev, rua: e.target.value }))}
+                        placeholder="Rua das Flores"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Complemento</label>
+                        <input
+                          value={shippingAddress.complemento}
+                          onChange={e => setShippingAddress(prev => ({ ...prev, complemento: e.target.value }))}
+                          placeholder="Apto 3, Bloco B"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Bairro *</label>
+                        <input
+                          value={shippingAddress.bairro}
+                          onChange={e => setShippingAddress(prev => ({ ...prev, bairro: e.target.value }))}
+                          placeholder="Centro"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Cidade *</label>
+                        <input
+                          value={shippingAddress.cidade}
+                          onChange={e => setShippingAddress(prev => ({ ...prev, cidade: e.target.value }))}
+                          placeholder="Uberlândia"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Estado *</label>
+                        <input
+                          value={shippingAddress.estado}
+                          onChange={e => setShippingAddress(prev => ({ ...prev, estado: e.target.value }))}
+                          placeholder="MG"
+                          maxLength={2}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Freight options */}
+                    {freightLoading && (
+                      <div className="flex items-center gap-2 py-3">
+                        <div className="w-4 h-4 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-sm text-zinc-400">Calculando frete...</span>
+                      </div>
+                    )}
+                    {!freightLoading && freightOptions.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">🚚 Selecione o Frete</p>
+                        {freightOptions.map(opt => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setSelectedFreight(opt)}
+                            className={`w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between ${selectedFreight?.id === opt.id ? 'border-[#EDAC02] bg-[#EDAC02]/5' : 'border-[#262626] hover:border-zinc-600'}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedFreight?.id === opt.id ? 'border-[#EDAC02]' : 'border-zinc-600'}`}>
+                                {selectedFreight?.id === opt.id && <span className="w-2 h-2 rounded-full bg-[#EDAC02]" />}
+                              </span>
+                              <div>
+                                <p className="text-sm font-bold text-white">{opt.name}</p>
+                                <p className="text-xs text-zinc-500">{opt.company} · {opt.delivery_time} dias úteis</p>
+                              </div>
+                            </div>
+                            <span className="text-sm font-black text-[#EDAC02] whitespace-nowrap ml-2">+ {opt.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Training Photo Upload */}
                 <div>
                   <label className={labelClass}>Foto Treinando <span className="text-zinc-600 normal-case">(para post CONFIRMED — opcional)</span></label>
@@ -1917,6 +2090,13 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                     {a.photo_url && <div className="flex justify-between items-center"><span className="text-zinc-400">Foto</span><span className="text-green-400 text-xs">✅ Enviada</span></div>}
                   </div>
                 ))}
+                {event?.slug === 'selecao' && selectedFreight && (
+                  <>
+                    <div className="border-t border-[#1a1a1a] my-2" />
+                    <div className="flex justify-between items-start"><span className="text-zinc-400 shrink-0">Endereço</span><span className="text-white text-xs text-right ml-4">{shippingAddress.rua}, {shippingAddress.numero}{shippingAddress.complemento ? ` — ${shippingAddress.complemento}` : ''}<br />{shippingAddress.bairro}, {shippingAddress.cidade}/{shippingAddress.estado} · {shippingAddress.cep}</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">Frete</span><span className="text-white">{selectedFreight.name} · {selectedFreight.delivery_time} dias úteis</span></div>
+                  </>
+                )}
               </div>
             </div>
             {!isEventFull && paymentType !== 'installments' && (
@@ -1936,6 +2116,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                   <div className="flex justify-between"><span className="text-zinc-400">Inscrição ({paymentType === 'installments' ? 'Parcelado' : 'PIX'})</span><span className="text-white">{formatCurrency(basePrice)}</span></div>
                   {kitPrice > 0 && <div className="flex justify-between"><span className="text-zinc-400">Kit</span><span className="text-white">+ {formatCurrency(kitPrice)}</span></div>}
                   {discount > 0 && <div className="flex justify-between"><span className="text-green-400">Desconto</span><span className="text-green-400">- {formatCurrency(discount)}</span></div>}
+                  {freightAmount > 0 && selectedFreight && <div className="flex justify-between"><span className="text-zinc-400">Frete ({selectedFreight.name})</span><span className="text-white">+ {formatCurrency(freightAmount)}</span></div>}
                   <div className="border-t border-[#1a1a1a] pt-2 mt-2 flex justify-between"><span className="text-white font-bold">Total</span><span className="text-2xl font-black text-[#EDAC02]">{formatCurrency(totalPrice)}</span></div>
                 </div>
               </div>
