@@ -2355,22 +2355,39 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     
     const exportData = registrations.map((r: any) => {
       const isTeamCat = ((r.categories as any)?.team_size || 1) > 1;
+      const addr = r.shipping_address || {};
       let base: any = {
         ID: r.id,
         Data_Inscricao: r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '',
         Categoria: (r.categories as any)?.name || '',
         Status: r.status,
-        Valor: r.total_paid || 0,
+        Valor_Total: r.total_paid || 0,
         Numero_Peito: r.bib_number || '',
         Nome_Equipe: isTeamCat ? r.team_name : '',
+        // Atleta principal
         Nome_Atleta_1: r.athlete_name || '',
         Email_Atleta_1: r.athlete_email || '',
         Telefone_Atleta_1: r.athlete_phone || '',
         Instagram_Atleta_1: r.athlete_instagram || '',
         Data_Nasc_Atleta_1: r.athlete_birth_date || '',
         Genero_Atleta_1: r.athlete_gender || '',
+        Modelo_Camisa: (r.shirt_models as any)?.name || '',
         Tamanho_Camisa_Atleta_1: r.athlete_shirt_size || '',
-        Local_Treino_Atleta_1: r.athlete_gym || ''
+        Local_Treino_Atleta_1: r.athlete_gym || '',
+        // CPF e endereço de entrega (evento Seleção)
+        CPF_Destinatario: r.athlete_cpf || '',
+        CEP: addr.cep || '',
+        Rua: addr.rua || '',
+        Numero_End: addr.numero || '',
+        Complemento: addr.complemento || '',
+        Bairro: addr.bairro || '',
+        Cidade: addr.cidade || '',
+        Estado: addr.estado || '',
+        // Frete e etiqueta
+        Frete_Servico: r.shipping_service_name || '',
+        Frete_Valor: r.shipping_freight_amount || '',
+        Etiqueta_URL: r.shipping_label_url || '',
+        Rastreio: r.shipping_tracking_code || '',
       };
       
       if (isTeamCat && r.team_members && Array.isArray(r.team_members)) {

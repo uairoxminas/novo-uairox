@@ -498,7 +498,8 @@ export function useEventRegistrations(eventId?: string) {
         .select(`
           *,
           categories(name, team_size),
-          heats(title, start_time)
+          heats(title, start_time),
+          shirt_models(name)
         `)
         .eq("event_id", eventId!)
         .order("created_at", { ascending: false });
