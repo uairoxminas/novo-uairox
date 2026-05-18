@@ -1786,7 +1786,7 @@ function ShirtModelsSection({ kit, eventId }: { kit: any; eventId: string }) {
     if (editingId) {
       await updateModel.mutateAsync({ id: editingId, kit_id: kit.id, event_id: eventId, name: name.trim(), photo_url: photoUrl || null, size_chart_url: sizeChartUrl || null, available_sizes: sizes });
     } else {
-      await createModel.mutateAsync({ kit_id: kit.id, event_id: eventId, name: name.trim(), photo_url: photoUrl || null, size_chart_url: sizeChartUrl || null, available_sizes: sizes });
+      await createModel.mutateAsync({ kit_id: kit.id, event_id: eventId, name: name.trim(), photo_url: photoUrl || undefined, size_chart_url: sizeChartUrl || undefined, available_sizes: sizes });
     }
     resetForm();
   };
