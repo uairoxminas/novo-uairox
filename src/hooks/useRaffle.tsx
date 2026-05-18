@@ -162,12 +162,18 @@ export function useDeleteRaffleWinner() {
 }
 
 // ============ TYPES ============
+export interface RafflePrize {
+  description: string;
+  photo_url?: string;
+}
+
 export interface RaffleConfig {
   id: string;
   event_id: string;
-  prizes: { description: string }[];
+  prizes: RafflePrize[];
   is_live: boolean;
   show_ticket_list: boolean;
+  celebration_image_url?: string;
   created_at: string;
   updated_at: string;
 }
