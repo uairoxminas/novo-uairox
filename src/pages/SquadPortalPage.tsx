@@ -69,7 +69,7 @@ export default function SquadPortalPage() {
   const [byEvent, setByEvent] = useState<{ eventTitle: string; count: number; date: string }[]>([]);
   const [activeKit, setActiveKit] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
-  const [arts, setArts] = useState<{ id: string; title: string; description: string | null; image_url: string }[]>([]);
+  const [arts, setArts] = useState<{ id: string; title: string; description: string | null; image_url: string; event_id: string | null; events?: { title: string } | null }[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -79,8 +79,10 @@ export default function SquadPortalPage() {
   const load = async () => {
     setLoading(true);
 
-    // Load promo arts (fire-and-forget alongside owner lookup)
-    db.from('squad_promo_arts').select('id, title, description, image_url').order('created_at', { ascending: false })
+    // Load promo arts grouped by event (fire-and-forget)
+    db.from('squad_promo_arts').select('id, title, description, image_url, event_id, events(title)')
+      .not('event_id', 'is', null)
+      .order('event_id').order('created_at', { ascending: false })
       .then(({ data }: any) => setArts(data ?? []));
 
     // Try squad_members by coupon_code slug first, then by portal_token UUID
@@ -318,34 +320,47 @@ export default function SquadPortalPage() {
             <p className="text-xs text-zinc-500 mt-0.5">Legendas prontas para copiar e postar agora mesmo</p>
           </div>
 
-          {/* Artes para download */}
-          {arts.length > 0 && (
-            <div className="p-4 border-b border-[#1a1a1a] space-y-3">
-              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">🎨 Artes do Evento</p>
-              <div className="grid grid-cols-2 gap-3">
-                {arts.map(art => (
-                  <div key={art.id} className="rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#050505]">
-                    <div className="aspect-square overflow-hidden bg-[#111]">
-                      <img src={art.image_url} alt={art.title} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="p-2.5 space-y-1.5">
-                      <p className="text-xs font-bold text-white truncate">{art.title}</p>
-                      {art.description && <p className="text-[10px] text-zinc-500 truncate">{art.description}</p>}
-                      <a
-                        href={art.image_url}
-                        download
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-[#EDAC02] text-black text-xs font-black hover:bg-[#d49b02] transition-colors"
-                      >
-                        ⬇ Baixar
-                      </a>
+          {/* Artes para download — agrupadas por evento */}
+          {arts.length > 0 && (() => {
+            const grouped = arts.reduce<Record<string, { eventTitle: string; items: typeof arts }>>((acc, art) => {
+              const key = art.event_id ?? '__none__';
+              const evTitle = art.events?.title ?? 'Evento';
+              if (!acc[key]) acc[key] = { eventTitle: evTitle, items: [] };
+              acc[key].items.push(art);
+              return acc;
+            }, {});
+            return (
+              <div className="p-4 border-b border-[#1a1a1a] space-y-5">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">🎨 Artes para Download</p>
+                {Object.entries(grouped).map(([key, group]) => (
+                  <div key={key} className="space-y-2">
+                    <p className="text-[10px] font-black text-[#EDAC02] uppercase tracking-widest">📅 {group.eventTitle}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {group.items.map(art => (
+                        <div key={art.id} className="rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#050505]">
+                          <div className="aspect-square overflow-hidden bg-[#111]">
+                            <img src={art.image_url} alt={art.title} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="p-2.5 space-y-1.5">
+                            <p className="text-xs font-bold text-white truncate">{art.title}</p>
+                            {art.description && <p className="text-[10px] text-zinc-500 truncate">{art.description}</p>}
+                            <a
+                              href={art.image_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-[#EDAC02] text-black text-xs font-black hover:bg-[#d49b02] transition-colors"
+                            >
+                              ⬇ Baixar
+                            </a>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="p-4 space-y-3">
             {templates.map((t, i) => (

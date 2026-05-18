@@ -37,24 +37,34 @@ interface SquadMember {
 }
 
 // ── Promo Arts Tab ────────────────────────────────────────────
-interface PromoArt { id: string; title: string; description: string | null; image_url: string; created_at: string; }
+interface PromoArt {
+  id: string; title: string; description: string | null;
+  image_url: string; created_at: string;
+  event_id: string | null; events?: { title: string } | null;
+}
 
 function ArtsTab() {
   const db = supabase as any;
   const [arts, setArts] = useState<PromoArt[]>([]);
+  const [events, setEvents] = useState<{ id: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  useEffect(() => { fetchArts(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const fetchArts = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data } = await db.from('squad_promo_arts').select('*').order('created_at', { ascending: false });
-    setArts(data ?? []);
+    const [artsRes, eventsRes] = await Promise.all([
+      db.from('squad_promo_arts').select('*, events(title)').order('event_id').order('created_at', { ascending: false }),
+      db.from('events').select('id, title').order('date', { ascending: false }).limit(30),
+    ]);
+    setArts(artsRes.data ?? []);
+    setEvents(eventsRes.data ?? []);
     setLoading(false);
   };
 
@@ -68,6 +78,7 @@ function ArtsTab() {
   const handleUpload = async (e: React.BaseSyntheticEvent) => {
     e.preventDefault();
     if (!file || !title.trim()) { toast.error('Título e imagem são obrigatórios'); return; }
+    if (!selectedEventId) { toast.error('Selecione o evento para esta arte'); return; }
     setUploading(true);
     try {
       const ext = file.name.split('.').pop();
@@ -75,10 +86,15 @@ function ArtsTab() {
       const { error: upErr } = await supabase.storage.from('squad-arts').upload(path, file, { upsert: true });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('squad-arts').getPublicUrl(path);
-      await db.from('squad_promo_arts').insert({ title: title.trim(), description: description.trim() || null, image_url: publicUrl });
+      await db.from('squad_promo_arts').insert({
+        title: title.trim(),
+        description: description.trim() || null,
+        image_url: publicUrl,
+        event_id: selectedEventId,
+      });
       toast.success('Arte adicionada!');
-      setTitle(''); setDescription(''); setFile(null); setPreview(null);
-      fetchArts();
+      setTitle(''); setDescription(''); setFile(null); setPreview(null); setSelectedEventId('');
+      fetchData();
     } catch (err: any) {
       toast.error('Erro: ' + err.message);
     } finally {
@@ -90,8 +106,17 @@ function ArtsTab() {
     if (!window.confirm(`Excluir "${art.title}"?`)) return;
     await db.from('squad_promo_arts').delete().eq('id', art.id);
     toast.success('Arte removida');
-    fetchArts();
+    fetchData();
   };
+
+  // Group arts by event
+  const grouped = arts.reduce<Record<string, { eventTitle: string; arts: PromoArt[] }>>((acc, art) => {
+    const key = art.event_id ?? '__none__';
+    const eventTitle = art.events?.title ?? 'Sem evento';
+    if (!acc[key]) acc[key] = { eventTitle, arts: [] };
+    acc[key].arts.push(art);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -99,24 +124,28 @@ function ArtsTab() {
       <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5">
         <p className="text-sm font-black text-white uppercase tracking-wider mb-4">🎨 Adicionar Nova Arte</p>
         <form onSubmit={handleUpload} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Evento *</label>
+              <select value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg">
+                <option value="">Selecione o evento...</option>
+                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Título *</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Story — Evento Janeiro" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg" />
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Story 9:16" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg" />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Descrição (opcional)</label>
-              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Use nos Stories 9:16" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg" />
+              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Use nos Stories" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Imagem *</label>
             <label className="flex items-center gap-4 cursor-pointer group">
               <div className="w-24 h-24 rounded-xl border-2 border-dashed border-dark-border group-hover:border-brand-500 bg-[#111] flex items-center justify-center overflow-hidden transition-colors flex-shrink-0">
-                {preview
-                  ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
-                  : <Upload size={24} className="text-zinc-600 group-hover:text-brand-500 transition-colors" />
-                }
+                {preview ? <img src={preview} alt="preview" className="w-full h-full object-cover" /> : <Upload size={24} className="text-zinc-600 group-hover:text-brand-500 transition-colors" />}
               </div>
               <div className="text-xs text-zinc-500 leading-relaxed">
                 <p className="text-zinc-300 font-bold mb-0.5">Clique para selecionar</p>
@@ -132,28 +161,35 @@ function ArtsTab() {
         </form>
       </div>
 
-      {/* Arts grid */}
+      {/* Arts grouped by event */}
       {loading ? (
         <div className="flex justify-center py-12"><RefreshCw className="w-6 h-6 text-brand-500 animate-spin" /></div>
-      ) : arts.length === 0 ? (
+      ) : Object.keys(grouped).length === 0 ? (
         <div className="text-center py-16 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
           <p className="text-4xl mb-3">🎨</p>
           <p className="text-zinc-500 text-sm">Nenhuma arte publicada ainda.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {arts.map(art => (
-            <div key={art.id} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden group">
-              <div className="aspect-square relative overflow-hidden bg-[#111]">
-                <img src={art.image_url} alt={art.title} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <a href={art.image_url} target="_blank" rel="noreferrer" download className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-xs font-bold">⬇ Ver</a>
-                  <button onClick={() => handleDelete(art)} className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/40 transition-colors text-red-400"><Trash2 size={14} /></button>
-                </div>
-              </div>
-              <div className="p-3">
-                <p className="text-xs font-bold text-white truncate">{art.title}</p>
-                {art.description && <p className="text-[10px] text-zinc-500 mt-0.5 truncate">{art.description}</p>}
+        <div className="space-y-8">
+          {Object.entries(grouped).map(([key, group]) => (
+            <div key={key}>
+              <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest mb-3">📅 {group.eventTitle}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {group.arts.map(art => (
+                  <div key={art.id} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden group">
+                    <div className="aspect-square relative overflow-hidden bg-[#111]">
+                      <img src={art.image_url} alt={art.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <a href={art.image_url} target="_blank" rel="noreferrer" className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-xs font-bold">⬇ Ver</a>
+                        <button onClick={() => handleDelete(art)} className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/40 transition-colors text-red-400"><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-xs font-bold text-white truncate">{art.title}</p>
+                      {art.description && <p className="text-[10px] text-zinc-500 mt-0.5 truncate">{art.description}</p>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
