@@ -345,10 +345,11 @@ export default function AdminSquad() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-1">
-                          {member.portal_token && (
+                          {(member.coupon_code || member.portal_token) && (
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/squad/${member.portal_token}`);
+                                const slug = member.coupon_code || member.portal_token;
+                                navigator.clipboard.writeText(`${window.location.origin}/squad/${slug}`);
                                 toast.success('Link do portal copiado!');
                               }}
                               className="p-2 text-zinc-500 hover:text-brand-500 transition-colors text-xs font-bold"

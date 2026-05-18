@@ -78,8 +78,11 @@ export default function SquadPortalPage() {
   const load = async () => {
     setLoading(true);
 
-    // Try squad_members first
-    const smRes = await db.from('squad_members').select('*').eq('portal_token', token).maybeSingle();
+    // Try squad_members by coupon_code slug first, then by portal_token UUID
+    const smByCoupon = await db.from('squad_members').select('*').ilike('coupon_code', token!).maybeSingle();
+    const smRes = smByCoupon.data
+      ? smByCoupon
+      : await db.from('squad_members').select('*').eq('portal_token', token).maybeSingle();
     if (smRes.data) {
       setOwner(smRes.data);
       setOwnerType('squad');
@@ -88,8 +91,11 @@ export default function SquadPortalPage() {
       return;
     }
 
-    // Try training_locations
-    const locRes = await db.from('training_locations').select('*').eq('portal_token', token).maybeSingle();
+    // Try training_locations by coupon_code slug first, then by portal_token UUID
+    const locByCoupon = await db.from('training_locations').select('*').ilike('coupon_code', token!).maybeSingle();
+    const locRes = locByCoupon.data
+      ? locByCoupon
+      : await db.from('training_locations').select('*').eq('portal_token', token).maybeSingle();
     if (locRes.data) {
       setOwner(locRes.data);
       setOwnerType('location');

@@ -1361,26 +1361,25 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
               let phone: string | null = null;
               let ownerName: string | null = null;
-              let portalToken: string | null = null;
-
+              let portalSlug: string | null = null;
               if (couponDiscount.squad_member_id) {
                 const { data: sm } = await (supabase as any).from('squad_members')
-                  .select('full_name, phone, portal_token').eq('id', couponDiscount.squad_member_id).single();
+                  .select('full_name, phone, coupon_code, portal_token').eq('id', couponDiscount.squad_member_id).single();
                 phone = sm?.phone?.replace(/\D/g, '') ?? null;
                 ownerName = sm?.full_name ?? null;
-                portalToken = sm?.portal_token ?? null;
+                portalSlug = sm?.coupon_code || sm?.portal_token || null;
               } else {
                 const { data: loc } = await (supabase as any).from('training_locations')
-                  .select('name, whatsapp, portal_token').eq('id', couponDiscount.location_id).single();
+                  .select('name, whatsapp, coupon_code, portal_token').eq('id', couponDiscount.location_id).single();
                 phone = loc?.whatsapp?.replace(/\D/g, '') ?? null;
                 ownerName = loc?.name ?? null;
-                portalToken = loc?.portal_token ?? null;
+                portalSlug = loc?.coupon_code || loc?.portal_token || null;
               }
 
               if (!phone) return;
 
               const levelNames: Record<number, string> = { 10: 'Bronze 🥉', 20: 'Bronze 🥉', 30: 'Prata 🥈', 50: 'Ouro 🥇', 100: 'Elite 🔥' };
-              const portalUrl = portalToken ? `${window.location.origin}/squad/${portalToken}` : '';
+              const portalUrl = portalSlug ? `${window.location.origin}/squad/${portalSlug}` : '';
               const marcoTemplate = bcfg.msg_marco || DEFAULT_MESSAGES.marco;
               const message = interpolate(marcoTemplate, {
                 nome: ownerName ?? '',

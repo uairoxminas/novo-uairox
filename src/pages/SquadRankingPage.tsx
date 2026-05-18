@@ -231,7 +231,8 @@ export default function SquadRankingPage() {
           <div className="space-y-2">
             {visible.map((e, i) => {
               const level = getLevel(e.total);
-              const portalUrl = e.portal_token ? `${window.location.origin}/squad/${e.portal_token}` : null;
+              const portalSlug = e.coupon_code || e.portal_token;
+              const portalUrl = portalSlug ? `${window.location.origin}/squad/${portalSlug}` : null;
               return (
                 <motion.div
                   key={e.id}
