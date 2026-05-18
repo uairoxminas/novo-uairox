@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS public.raffle_tickets (
 
 ALTER TABLE public.raffle_tickets ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "raffle_tickets_public_read" ON public.raffle_tickets FOR SELECT USING (true);
-CREATE POLICY "raffle_tickets_auth_write"  ON public.raffle_tickets FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "raffle_tickets_anon_write"  ON public.raffle_tickets FOR ALL USING (true) WITH CHECK (true);
 
 -- Vencedores sorteados
 CREATE TABLE IF NOT EXISTS public.raffle_winners (
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.raffle_winners (
 
 ALTER TABLE public.raffle_winners ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "raffle_winners_public_read" ON public.raffle_winners FOR SELECT USING (true);
-CREATE POLICY "raffle_winners_auth_write"  ON public.raffle_winners FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "raffle_winners_anon_write"  ON public.raffle_winners FOR ALL USING (true) WITH CHECK (true);
 
 -- Configurações do sorteio por evento
 CREATE TABLE IF NOT EXISTS public.raffle_configs (
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.raffle_configs (
 
 ALTER TABLE public.raffle_configs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "raffle_configs_public_read" ON public.raffle_configs FOR SELECT USING (true);
-CREATE POLICY "raffle_configs_auth_write"  ON public.raffle_configs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "raffle_configs_anon_write"  ON public.raffle_configs FOR ALL USING (true) WITH CHECK (true);
 
 -- Função SQL: gera (ou re-gera) todos os tickets de um evento
 CREATE OR REPLACE FUNCTION public.generate_raffle_tickets(p_event_id UUID)
