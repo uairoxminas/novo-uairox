@@ -43,6 +43,7 @@ import SquadPortalPage from './pages/SquadPortalPage';
 import SquadRankingPage from './pages/SquadRankingPage';
 import PartnerViewPage from './pages/PartnerViewPage';
 import PublicEventSchedule from './pages/PublicEventSchedule';
+import ChallengePortalPage from './pages/ChallengePortalPage';
 
 // Páginas Juiz
 import JudgePassagesPanel from './pages/judge/JudgePassagesPanel';
@@ -106,6 +107,9 @@ export default function App() {
 
           {/* Painel do Parceiro — Visualização read-only via token */}
           <Route path="/parceiro/:token" element={<PartnerViewPage />} />
+
+          {/* Portal do atleta — Desafio (GymRats-like) */}
+          <Route path="/desafio/:slug/:registrationId" element={<ChallengePortalPage />} />
 
           {/* 2. Área do Admin — Acesso total com senha */}
           <Route path="/admin" element={
