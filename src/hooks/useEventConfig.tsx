@@ -385,7 +385,7 @@ export function useAthleteKits(eventId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("athlete_kits")
-        .select("*")
+        .select("*, shirt_models(*)")
         .eq("event_id", eventId!)
         .order("created_at");
       if (error) throw error;
@@ -438,6 +438,53 @@ export function useDeleteAthleteKit() {
       toast.success("Kit excluído!");
     },
     onError: (e) => toast.error("Erro: " + e.message),
+  });
+}
+
+// ============ SHIRT MODELS ============
+export function useCreateShirtModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (model: { kit_id: string; event_id: string; name: string; photo_url?: string; size_chart_url?: string; available_sizes?: string[]; order_index?: number }) => {
+      const { event_id, ...insert } = model;
+      const { data, error } = await supabase.from("shirt_models" as any).insert(insert).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["athlete-kits", vars.event_id] });
+      toast.success("Modelo criado!");
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+}
+
+export function useUpdateShirtModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, event_id, kit_id, ...updates }: { id: string; event_id: string; kit_id: string; [key: string]: any }) => {
+      const { error } = await supabase.from("shirt_models" as any).update(updates).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["athlete-kits", vars.event_id] });
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+}
+
+export function useDeleteShirtModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; event_id: string; kit_id: string }) => {
+      const { error } = await supabase.from("shirt_models" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["athlete-kits", vars.event_id] });
+      toast.success("Modelo excluído!");
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
   });
 }
 

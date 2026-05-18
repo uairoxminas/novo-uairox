@@ -9,6 +9,7 @@ import {
   useDiscountCoupons, useCreateDiscountCoupon, useUpdateDiscountCoupon, useDeleteDiscountCoupon,
   useCouponBatchRules, useCreateCouponBatchRule, useDeleteCouponBatchRule,
   useAthleteKits, useCreateAthleteKit, useUpdateAthleteKit, useDeleteAthleteKit,
+  useCreateShirtModel, useUpdateShirtModel, useDeleteShirtModel,
   useEventRegistrations, useEventStats,
   useHeats, useCreateHeat, useUpdateHeat, useDeleteHeat,
   useLaneAssignments, useAssignLane, useCreateLaneAssignments, useAutoGenerateHeats, useCategoryRegCounts,
@@ -1661,6 +1662,156 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   );
 }
 
+// ============ SHIRT MODELS SECTION ============
+const ALL_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XGG'];
+
+function ShirtModelsSection({ kit, eventId }: { kit: any; eventId: string }) {
+  const createModel = useCreateShirtModel();
+  const updateModel = useUpdateShirtModel();
+  const deleteModel = useDeleteShirtModel();
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [sizeChartUrl, setSizeChartUrl] = useState('');
+  const [sizes, setSizes] = useState<string[]>([]);
+  const [uploading, setUploading] = useState<'photo' | 'chart' | null>(null);
+  const [sizeChartPreview, setSizeChartPreview] = useState<string | null>(null);
+
+  const models: any[] = kit.shirt_models || [];
+
+  const resetForm = () => { setName(''); setPhotoUrl(''); setSizeChartUrl(''); setSizes([]); setEditingId(null); setShowForm(false); };
+
+  const startEdit = (m: any) => { setEditingId(m.id); setName(m.name); setPhotoUrl(m.photo_url || ''); setSizeChartUrl(m.size_chart_url || ''); setSizes(m.available_sizes || []); setShowForm(true); };
+
+  const uploadFile = async (file: File, type: 'photo' | 'chart') => {
+    setUploading(type);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `shirt-${kit.id}-${type}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('kits').upload(path, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from('kits').getPublicUrl(path);
+      if (type === 'photo') setPhotoUrl(data.publicUrl);
+      else setSizeChartUrl(data.publicUrl);
+    } catch (e: any) { toast.error('Erro no upload: ' + e.message); }
+    finally { setUploading(null); }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    if (editingId) {
+      await updateModel.mutateAsync({ id: editingId, kit_id: kit.id, event_id: eventId, name: name.trim(), photo_url: photoUrl || null, size_chart_url: sizeChartUrl || null, available_sizes: sizes });
+    } else {
+      await createModel.mutateAsync({ kit_id: kit.id, event_id: eventId, name: name.trim(), photo_url: photoUrl || null, size_chart_url: sizeChartUrl || null, available_sizes: sizes });
+    }
+    resetForm();
+  };
+
+  return (
+    <div className="mt-3 border-t border-[#1a1a1a] pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-bold text-[#EDAC02] uppercase tracking-wider">🎽 Modelos de Camisa</p>
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold transition-colors">+ Modelo</button>
+      </div>
+
+      {models.length === 0 && !showForm && (
+        <p className="text-[10px] text-zinc-600 text-center py-2">Nenhum modelo cadastrado — tamanhos fixos (PP–XGG)</p>
+      )}
+
+      <div className="space-y-2">
+        {models.map((m: any) => (
+          <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg bg-[#0a0a0a] border border-[#1a1a1a] group">
+            {m.photo_url
+              ? <img src={m.photo_url} alt={m.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+              : <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center flex-shrink-0 text-lg">👕</div>
+            }
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-white truncate">{m.name}</p>
+              <p className="text-[10px] text-zinc-500">{(m.available_sizes || []).join(' · ') || 'Sem tamanhos'}</p>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {m.size_chart_url && (
+                <button onClick={() => setSizeChartPreview(m.size_chart_url)} className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px]" title="Ver tabela">📏</button>
+              )}
+              <button onClick={() => startEdit(m)} className="p-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px]">✏️</button>
+              <button onClick={() => deleteModel.mutate({ id: m.id, kit_id: kit.id, event_id: eventId })} className="p-1 rounded bg-zinc-700 hover:bg-red-500/30 text-zinc-400 hover:text-red-400 text-[10px]">🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showForm && (
+        <div className="mt-2 p-3 rounded-lg border border-[#262626] bg-[#0a0a0a] space-y-3">
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{editingId ? 'Editar Modelo' : 'Novo Modelo'}</p>
+          <div>
+            <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Nome do Modelo *</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Modelo Masculino, Feminino Dry-Fit..." className="w-full bg-[#111] border border-[#262626] rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#EDAC02]/40" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Foto do Modelo</label>
+              {photoUrl
+                ? <div className="relative rounded-lg overflow-hidden border border-[#262626] group/img h-24">
+                    <img src={photoUrl} alt="modelo" className="w-full h-full object-cover" />
+                    <button onClick={() => setPhotoUrl('')} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 text-white text-[10px] font-bold transition-opacity">Trocar</button>
+                  </div>
+                : <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-[#262626] hover:border-[#EDAC02] rounded-lg text-zinc-500 cursor-pointer transition-colors">
+                    {uploading === 'photo' ? <span className="text-[10px] text-[#EDAC02] animate-pulse">Enviando...</span> : <><span className="text-xl">📸</span><span className="text-[10px]">Upload foto</span></>}
+                    <input type="file" className="hidden" accept="image/*" disabled={!!uploading} onChange={e => e.target.files?.[0] && uploadFile(e.target.files[0], 'photo')} />
+                  </label>
+              }
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">Tabela de Medidas</label>
+              {sizeChartUrl
+                ? <div className="relative rounded-lg overflow-hidden border border-[#262626] group/img h-24">
+                    <img src={sizeChartUrl} alt="tabela" className="w-full h-full object-contain bg-white/5" />
+                    <button onClick={() => setSizeChartUrl('')} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 text-white text-[10px] font-bold transition-opacity">Trocar</button>
+                  </div>
+                : <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-[#262626] hover:border-[#EDAC02] rounded-lg text-zinc-500 cursor-pointer transition-colors">
+                    {uploading === 'chart' ? <span className="text-[10px] text-[#EDAC02] animate-pulse">Enviando...</span> : <><span className="text-xl">📏</span><span className="text-[10px]">Upload tabela</span></>}
+                    <input type="file" className="hidden" accept="image/*" disabled={!!uploading} onChange={e => e.target.files?.[0] && uploadFile(e.target.files[0], 'chart')} />
+                  </label>
+              }
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-2">Tamanhos Disponíveis</label>
+            <div className="flex flex-wrap gap-2">
+              {ALL_SIZES.map(s => (
+                <button key={s} onClick={() => setSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${sizes.includes(s) ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]' : 'border-[#262626] bg-[#050505] text-zinc-500 hover:text-white'}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={resetForm} className="flex-1 py-2 rounded-lg border border-[#262626] text-zinc-400 hover:text-white text-xs font-bold transition-colors">Cancelar</button>
+            <button onClick={handleSave} disabled={!name.trim() || createModel.isPending || updateModel.isPending} className="flex-1 py-2 rounded-lg bg-[#EDAC02] text-black text-xs font-bold hover:bg-[#d4980a] disabled:opacity-50 transition-colors">
+              {(createModel.isPending || updateModel.isPending) ? 'Salvando...' : 'Salvar Modelo'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sizeChartPreview && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setSizeChartPreview(null)}>
+          <div className="max-w-lg w-full bg-[#0a0a0a] rounded-2xl overflow-hidden border border-[#262626]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
+              <p className="text-sm font-bold text-white">📏 Tabela de Medidas</p>
+              <button onClick={() => setSizeChartPreview(null)} className="text-zinc-500 hover:text-white text-lg">✕</button>
+            </div>
+            <img src={sizeChartPreview} alt="tabela de medidas" className="w-full object-contain max-h-[70vh]" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============ TAB: KITS ============
 function KitsTab({ eventId }: { eventId: string }) {
   const { data: kits } = useAthleteKits(eventId);
@@ -1747,6 +1898,7 @@ function KitsTab({ eventId }: { eventId: string }) {
               <p className={`text-lg font-black mt-2 ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
                 {kit.is_optional === false ? 'Cortesia' : `+ R$ ${Number(kit.price).toFixed(2)}`}
               </p>
+              <ShirtModelsSection kit={kit} eventId={eventId} />
             </div>
           </div>
         ))}

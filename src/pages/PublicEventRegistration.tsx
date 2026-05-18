@@ -1077,8 +1077,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     }
   }, [kits, kitId]);
   // Athlete data structure - index 0 = main athlete, 1+ = team members
-  type AthleteData = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; shirt_size: string; gym: string; photo_url: string; };
-  const emptyAthlete = (): AthleteData => ({ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', shirt_size: '', gym: '', photo_url: '' });
+  type AthleteData = { name: string; email: string; phone: string; instagram: string; birth_date: string; gender: string; shirt_size: string; shirt_model_id: string; gym: string; photo_url: string; };
+  const emptyAthlete = (): AthleteData => ({ name: '', email: '', phone: '', instagram: '', birth_date: '', gender: '', shirt_size: '', shirt_model_id: '', gym: '', photo_url: '' });
   const [athletes, setAthletes] = useState<AthleteData[]>([emptyAthlete()]);
   const [teamName, setTeamName] = useState('');
   const [photoUploading, setPhotoUploading] = useState<number | null>(null);
@@ -1090,6 +1090,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'pix' | 'card' | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [processingConfirmation, setProcessingConfirmation] = useState(false);
+  const [sizeChartModal, setSizeChartModal] = useState<string | null>(null);
 
   // Installment state
   const [paymentType, setPaymentType] = useState<'full' | 'card' | 'installments'>('full');
@@ -1119,6 +1120,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const selectedCategory = categories.find(c => c.id === categoryId);
   const selectedKit = kits.find(k => k.id === kitId);
+  const kitShirtModels: any[] = selectedKit?.shirt_models || [];
   const formActiveBatch = getActiveBatch(batches, categoryId);
   const teamSize = selectedCategory?.team_size || 1;
   const isTeam = teamSize > 1;
@@ -1310,6 +1312,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         athlete_name: a1.name.trim(), athlete_email: a1.email.trim(),
         athlete_phone: a1.phone.trim(), athlete_birth_date: a1.birth_date || null,
         athlete_gender: a1.gender || null, athlete_shirt_size: a1.shirt_size || null,
+        shirt_model_id: a1.shirt_model_id || null,
         athlete_instagram: a1.instagram.trim() || null,
         athlete_gym: a1.gym.trim() || null,
         athlete_photo_url: a1.photo_url || null,
@@ -1502,6 +1505,19 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
   const inputClass = "w-full bg-[#050505] border border-[#262626] rounded-lg p-3 text-white placeholder:text-zinc-600 focus:border-[#EDAC02] focus:outline-none transition-colors";
   const labelClass = "block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5";
+
+  // ============ SIZE CHART MODAL ============
+  const SizeChartModal = sizeChartModal ? (
+    <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={() => setSizeChartModal(null)}>
+      <div className="max-w-md w-full bg-[#0a0a0a] rounded-2xl overflow-hidden border border-[#262626]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
+          <p className="text-sm font-bold text-white">📏 Tabela de Medidas</p>
+          <button onClick={() => setSizeChartModal(null)} className="text-zinc-500 hover:text-white text-xl leading-none">✕</button>
+        </div>
+        <img src={sizeChartModal} alt="Tabela de medidas" className="w-full object-contain max-h-[70vh]" />
+      </div>
+    </div>
+  ) : null;
 
   // ============ PROCESSING OVERLAY ============
   if (processingConfirmation) {
@@ -1928,11 +1944,13 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     if (step === 1) {
       const a1 = athletes[0];
       if (!a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.shirt_size || !a1.gym.trim()) return false;
+      if (kitShirtModels.length > 0 && !a1.shirt_model_id) return false;
       if (isTeam) {
         if (!teamName.trim()) return false;
         for (let i = 1; i < athletes.length; i++) {
           const m = athletes[i];
           if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.shirt_size || !m.gym.trim()) return false;
+          if (kitShirtModels.length > 0 && !m.shirt_model_id) return false;
         }
       }
       if (event?.slug === 'selecao') {
@@ -1946,6 +1964,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   };
 
   return (
+    <>
+    {SizeChartModal}
     <section id="inscricao" className="py-20 bg-[#050505] border-t border-[#1a1a1a]">
       <div className="max-w-xl mx-auto px-4 space-y-6">
         <div className="text-center mb-8">
@@ -2104,18 +2124,75 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                   <div><label className={labelClass}>Data de Nascimento *</label><input type="date" value={athlete.birth_date} onChange={e => updateAthlete(idx, 'birth_date', e.target.value)} className={inputClass} /></div>
                   <div><label className={labelClass}>Gênero *</label><select value={athlete.gender} onChange={e => updateAthlete(idx, 'gender', e.target.value)} className={inputClass}><option value="">Selecione</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
                 </div>
-                <div>
-                  <label className={labelClass}>Tamanho da Camisa *</label>
-                  <select value={athlete.shirt_size} onChange={e => updateAthlete(idx, 'shirt_size', e.target.value)} className={inputClass}>
-                    <option value="">Selecione o tamanho</option>
-                    <option value="PP">PP</option>
-                    <option value="P">P</option>
-                    <option value="M">M</option>
-                    <option value="G">G</option>
-                    <option value="GG">GG</option>
-                    <option value="EXG">EXG</option>
-                  </select>
-                </div>
+                {kitShirtModels.length > 0 ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className={labelClass}>Modelo da Camisa *</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {kitShirtModels.map((model: any) => (
+                          <button
+                            key={model.id}
+                            type="button"
+                            onClick={() => { updateAthlete(idx, 'shirt_model_id', model.id); updateAthlete(idx, 'shirt_size', ''); }}
+                            className={`relative rounded-xl border overflow-hidden transition-all text-left ${athlete.shirt_model_id === model.id ? 'border-[#EDAC02] ring-1 ring-[#EDAC02]/40' : 'border-[#1a1a1a] hover:border-zinc-600'}`}
+                          >
+                            {model.photo_url
+                              ? <img src={model.photo_url} alt={model.name} className="w-full h-28 object-cover" />
+                              : <div className="w-full h-28 bg-[#0a0a0a] flex items-center justify-center text-3xl">👕</div>
+                            }
+                            <div className="p-2 bg-[#0a0a0a]">
+                              <p className="text-xs font-bold text-white leading-tight">{model.name}</p>
+                              {model.size_chart_url && (
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); setSizeChartModal(model.size_chart_url); }}
+                                  className="mt-1 text-[10px] text-[#EDAC02] hover:underline"
+                                >📏 Ver tabela de medidas</button>
+                              )}
+                            </div>
+                            {athlete.shirt_model_id === model.id && (
+                              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#EDAC02] flex items-center justify-center">
+                                <span className="text-black text-[10px] font-black">✓</span>
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {athlete.shirt_model_id && (() => {
+                      const model = kitShirtModels.find((m: any) => m.id === athlete.shirt_model_id);
+                      const sizes: string[] = model?.available_sizes || [];
+                      return sizes.length > 0 ? (
+                        <div>
+                          <label className={labelClass}>Tamanho *</label>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {sizes.map(s => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => updateAthlete(idx, 'shirt_size', s)}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${athlete.shirt_size === s ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]' : 'border-[#1a1a1a] bg-[#0a0a0a] text-zinc-400 hover:text-white hover:border-zinc-600'}`}
+                              >{s}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  <div>
+                    <label className={labelClass}>Tamanho da Camisa *</label>
+                    <select value={athlete.shirt_size} onChange={e => updateAthlete(idx, 'shirt_size', e.target.value)} className={inputClass}>
+                      <option value="">Selecione o tamanho</option>
+                      <option value="PP">PP</option>
+                      <option value="P">P</option>
+                      <option value="M">M</option>
+                      <option value="G">G</option>
+                      <option value="GG">GG</option>
+                      <option value="EXG">EXG</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* Shipping address — selecao event, main athlete only */}
                 {event?.slug === 'selecao' && idx === 0 && (
@@ -2448,5 +2525,6 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         </div>
       </div>
     </section>
+    </>
   );
 }
