@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { sendWebhook } from '@/lib/botconversa';
 import { toast } from 'sonner';
 import {
   useChallengeLeaderboard,
@@ -185,14 +186,22 @@ function WorkoutCard({
 }
 
 // ── Workout Modal ─────────────────────────────────────────────
+const MILESTONE_MESSAGES: Record<number, (name: string) => string> = {
+  10: (name) => `🎉 PARABÉNS, ${name}! Você completou *10 treinos* no Desafio UAIROX! Continue assim, você está arrasando! 💪`,
+  20: (name) => `🔥 INCRÍVEL, ${name}! *20 treinos* no Desafio UAIROX! Faltam apenas *10* para garantir sua vaga no sorteio! Bora! ⚡`,
+  30: (name) => `🏆 ${name}, você é INCRÍVEL! Completou os *30 treinos* do Desafio UAIROX e *GARANTIU SUA VAGA NO SORTEIO*! Nos vemos no evento! 🎯`,
+};
+
 function WorkoutModal({
   onClose,
   registration,
   eventId,
+  currentCount,
 }: {
   onClose: () => void;
   registration: any;
   eventId: string;
+  currentCount: number;
 }) {
   const [photoFile, setPhotoFile]       = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -200,6 +209,7 @@ function WorkoutModal({
   const [workoutDate, setWorkoutDate]   = useState(todayStr());
   const [submitting, setSubmitting]     = useState(false);
   const [success, setSuccess]           = useState(false);
+  const [milestone, setMilestone]       = useState<number | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const submitWorkout = useSubmitWorkout();
@@ -232,8 +242,36 @@ function WorkoutModal({
         description:    description.trim(),
         workout_date:   workoutDate,
       });
+
+      // ── Marco automático ──────────────────────────────────
+      const newCount = currentCount + 1;
+      let hitMilestone: number | null = null;
+      if ([10, 20, 30].includes(newCount)) {
+        hitMilestone = newCount;
+        setMilestone(newCount);
+        // Enviar WhatsApp via BotConversa (fire-and-forget)
+        try {
+          const phone = (registration.athlete_phone || '').replace(/\D/g, '');
+          if (phone.length >= 10) {
+            const { data: bcfg } = await (db as any)
+              .from('botconversa_config')
+              .select('trigger_inscricao_url')
+              .eq('event_id', eventId)
+              .maybeSingle();
+            if (bcfg?.trigger_inscricao_url) {
+              await sendWebhook(bcfg.trigger_inscricao_url, {
+                telefone: phone,
+                message: MILESTONE_MESSAGES[newCount](registration.athlete_name),
+              }, { maxAttempts: 2, retryDelay: 500 });
+            }
+          }
+        } catch {
+          // Silencioso — falha na mensagem não quebra o fluxo
+        }
+      }
+
       setSuccess(true);
-      setTimeout(onClose, 1800);
+      setTimeout(onClose, hitMilestone ? 3500 : 1800);
     } catch (err: any) {
       toast.error(err.message ?? 'Erro ao registrar treino.');
       setSubmitting(false);
@@ -266,20 +304,63 @@ function WorkoutModal({
           <AnimatePresence>
             {success && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="absolute inset-0 z-10 bg-[#0a0a0a] flex flex-col items-center justify-center gap-4"
+                className="absolute inset-0 z-10 bg-[#0a0a0a] flex flex-col items-center justify-center gap-4 px-6 text-center"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.1 }}
-                  className="w-20 h-20 rounded-full bg-[#25D366]/10 border-2 border-[#25D366] flex items-center justify-center text-4xl"
-                >
-                  ✅
-                </motion.div>
-                <p className="text-xl font-black text-white">Treino registrado!</p>
-                <p className="text-zinc-500 text-sm">Continue assim! 💪</p>
+                {milestone ? (
+                  <>
+                    <motion.div
+                      initial={{ scale: 0, rotate: -20 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: 'spring', stiffness: 250, damping: 12, delay: 0.1 }}
+                      className="text-7xl"
+                    >
+                      {milestone === 30 ? '🏆' : milestone === 20 ? '🔥' : '🎉'}
+                    </motion.div>
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25 }}
+                      className="text-3xl font-black text-[#EDAC02]"
+                    >
+                      {milestone} Treinos!
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.35 }}
+                      className="text-lg font-bold text-white"
+                    >
+                      {milestone === 30
+                        ? 'Você garantiu sua vaga no sorteio! 🎯'
+                        : milestone === 20
+                        ? `Mais ${GOAL - milestone} para o sorteio! ⚡`
+                        : 'Continue assim! Você está arrasando! 💪'}
+                    </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-xs text-zinc-500"
+                    >
+                      📲 Mensagem enviada no seu WhatsApp
+                    </motion.p>
+                  </>
+                ) : (
+                  <>
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 15, delay: 0.1 }}
+                      className="w-20 h-20 rounded-full bg-[#25D366]/10 border-2 border-[#25D366] flex items-center justify-center text-4xl"
+                    >
+                      ✅
+                    </motion.div>
+                    <p className="text-xl font-black text-white">Treino registrado!</p>
+                    <p className="text-zinc-500 text-sm">Continue assim! 💪</p>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -708,6 +789,7 @@ export default function ChallengePortalPage() {
         <WorkoutModal
           registration={registration}
           eventId={eventId}
+          currentCount={myCount}
           onClose={() => setShowModal(false)}
         />
       )}
