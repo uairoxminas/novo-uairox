@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import { sendWebhook } from '@/lib/botconversa';
 import AdminPixParceladoTab from './AdminPixParceladoTab';
+import AdminSorteioTab from './AdminSorteioTab';
 
 // ============ Shared Components / Styles ============
 const GOLD = '#EDAC02';
@@ -4000,6 +4001,7 @@ const TABS = [
   { key: 'botconversa', label: '💬 BotConversa' },
   { key: 'pix_parcelado', label: '💰 PIX Parcelado' },
   { key: 'espera', label: '⏳ Lista de Espera' },
+  { key: 'sorteio', label: '🎰 Sorteio' },
 ];
 
 export default function AdminEventConfig() {
@@ -4100,6 +4102,7 @@ export default function AdminEventConfig() {
         {activeTab === 'despesas' && <AdminEventExpensesTab eventId={id!} />}
         { activeTab === 'botconversa' && <BotconversaTab eventId={id!} /> }
         { activeTab === 'pix_parcelado' && <AdminPixParceladoTab eventId={id!} /> }
+        { activeTab === 'sorteio' && <AdminSorteioTab eventId={id!} /> }
       </div>
     </div>
   );

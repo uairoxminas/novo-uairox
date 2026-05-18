@@ -38,6 +38,7 @@ import AdminLocations from './pages/admin/AdminLocations';
 import AdminMarketingPage from './pages/admin/AdminMarketingPage';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 import PaymentPortal from './pages/PaymentPortal';
+import RaffleLivePage from './pages/RaffleLivePage';
 import PartnerViewPage from './pages/PartnerViewPage';
 import PublicEventSchedule from './pages/PublicEventSchedule';
 
@@ -88,6 +89,9 @@ export default function App() {
           {/* Inscrição Pública em Eventos */}
           <Route path="/evento/:id" element={<PublicEventRegistration />} />
           <Route path="/evento/:id/cronograma" element={<PublicEventSchedule />} />
+
+          {/* Sorteio Público ao Vivo */}
+          <Route path="/sorteio/:slug" element={<RaffleLivePage />} />
 
           {/* Portal de Pagamento (Parcelas PIX) */}
           <Route path="/pagamento/:registrationId" element={<PaymentPortal />} />
