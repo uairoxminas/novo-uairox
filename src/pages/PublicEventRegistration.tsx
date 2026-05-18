@@ -1354,7 +1354,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
               const { data: bcfg } = await (supabase as any)
                 .from('botconversa_config')
-                .select('trigger_inscricao_ativo, trigger_inscricao_url')
+                .select('trigger_inscricao_ativo, trigger_inscricao_url, msg_marco')
                 .eq('event_id', eventId)
                 .maybeSingle();
               if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
@@ -1381,7 +1381,14 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
               const levelNames: Record<number, string> = { 10: 'Bronze 🥉', 20: 'Bronze 🥉', 30: 'Prata 🥈', 50: 'Ouro 🥇', 100: 'Elite 🔥' };
               const portalUrl = portalToken ? `${window.location.origin}/squad/${portalToken}` : '';
-              const message = `🏆 *MARCO ATINGIDO — UAIROX*\n\nParabéns, *${ownerName}*! Você atingiu *${count} indicações* com seu cupom e alcançou o nível *${levelNames[count ?? 0] ?? ''}*!\n\n💪 Continue indicando e acumule mais benefícios nos próximos eventos!${portalUrl ? `\n\n🔗 Veja seu painel: ${portalUrl}` : ''}`;
+              const marcoTemplate = bcfg.msg_marco || DEFAULT_MESSAGES.marco;
+              const message = interpolate(marcoTemplate, {
+                nome: ownerName ?? '',
+                count: count ?? 0,
+                nivel: levelNames[count ?? 0] ?? '',
+                portal_url: portalUrl,
+                evento: event?.title ?? 'UAIROX',
+              });
 
               fetch(bcfg.trigger_inscricao_url, {
                 method: 'POST',

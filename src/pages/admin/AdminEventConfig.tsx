@@ -1449,6 +1449,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const [msgPix0d, setMsgPix0d] = useState(DEFAULT_MESSAGES.pix_0d);
   const [msgPix1d, setMsgPix1d] = useState(DEFAULT_MESSAGES.pix_1d);
   const [msgPix5d, setMsgPix5d] = useState(DEFAULT_MESSAGES.pix_5d);
+  const [msgMarco, setMsgMarco] = useState(DEFAULT_MESSAGES.marco);
   const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -1472,6 +1473,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     if (cfg.msg_pix_0d)     setMsgPix0d(cfg.msg_pix_0d);
     if (cfg.msg_pix_1d)     setMsgPix1d(cfg.msg_pix_1d);
     if (cfg.msg_pix_5d)     setMsgPix5d(cfg.msg_pix_5d);
+    if ((cfg as any).msg_marco) setMsgMarco((cfg as any).msg_marco);
   }, [cfg]);
 
   const handleSave = () => upsert.mutate({
@@ -1491,6 +1493,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     msg_pix_0d:     msgPix0d      || null,
     msg_pix_1d:     msgPix1d      || null,
     msg_pix_5d:     msgPix5d      || null,
+    msg_marco:      msgMarco      || null,
   } as any);
 
   const testWebhook = async (url: string, triggerKey: string) => {
@@ -1675,6 +1678,40 @@ function BotconversaTab({ eventId }: { eventId: string }) {
           <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-blue-500/20 bg-blue-500/5">
             <span className="text-blue-400 text-xs mt-0.5">ℹ</span>
             <p className="text-[10px] text-blue-400 leading-relaxed">Cron diário às 9h via Edge Function <code className="font-mono bg-blue-500/10 px-1 rounded">pix-reminder-cron</code>. Datas calculadas a partir do campo <code className="font-mono bg-blue-500/10 px-1 rounded">due_date</code> de cada parcela em <code className="font-mono bg-blue-500/10 px-1 rounded">registration_installments</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Squad & Parceiros — Marcos de Indicação */}
+      <div className="space-y-2">
+        <p className={labelClass}>Squad & Parceiros — Marcos de Indicação</p>
+        <div className={`${cardClass} p-4 space-y-3`}>
+          <div>
+            <p className="text-xs font-bold text-white">🏆 Mensagem de Marco Atingido</p>
+            <p className="text-[10px] text-zinc-500 mt-0.5">
+              Enviada automaticamente quando um membro de Squad ou Parceiro atinge 10, 20, 30, 50 ou 100 indicações confirmadas. Usa a mesma URL do webhook configurada acima.
+            </p>
+          </div>
+          <MsgEditor
+            label="Editar mensagem de marco"
+            value={msgMarco}
+            onChange={setMsgMarco}
+            defaultMsg={DEFAULT_MESSAGES.marco}
+            vars={['nome', 'count', 'nivel', 'portal_url', 'evento']}
+          />
+          <div className="flex flex-wrap gap-2 pt-1">
+            {[
+              { v: '{{nome}}', desc: 'Nome do membro/parceiro' },
+              { v: '{{count}}', desc: 'Total de indicações' },
+              { v: '{{nivel}}', desc: 'Nível alcançado (Bronze, Prata…)' },
+              { v: '{{portal_url}}', desc: 'Link do painel pessoal' },
+              { v: '{{evento}}', desc: 'Nome do evento' },
+            ].map(({ v, desc }) => (
+              <span key={v} className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px]">
+                <code className="text-[#EDAC02] font-mono">{v}</code>
+                <span className="text-zinc-500">{desc}</span>
+              </span>
+            ))}
           </div>
         </div>
       </div>

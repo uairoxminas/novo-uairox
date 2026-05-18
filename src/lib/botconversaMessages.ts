@@ -76,6 +76,14 @@ Parcela {{parcela}} em atraso desde {{vencimento}}.
 🔑 Chave PIX: {{pix}}
 
 🔖 Código: {{codigo}}`,
+
+  marco: `🏆 *MARCO ATINGIDO — UAIROX*
+
+Parabéns, *{{nome}}*! Você atingiu *{{count}} indicações* com seu cupom e alcançou o nível *{{nivel}}*!
+
+💪 Continue indicando e acumule mais benefícios nos próximos eventos UAIROX!
+
+🔗 Veja seu painel: {{portal_url}}`,
 };
 
 export function interpolate(template: string, vars: Record<string, string | number | null | undefined>): string {

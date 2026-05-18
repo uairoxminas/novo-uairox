@@ -277,7 +277,22 @@ export default function AdminSquad() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <a
+                href="/ranking-squad"
+                target="_blank"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] hover:bg-[#EDAC02]/20 font-bold text-xs uppercase rounded transition-colors"
+              >
+                🏆 Ver Ranking
+              </a>
+              <button
+                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/ranking-squad`); toast.success('Link do ranking copiado!'); }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#111] border border-[#EDAC02]/20 text-zinc-400 hover:text-[#EDAC02] font-bold text-xs uppercase rounded transition-colors"
+              >
+                📋 Copiar Link Ranking
+              </button>
+            </div>
             <button onClick={calculateTiers} className="flex items-center gap-2 px-4 py-2 bg-[#111] border border-brand-500/30 text-brand-500 hover:bg-brand-500/10 font-bold text-xs uppercase rounded transition-colors">
               <RefreshCw size={14} /> Atualizar Níveis (Auto)
             </button>
