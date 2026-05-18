@@ -33,6 +33,7 @@ interface SquadMember {
   is_active: boolean;
   coupon_code: string | null;
   coupon_usage_count: number;
+  portal_token: string | null;
 }
 
 export default function AdminSquad() {
@@ -329,6 +330,18 @@ export default function AdminSquad() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-1">
+                          {member.portal_token && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/squad/${member.portal_token}`);
+                                toast.success('Link do portal copiado!');
+                              }}
+                              className="p-2 text-zinc-500 hover:text-brand-500 transition-colors text-xs font-bold"
+                              title="Copiar link do portal pessoal"
+                            >
+                              🔗
+                            </button>
+                          )}
                           <button className="p-2 text-zinc-500 hover:text-brand-500 transition-colors" title="Contato via WhatsApp">
                             <MessageCircle size={18} />
                           </button>

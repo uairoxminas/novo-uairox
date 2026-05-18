@@ -1339,6 +1339,57 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             benefit_description: couponDiscount.benefit_description || null,
             discount_applied: discount || null,
           });
+
+          // Milestone WhatsApp notification (fire-and-forget)
+          ;(async () => {
+            try {
+              const ownerField = couponDiscount.squad_member_id ? 'squad_member_id' : 'location_id';
+              const ownerId = couponDiscount.squad_member_id || couponDiscount.location_id;
+              const { count } = await (supabase as any)
+                .from('coupon_benefit_logs')
+                .select('id', { count: 'exact', head: true })
+                .eq(ownerField, ownerId);
+              const MILESTONES = [10, 20, 30, 50, 100];
+              if (!MILESTONES.includes(count ?? 0)) return;
+
+              const { data: bcfg } = await (supabase as any)
+                .from('botconversa_config')
+                .select('trigger_inscricao_ativo, trigger_inscricao_url')
+                .eq('event_id', eventId)
+                .maybeSingle();
+              if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
+
+              let phone: string | null = null;
+              let ownerName: string | null = null;
+              let portalToken: string | null = null;
+
+              if (couponDiscount.squad_member_id) {
+                const { data: sm } = await (supabase as any).from('squad_members')
+                  .select('full_name, phone, portal_token').eq('id', couponDiscount.squad_member_id).single();
+                phone = sm?.phone?.replace(/\D/g, '') ?? null;
+                ownerName = sm?.full_name ?? null;
+                portalToken = sm?.portal_token ?? null;
+              } else {
+                const { data: loc } = await (supabase as any).from('training_locations')
+                  .select('name, whatsapp, portal_token').eq('id', couponDiscount.location_id).single();
+                phone = loc?.whatsapp?.replace(/\D/g, '') ?? null;
+                ownerName = loc?.name ?? null;
+                portalToken = loc?.portal_token ?? null;
+              }
+
+              if (!phone) return;
+
+              const levelNames: Record<number, string> = { 10: 'Bronze 🥉', 20: 'Bronze 🥉', 30: 'Prata 🥈', 50: 'Ouro 🥇', 100: 'Elite 🔥' };
+              const portalUrl = portalToken ? `${window.location.origin}/squad/${portalToken}` : '';
+              const message = `🏆 *MARCO ATINGIDO — UAIROX*\n\nParabéns, *${ownerName}*! Você atingiu *${count} indicações* com seu cupom e alcançou o nível *${levelNames[count ?? 0] ?? ''}*!\n\n💪 Continue indicando e acumule mais benefícios nos próximos eventos!${portalUrl ? `\n\n🔗 Veja seu painel: ${portalUrl}` : ''}`;
+
+              fetch(bcfg.trigger_inscricao_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telefone: phone, message }),
+              }).catch(() => {});
+            } catch {}
+          })();
         }
       }
 

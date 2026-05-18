@@ -39,6 +39,8 @@ import AdminMarketingPage from './pages/admin/AdminMarketingPage';
 import PublicEventRegistration from './pages/PublicEventRegistration';
 import PaymentPortal from './pages/PaymentPortal';
 import RaffleLivePage from './pages/RaffleLivePage';
+import SquadPortalPage from './pages/SquadPortalPage';
+import SquadRankingPage from './pages/SquadRankingPage';
 import PartnerViewPage from './pages/PartnerViewPage';
 import PublicEventSchedule from './pages/PublicEventSchedule';
 
@@ -92,6 +94,12 @@ export default function App() {
 
           {/* Sorteio Público ao Vivo */}
           <Route path="/sorteio/:slug" element={<RaffleLivePage />} />
+
+          {/* Portal pessoal Squad/Parceiro */}
+          <Route path="/squad/:token" element={<SquadPortalPage />} />
+
+          {/* Ranking público de indicadores */}
+          <Route path="/ranking-squad" element={<SquadRankingPage />} />
 
           {/* Portal de Pagamento (Parcelas PIX) */}
           <Route path="/pagamento/:registrationId" element={<PaymentPortal />} />
