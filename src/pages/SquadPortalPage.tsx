@@ -69,6 +69,7 @@ export default function SquadPortalPage() {
   const [byEvent, setByEvent] = useState<{ eventTitle: string; count: number; date: string }[]>([]);
   const [activeKit, setActiveKit] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
+  const [arts, setArts] = useState<{ id: string; title: string; description: string | null; image_url: string }[]>([]);
 
   useEffect(() => {
     if (!token) return;
@@ -77,6 +78,10 @@ export default function SquadPortalPage() {
 
   const load = async () => {
     setLoading(true);
+
+    // Load promo arts (fire-and-forget alongside owner lookup)
+    db.from('squad_promo_arts').select('id, title, description, image_url').order('created_at', { ascending: false })
+      .then(({ data }: any) => setArts(data ?? []));
 
     // Try squad_members by coupon_code slug first, then by portal_token UUID
     const smByCoupon = await db.from('squad_members').select('*').ilike('coupon_code', token!).maybeSingle();
@@ -312,6 +317,35 @@ export default function SquadPortalPage() {
             <p className="text-sm font-black text-[#EDAC02]">📣 Kit do Promotor</p>
             <p className="text-xs text-zinc-500 mt-0.5">Legendas prontas para copiar e postar agora mesmo</p>
           </div>
+
+          {/* Artes para download */}
+          {arts.length > 0 && (
+            <div className="p-4 border-b border-[#1a1a1a] space-y-3">
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">🎨 Artes do Evento</p>
+              <div className="grid grid-cols-2 gap-3">
+                {arts.map(art => (
+                  <div key={art.id} className="rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#050505]">
+                    <div className="aspect-square overflow-hidden bg-[#111]">
+                      <img src={art.image_url} alt={art.title} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="p-2.5 space-y-1.5">
+                      <p className="text-xs font-bold text-white truncate">{art.title}</p>
+                      {art.description && <p className="text-[10px] text-zinc-500 truncate">{art.description}</p>}
+                      <a
+                        href={art.image_url}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-[#EDAC02] text-black text-xs font-black hover:bg-[#d49b02] transition-colors"
+                      >
+                        ⬇ Baixar
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="p-4 space-y-3">
             {templates.map((t, i) => (

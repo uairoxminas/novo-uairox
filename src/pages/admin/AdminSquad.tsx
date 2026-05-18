@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Crown, MessageCircle, AlertCircle, RefreshCw, Trash2, Pencil, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,8 +36,135 @@ interface SquadMember {
   portal_token: string | null;
 }
 
+// ── Promo Arts Tab ────────────────────────────────────────────
+interface PromoArt { id: string; title: string; description: string | null; image_url: string; created_at: string; }
+
+function ArtsTab() {
+  const db = supabase as any;
+  const [arts, setArts] = useState<PromoArt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => { fetchArts(); }, []);
+
+  const fetchArts = async () => {
+    setLoading(true);
+    const { data } = await db.from('squad_promo_arts').select('*').order('created_at', { ascending: false });
+    setArts(data ?? []);
+    setLoading(false);
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  };
+
+  const handleUpload = async (e: React.BaseSyntheticEvent) => {
+    e.preventDefault();
+    if (!file || !title.trim()) { toast.error('Título e imagem são obrigatórios'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `arts/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('squad-arts').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('squad-arts').getPublicUrl(path);
+      await db.from('squad_promo_arts').insert({ title: title.trim(), description: description.trim() || null, image_url: publicUrl });
+      toast.success('Arte adicionada!');
+      setTitle(''); setDescription(''); setFile(null); setPreview(null);
+      fetchArts();
+    } catch (err: any) {
+      toast.error('Erro: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (art: PromoArt) => {
+    if (!window.confirm(`Excluir "${art.title}"?`)) return;
+    await db.from('squad_promo_arts').delete().eq('id', art.id);
+    toast.success('Arte removida');
+    fetchArts();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Upload form */}
+      <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-5">
+        <p className="text-sm font-black text-white uppercase tracking-wider mb-4">🎨 Adicionar Nova Arte</p>
+        <form onSubmit={handleUpload} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Título *</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Story — Evento Janeiro" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Descrição (opcional)</label>
+              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Use nos Stories 9:16" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none rounded-lg" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Imagem *</label>
+            <label className="flex items-center gap-4 cursor-pointer group">
+              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-dark-border group-hover:border-brand-500 bg-[#111] flex items-center justify-center overflow-hidden transition-colors flex-shrink-0">
+                {preview
+                  ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
+                  : <Upload size={24} className="text-zinc-600 group-hover:text-brand-500 transition-colors" />
+                }
+              </div>
+              <div className="text-xs text-zinc-500 leading-relaxed">
+                <p className="text-zinc-300 font-bold mb-0.5">Clique para selecionar</p>
+                <p>PNG, JPG, WebP recomendados</p>
+                <p>Stories: 1080×1920 · Feed: 1080×1080</p>
+              </div>
+              <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+            </label>
+          </div>
+          <button type="submit" disabled={uploading} className="px-6 py-2.5 bg-brand-500 text-black text-sm font-black uppercase rounded-lg hover:bg-brand-400 disabled:opacity-50 transition-colors">
+            {uploading ? 'Enviando...' : '+ Adicionar Arte'}
+          </button>
+        </form>
+      </div>
+
+      {/* Arts grid */}
+      {loading ? (
+        <div className="flex justify-center py-12"><RefreshCw className="w-6 h-6 text-brand-500 animate-spin" /></div>
+      ) : arts.length === 0 ? (
+        <div className="text-center py-16 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
+          <p className="text-4xl mb-3">🎨</p>
+          <p className="text-zinc-500 text-sm">Nenhuma arte publicada ainda.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {arts.map(art => (
+            <div key={art.id} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden group">
+              <div className="aspect-square relative overflow-hidden bg-[#111]">
+                <img src={art.image_url} alt={art.title} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <a href={art.image_url} target="_blank" rel="noreferrer" download className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white text-xs font-bold">⬇ Ver</a>
+                  <button onClick={() => handleDelete(art)} className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/40 transition-colors text-red-400"><Trash2 size={14} /></button>
+                </div>
+              </div>
+              <div className="p-3">
+                <p className="text-xs font-bold text-white truncate">{art.title}</p>
+                {art.description && <p className="text-[10px] text-zinc-500 mt-0.5 truncate">{art.description}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminSquad() {
-  const [activeTab, setActiveTab] = useState<'pendentes' | 'membros'>('pendentes');
+  const [activeTab, setActiveTab] = useState<'pendentes' | 'membros' | 'artes'>('pendentes');
   const [applications, setApplications] = useState<Application[]>([]);
   const [members, setMembers] = useState<SquadMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +259,7 @@ export default function AdminSquad() {
     }
   };
 
-  const handleSaveMember = async (e: React.FormEvent) => {
+  const handleSaveMember = async (e: React.BaseSyntheticEvent) => {
     e.preventDefault();
     if (!editingMember) return;
     
@@ -228,6 +355,14 @@ export default function AdminSquad() {
           >
             Membros ({members.length})
           </button>
+          <button
+            onClick={() => setActiveTab('artes')}
+            className={`px-6 py-2 text-sm font-bold uppercase tracking-widest rounded-md transition-colors ${
+              activeTab === 'artes' ? 'bg-brand-500 text-black' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            🎨 Artes
+          </button>
         </div>
       </div>
 
@@ -275,7 +410,7 @@ export default function AdminSquad() {
             ))
           )}
         </div>
-      ) : (
+      ) : activeTab === 'membros' ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -385,7 +520,9 @@ export default function AdminSquad() {
             </div>
           </div>
         </div>
-      )}
+      ) : activeTab === 'artes' ? (
+        <ArtsTab />
+      ) : null}
 
       {/* Edit Modal */}
       {editingMember && (
