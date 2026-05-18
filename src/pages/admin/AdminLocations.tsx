@@ -18,10 +18,13 @@ interface TrainingLocation {
   is_featured: boolean;
   status: string;
   created_at?: string;
+  coupon_code: string | null;
+  portal_token: string | null;
 }
 
 export default function AdminLocations() {
   const [locations, setLocations] = useState<TrainingLocation[]>([]);
+  const [benefitCounts, setBenefitCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -36,18 +39,23 @@ export default function AdminLocations() {
 
   async function fetchLocations() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('training_locations')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const [locRes, logsRes] = await Promise.all([
+      supabase.from('training_locations').select('*').order('created_at', { ascending: false }),
+      (supabase as any).from('coupon_benefit_logs').select('location_id'),
+    ]);
 
-    if (error) {
-      console.error("Fetch Locations Error:", error);
-      toast.error('Erro ao buscar parceiros: ' + error.message);
+    if (locRes.error) {
+      toast.error('Erro ao buscar parceiros: ' + locRes.error.message);
     } else {
-      console.log("Fetched locations from DB:", data);
-      setLocations((data as any) || []);
+      setLocations((locRes.data as any) || []);
     }
+
+    const counts: Record<string, number> = {};
+    for (const row of (logsRes.data ?? [])) {
+      if (row.location_id) counts[row.location_id] = (counts[row.location_id] ?? 0) + 1;
+    }
+    setBenefitCounts(counts);
+
     setLoading(false);
   }
 
@@ -128,7 +136,8 @@ export default function AdminLocations() {
           website: editingLocation.website,
           is_featured: editingLocation.is_featured,
           logo_url: finalLogoUrl,
-          photos: finalPhotos
+          photos: finalPhotos,
+          coupon_code: (editingLocation.coupon_code || '').toUpperCase().trim() || null,
         } as any)
         .eq('id', editingLocation.id);
 
@@ -158,6 +167,21 @@ export default function AdminLocations() {
         <div>
           <h1 className="text-3xl font-black text-white uppercase italic">Onde Treinar <span className="text-brand-500">Admin</span></h1>
           <p className="text-zinc-400 mt-1">Gerencie os Boxes e Academias parceiras</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href="/ranking-squad"
+            target="_blank"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-bold hover:bg-[#EDAC02]/20 transition-colors"
+          >
+            🏆 Ver Ranking
+          </a>
+          <button
+            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/ranking-squad`); toast.success('Link do ranking copiado!'); }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-bold hover:border-zinc-500 transition-colors"
+          >
+            📋 Copiar Link Ranking
+          </button>
         </div>
       </div>
 
@@ -225,9 +249,19 @@ export default function AdminLocations() {
                   {loc.is_featured && <Star size={16} className="text-brand-500 fill-brand-500" />}
                 </div>
                 <p className="text-sm text-zinc-400 flex items-center gap-1 mb-2"><MapPin size={14} /> {loc.city} - {loc.state}</p>
-                <div className="flex gap-4 text-xs text-zinc-500">
+                <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
                   {loc.whatsapp && <span>WhatsApp: {loc.whatsapp}</span>}
                   {loc.instagram && <span>Instagram: {loc.instagram}</span>}
+                  {(loc as any).coupon_code && (
+                    <span className="px-2 py-0.5 rounded bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] font-mono font-bold">
+                      🎟 {(loc as any).coupon_code}
+                    </span>
+                  )}
+                  {benefitCounts[loc.id] > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-300 font-bold">
+                      {benefitCounts[loc.id]} uso{benefitCounts[loc.id] !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -244,6 +278,20 @@ export default function AdminLocations() {
                   </>
                 )}
                 
+                {((loc as any).coupon_code || (loc as any).portal_token) && (
+                  <button
+                    onClick={() => {
+                      const slug = (loc as any).coupon_code || (loc as any).portal_token;
+                      navigator.clipboard.writeText(`${window.location.origin}/squad/${slug}`);
+                      toast.success('Link do portal copiado!');
+                    }}
+                    className="p-2 text-zinc-500 hover:text-[#EDAC02] transition-colors border border-dark-border hover:border-[#EDAC02]/40 bg-dark-bg"
+                    title="Copiar link do portal pessoal"
+                  >
+                    🔗
+                  </button>
+                )}
+
                 <button onClick={() => {
                   setEditingLocation(loc);
                   setNewLogoFile(null);
@@ -343,6 +391,33 @@ export default function AdminLocations() {
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Website</label>
                 <input type="text" value={editingLocation.website || ''} onChange={e => setEditingLocation({...editingLocation, website: e.target.value})} className="w-full bg-[#111] border border-dark-border p-2.5 text-white focus:border-brand-500 outline-none" />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Código do Cupom</label>
+                <input
+                  type="text"
+                  value={editingLocation.coupon_code || ''}
+                  onChange={e => setEditingLocation({...editingLocation, coupon_code: e.target.value.toUpperCase()})}
+                  placeholder="Ex: BOXCENTRAL10"
+                  className="w-full bg-[#111] border border-dark-border p-2.5 text-[#EDAC02] font-mono font-bold focus:border-brand-500 outline-none placeholder-zinc-700"
+                />
+                <p className="text-[10px] text-zinc-600 mt-1">
+                  Será o slug do portal pessoal: <span className="text-zinc-400 font-mono">/squad/{editingLocation.coupon_code || '...'}</span>
+                  {(editingLocation.coupon_code || editingLocation.portal_token) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const slug = editingLocation.coupon_code || editingLocation.portal_token;
+                        navigator.clipboard.writeText(`${window.location.origin}/squad/${slug}`);
+                        toast.success('Link copiado!');
+                      }}
+                      className="ml-2 text-[#EDAC02] underline"
+                    >
+                      Copiar link
+                    </button>
+                  )}
+                </p>
               </div>
             </div>
 
