@@ -1943,7 +1943,7 @@ function KitsTab({ eventId }: { eventId: string }) {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [isOptional, setIsOptional] = useState(true);
+  const [kitType, setKitType] = useState<'included' | 'raffle' | 'upgrade'>('included');
   const [uploading, setUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1965,21 +1965,22 @@ function KitsTab({ eventId }: { eventId: string }) {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || (!isOptional && price === '') || (isOptional && price === '')) return;
+    if (!name.trim()) return;
+    if (kitType === 'upgrade' && price === '') return;
     await createKit.mutateAsync({
       event_id: eventId,
       name: name.trim(),
       description: description.trim() || undefined,
-      price: parseFloat(price) || 0,
+      price: kitType === 'upgrade' ? (parseFloat(price) || 0) : 0,
       image_url: imageUrl.trim() || undefined,
-      is_optional: isOptional,
+      kit_type: kitType,
     });
     setShowForm(false);
     setName('');
     setDescription('');
     setPrice('');
     setImageUrl('');
-    setIsOptional(true);
+    setKitType('included');
   };
 
   return (
@@ -2006,8 +2007,12 @@ function KitsTab({ eventId }: { eventId: string }) {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold tracking-widest uppercase ${kit.is_optional === false ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'bg-[#111] text-zinc-400 border border-[#262626]'}`}>
-                      {kit.is_optional === false ? 'Incluso na Inscrição' : 'Kit Opcional'}
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold tracking-widest uppercase ${
+                      kit.kit_type === 'included' ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20'
+                      : kit.kit_type === 'raffle'  ? 'bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20'
+                      : 'bg-[#111] text-zinc-400 border border-[#262626]'
+                    }`}>
+                      {kit.kit_type === 'included' ? 'Incluso na Inscrição' : kit.kit_type === 'raffle' ? '🏆 Sorteio' : 'Kit de Upgrade'}
                     </span>
                   </div>
                   <p className="font-bold text-white text-sm">{kit.name}</p>
@@ -2015,8 +2020,8 @@ function KitsTab({ eventId }: { eventId: string }) {
                 </div>
                 <button onClick={() => deleteKit.mutate({ id: kit.id, event_id: eventId })} className="p-1 rounded text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs">🗑️</button>
               </div>
-              <p className={`text-lg font-black mt-2 ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
-                {kit.is_optional === false ? 'Cortesia' : `+ R$ ${Number(kit.price).toFixed(2)}`}
+              <p className={`text-lg font-black mt-2 ${kit.kit_type === 'included' ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                {kit.kit_type === 'included' ? 'Cortesia' : kit.kit_type === 'raffle' ? '🏆 Sorteio' : `+ R$ ${Number(kit.price).toFixed(2)}`}
               </p>
               <ShirtModelsSection kit={kit} eventId={eventId} />
             </div>
@@ -2029,22 +2034,27 @@ function KitsTab({ eventId }: { eventId: string }) {
         <div className="space-y-4">
           <div>
             <label className={labelClass}>Tipo do Kit</label>
-            <div className="flex gap-4 mt-2">
-              <button 
-                onClick={() => { setIsOptional(false); setPrice('0'); }} 
-                className={`flex-1 py-3 text-xs font-bold border rounded-lg transition-all uppercase tracking-widest ${!isOptional ? 'border-[#25D366] bg-[#25D366]/10 text-[#25D366]' : 'border-[#262626] bg-[#0a0a0a] text-zinc-500 hover:text-white'}`}>
-                Obrigatório (Incluso)
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <button
+                onClick={() => { setKitType('included'); setPrice('0'); }}
+                className={`py-3 text-[11px] font-bold border rounded-lg transition-all uppercase tracking-widest ${kitType === 'included' ? 'border-[#25D366] bg-[#25D366]/10 text-[#25D366]' : 'border-[#262626] bg-[#0a0a0a] text-zinc-500 hover:text-white'}`}>
+                🟢 Incluso
               </button>
-              <button 
-                onClick={() => setIsOptional(true)} 
-                className={`flex-1 py-3 text-xs font-bold border rounded-lg transition-all uppercase tracking-widest ${isOptional ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]' : 'border-[#262626] bg-[#0a0a0a] text-zinc-500 hover:text-white'}`}>
-                Opcional (Upgrade)
+              <button
+                onClick={() => { setKitType('raffle'); setPrice('0'); }}
+                className={`py-3 text-[11px] font-bold border rounded-lg transition-all uppercase tracking-widest ${kitType === 'raffle' ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]' : 'border-[#262626] bg-[#0a0a0a] text-zinc-500 hover:text-white'}`}>
+                🏆 Sorteio
+              </button>
+              <button
+                onClick={() => setKitType('upgrade')}
+                className={`py-3 text-[11px] font-bold border rounded-lg transition-all uppercase tracking-widest ${kitType === 'upgrade' ? 'border-zinc-400 bg-zinc-800/30 text-zinc-300' : 'border-[#262626] bg-[#0a0a0a] text-zinc-500 hover:text-white'}`}>
+                ⭐ Upgrade
               </button>
             </div>
           </div>
           <div><label className={labelClass}>Nome *</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Kit Premium (Camiseta + Medalha)" className={inputClass} /></div>
           <div><label className={labelClass}>Descrição</label><textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="O que está incluso..." rows={2} className={`${inputClass} resize-none`} /></div>
-          {isOptional && <div><label className={labelClass}>Preço Adicional (R$) *</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="79.90" className={inputClass} /></div>}
+          {kitType === 'upgrade' && <div><label className={labelClass}>Preço Adicional (R$) *</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="79.90" className={inputClass} /></div>}
           
           <div>
             <label className={labelClass}>Imagem do Kit</label>

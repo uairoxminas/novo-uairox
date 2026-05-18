@@ -398,7 +398,7 @@ export function useAthleteKits(eventId?: string) {
 export function useCreateAthleteKit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (kit: { event_id: string; name: string; description?: string; price: number; items?: any; image_url?: string; is_optional?: boolean }) => {
+    mutationFn: async (kit: { event_id: string; name: string; description?: string; price: number; items?: any; image_url?: string; kit_type?: string }) => {
       const { data, error } = await supabase.from("athlete_kits").insert(kit as any).select().single();
       if (error) throw error;
       return data;

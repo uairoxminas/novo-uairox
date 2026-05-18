@@ -733,8 +733,12 @@ export default function PublicEventRegistration() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {kits.map((kit: any) => (
                 <div key={kit.id} className="relative bg-[#050505] border border-[#1a1a1a] rounded-2xl overflow-hidden group hover:border-[#EDAC02]/30 transition-all shadow-xl">
-                  <div className={`absolute top-4 right-4 px-3 py-1 text-[10px] shadow-lg font-black tracking-widest uppercase rounded z-10 ${kit.is_optional === false ? 'bg-[#25D366] text-black' : 'bg-black text-[#EDAC02] border border-[#EDAC02]/30'}`}>
-                    {kit.is_optional === false ? 'Incluso na Inscrição' : 'Kit de Upgrade'}
+                  <div className={`absolute top-4 right-4 px-3 py-1 text-[10px] shadow-lg font-black tracking-widest uppercase rounded z-10 ${
+                    kit.kit_type === 'included' ? 'bg-[#25D366] text-black'
+                    : kit.kit_type === 'raffle' ? 'bg-[#EDAC02] text-black'
+                    : 'bg-black text-[#EDAC02] border border-[#EDAC02]/30'
+                  }`}>
+                    {kit.kit_type === 'included' ? 'Incluso na Inscrição' : kit.kit_type === 'raffle' ? '🏆 Sorteio' : 'Kit de Upgrade'}
                   </div>
                   {kit.image_url ? (
                     <div className="relative w-full aspect-[4/3] bg-[#0a0a0a] border-b border-[#1a1a1a]">
@@ -748,8 +752,8 @@ export default function PublicEventRegistration() {
                   <div className="p-6 relative z-10">
                     <h3 className="text-xl font-black text-white uppercase tracking-tight">{kit.name}</h3>
                     {kit.description && <p className="text-sm text-zinc-400 mt-3 border-l-2 border-[#262626] pl-3">{kit.description}</p>}
-                    <p className={`text-3xl font-black italic tracking-tighter mt-6 ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
-                      {kit.is_optional === false ? 'Grátis (Incluso)' : `+ R$ ${Number(kit.price).toFixed(2).replace('.', ',')}`}
+                    <p className={`text-3xl font-black italic tracking-tighter mt-6 ${kit.kit_type === 'included' ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                      {kit.kit_type === 'included' ? 'Grátis (Incluso)' : kit.kit_type === 'raffle' ? '🏆 Sorteado' : `+ R$ ${Number(kit.price).toFixed(2).replace('.', ',')}`}
                     </p>
                   </div>
                 </div>
@@ -761,8 +765,8 @@ export default function PublicEventRegistration() {
 
       {/* ============ A RECOMPENSA — selecao event ============ */}
       {event.slug === 'selecao' && kits.length > 0 && (() => {
-        const prize = kits.find((k: any) => k.is_optional !== false) || kits[kits.length - 1];
-        const included = kits.find((k: any) => k.is_optional === false) || kits[0];
+        const prize = kits.find((k: any) => k.kit_type === 'raffle') || kits[kits.length - 1];
+        const included = kits.find((k: any) => k.kit_type === 'included') || kits[0];
         return (
           <section className="bg-[#020202]">
             {/* Section header */}
@@ -1070,7 +1074,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   // Auto-select mandatory kit se for o primeiro render e existir kit obrigatório
   useEffect(() => {
     if (kits && kits.length > 0 && !kitId) {
-      const mandatoryKits = kits.filter((k:any) => k.is_optional === false);
+      const mandatoryKits = kits.filter((k:any) => k.kit_type === 'included');
       if (mandatoryKits.length > 0) {
         setKitId(mandatoryKits[0].id);
       }
@@ -2105,7 +2109,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               })}
             </div>
             {kits.length > 0 && (() => {
-              const mandatoryKits = kits.filter(k => k.is_optional === false);
+              const mandatoryKits = kits.filter(k => k.kit_type === 'included');
               if (event?.slug === 'selecao') {
                 return (
                   <div className="mt-8 border-t border-[#1a1a1a] pt-6">
@@ -2116,16 +2120,19 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="flex items-center gap-2 mb-1.5">
-                                <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase ${kit.is_optional === false ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20'}`}>
-                                  {kit.is_optional === false ? 'Incluso na Inscrição' : 'Sorteio'}
+                                <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase ${
+                                  kit.kit_type === 'included' ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20'
+                                  : 'bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20'
+                                }`}>
+                                  {kit.kit_type === 'included' ? 'Incluso na Inscrição' : 'Sorteio'}
                                 </span>
                               </div>
                               <p className="font-black text-white text-base leading-tight">{kit.name}</p>
                               {kit.description && <p className="text-xs text-zinc-500 mt-1">{kit.description}</p>}
                             </div>
                             <div className="text-right flex-shrink-0 ml-4">
-                              <span className={`text-xl font-black italic tracking-tighter block ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
-                                {kit.is_optional === false ? 'Grátis' : '🏆'}
+                              <span className={`text-xl font-black italic tracking-tighter block ${kit.kit_type === 'included' ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                                {kit.kit_type === 'included' ? 'Grátis' : '🏆'}
                               </span>
                             </div>
                           </div>
@@ -2147,16 +2154,20 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       <div className="flex items-center justify-between">
                         <div>
                            <div className="flex items-center gap-2 mb-1.5">
-                             <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase ${kit.is_optional === false ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'bg-transparent text-zinc-400 border border-[#262626]'}`}>
-                            {kit.is_optional === false ? 'Incluso na Inscrição' : 'Opcional'}
+                             <span className={`text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase ${
+                               kit.kit_type === 'included' ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20'
+                               : kit.kit_type === 'raffle' ? 'bg-[#EDAC02]/10 text-[#EDAC02] border border-[#EDAC02]/20'
+                               : 'bg-transparent text-zinc-400 border border-[#262626]'
+                             }`}>
+                               {kit.kit_type === 'included' ? 'Incluso na Inscrição' : kit.kit_type === 'raffle' ? '🏆 Sorteio' : 'Opcional'}
                              </span>
                            </div>
                            <p className="font-black text-white text-base leading-tight">{kit.name}</p>
                            {kit.description && <p className="text-xs text-zinc-500 mt-1">{kit.description}</p>}
                         </div>
                         <div className="text-right flex-shrink-0 ml-4">
-                           <span className={`text-xl font-black italic tracking-tighter block ${kit.is_optional === false ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
-                             {kit.is_optional === false ? 'Grátis' : `+ ${formatCurrency(Number(kit.price))}`}
+                           <span className={`text-xl font-black italic tracking-tighter block ${kit.kit_type === 'included' ? 'text-[#25D366]' : 'text-[#EDAC02]'}`}>
+                             {kit.kit_type === 'included' ? 'Grátis' : kit.kit_type === 'raffle' ? '🏆' : `+ ${formatCurrency(Number(kit.price))}`}
                            </span>
                         </div>
                       </div>
