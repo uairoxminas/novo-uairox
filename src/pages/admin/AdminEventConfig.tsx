@@ -2130,6 +2130,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           athlete_name:     a1.name || reg.athlete_name || '',
           athlete_email:    a1.email || reg.athlete_email || '',
           athlete_phone:    a1.phone || reg.athlete_phone || '',
+          athlete_cpf:      reg.athlete_cpf || '',
           registration_id:  reg.id,
         }),
       });

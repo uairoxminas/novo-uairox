@@ -20,7 +20,7 @@ export default async function handler(req) {
     });
 
   try {
-    const { service_id, shipping_address, athlete_name, athlete_email, athlete_phone, registration_id } = await req.json();
+    const { service_id, shipping_address, athlete_name, athlete_email, athlete_phone, athlete_cpf, registration_id } = await req.json();
 
     const token = process.env.MELHOR_ENVIO_TOKEN;
     if (!token) throw new Error('MELHOR_ENVIO_TOKEN não configurado no Vercel');
@@ -40,10 +40,15 @@ export default async function handler(req) {
     };
 
     const addr = shipping_address || {};
+    const cpfDigits = (athlete_cpf || '').replace(/\D/g, '');
+    if (!cpfDigits || cpfDigits.length !== 11) {
+      return json({ error: 'CPF do destinatário inválido ou não informado (obrigatório pelos Correios).' }, 400);
+    }
     const to = {
       name:       athlete_name  || 'Atleta',
       phone:      (athlete_phone || '').replace(/\D/g, ''),
       email:      athlete_email || '',
+      document:   cpfDigits,
       address:    addr.rua      || '',
       complement: addr.complemento || null,
       number:     addr.numero   || 'S/N',

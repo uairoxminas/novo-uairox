@@ -1105,6 +1105,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [selectedFreight, setSelectedFreight] = useState<FreightOption | null>(null);
   const [freightLoading, setFreightLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [athleteCpf, setAthleteCpf] = useState('');
 
   // Installment helpers
   // Invite mode overrides: treat as normal registration even if event is "full"
@@ -1322,6 +1323,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           shipping_service_id: selectedFreight.id,
           shipping_service_name: selectedFreight.name,
           shipping_freight_amount: selectedFreight.price,
+          athlete_cpf: athleteCpf.replace(/\D/g, ''),
         } : {}),
       } as any).select().single();
       if (error) throw error;
@@ -2028,6 +2030,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       if (event?.slug === 'selecao') {
         if (shippingAddress.cep.replace(/\D/g, '').length !== 8) return false;
         if (!shippingAddress.rua.trim() || !shippingAddress.numero.trim() || !shippingAddress.bairro.trim() || !shippingAddress.cidade.trim() || !shippingAddress.estado.trim()) return false;
+        if (athleteCpf.replace(/\D/g, '').length !== 11) return false;
         if (!selectedFreight) return false;
       }
       return true;
@@ -2347,6 +2350,25 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                           className={inputClass}
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>CPF do Destinatário *</label>
+                      <input
+                        value={athleteCpf}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                          const fmt = digits.length <= 3 ? digits
+                            : digits.length <= 6 ? `${digits.slice(0,3)}.${digits.slice(3)}`
+                            : digits.length <= 9 ? `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6)}`
+                            : `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9)}`;
+                          setAthleteCpf(fmt);
+                        }}
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        className={inputClass}
+                      />
+                      <p className="text-xs text-zinc-500 mt-1">Necessário para emissão da etiqueta pelos Correios.</p>
                     </div>
 
                     {/* Freight options */}
