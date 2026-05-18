@@ -1326,6 +1326,20 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       if (error) throw error;
       if (couponDiscount) {
         await supabase.from('discount_coupons').update({ current_uses: (couponDiscount.current_uses || 0) + 1 }).eq('id', couponDiscount.id);
+        if (couponDiscount.squad_member_id || couponDiscount.location_id) {
+          await (supabase as any).from('coupon_benefit_logs').insert({
+            coupon_id: couponDiscount.id,
+            registration_id: data.id,
+            event_id: eventId,
+            squad_member_id: couponDiscount.squad_member_id || null,
+            location_id: couponDiscount.location_id || null,
+            athlete_name: a1.name.trim(),
+            athlete_email: a1.email.trim(),
+            coupon_code: couponDiscount.code,
+            benefit_description: couponDiscount.benefit_description || null,
+            discount_applied: discount || null,
+          });
+        }
       }
 
       // Increment invite link usage counter

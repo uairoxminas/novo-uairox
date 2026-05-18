@@ -956,3 +956,35 @@ export function useDeleteEventExpense() {
     onError: (e) => toast.error("Erro: " + e.message),
   });
 }
+
+// ============ SQUAD MEMBERS (reference — for coupon linking) ============
+export function useSquadMembers() {
+  return useQuery({
+    queryKey: ["squad-members-all"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("squad_members")
+        .select("id, full_name, coupon_code, role, avatar_url")
+        .eq("is_active", true)
+        .order("full_name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; full_name: string; coupon_code: string | null; role: string; avatar_url: string | null }[];
+    },
+  });
+}
+
+// ============ TRAINING LOCATIONS (reference — for coupon linking) ============
+export function useTrainingLocations() {
+  return useQuery({
+    queryKey: ["training-locations-all"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("training_locations")
+        .select("id, name, coupon_code")
+        .eq("status", "approved")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string; coupon_code: string | null }[];
+    },
+  });
+}

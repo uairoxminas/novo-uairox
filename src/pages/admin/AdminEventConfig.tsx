@@ -15,6 +15,7 @@ import {
   useLaneAssignments, useAssignLane, useCreateLaneAssignments, useAutoGenerateHeats, useCategoryRegCounts,
   useUnassignedRegistrations,
   useBotconversaConfig, useUpsertBotconversaConfig, useBotconversaLogs, useCreateBotconversaLog,
+  useSquadMembers, useTrainingLocations,
 } from '@/hooks/useEventConfig';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -1050,6 +1051,8 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const { data: categories } = useCategories(eventId);
   const { data: batches } = usePriceBatches(eventId);
   const { data: allRules } = useCouponBatchRules(eventId);
+  const { data: squadMembers } = useSquadMembers();
+  const { data: trainingLocations } = useTrainingLocations();
   const createCoupon = useCreateDiscountCoupon();
   const deleteCoupon = useDeleteDiscountCoupon();
   const createRule = useCreateCouponBatchRule();
@@ -1062,6 +1065,9 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const [maxUses, setMaxUses] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [ownerType, setOwnerType] = useState<'none' | 'squad' | 'location'>('none');
+  const [ownerId, setOwnerId] = useState('');
+  const [benefitDescription, setBenefitDescription] = useState('');
 
   // Travas configuradas no formulário de criação
   const [formBatchIds, setFormBatchIds] = useState<string[]>([]);
@@ -1071,7 +1077,20 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const resetForm = () => {
     setCode(''); setDiscountValue(''); setMaxUses(''); setPaymentLink('');
     setCategoryId(''); setDiscountType('percentage');
+    setOwnerType('none'); setOwnerId(''); setBenefitDescription('');
     setFormBatchIds([]); setFormRuleDiscountType(''); setFormRuleDiscountValue('');
+  };
+
+  const handleOwnerChange = (type: 'none' | 'squad' | 'location', id: string) => {
+    setOwnerType(type);
+    setOwnerId(id);
+    if (type === 'squad') {
+      const m = (squadMembers || []).find(m => m.id === id);
+      if (m?.coupon_code) setCode(m.coupon_code);
+    } else if (type === 'location') {
+      const l = (trainingLocations || []).find(l => l.id === id);
+      if (l?.coupon_code) setCode(l.coupon_code);
+    }
   };
 
   const toggleFormBatch = (batchId: string) =>
@@ -1087,7 +1106,10 @@ function CuponsTab({ eventId }: { eventId: string }) {
       max_uses: maxUses ? parseInt(maxUses) : undefined,
       payment_link: paymentLink.trim() || undefined,
       category_id: categoryId || undefined,
-    });
+      squad_member_id: ownerType === 'squad' ? ownerId || undefined : undefined,
+      location_id: ownerType === 'location' ? ownerId || undefined : undefined,
+      benefit_description: benefitDescription.trim() || undefined,
+    } as any);
     if (formBatchIds.length > 0 && newCoupon?.id) {
       for (const bid of formBatchIds) {
         await createRule.mutateAsync({
@@ -1110,6 +1132,7 @@ function CuponsTab({ eventId }: { eventId: string }) {
     setMaxUses(c.max_uses ? String(c.max_uses) : '');
     setPaymentLink(c.payment_link || '');
     setCategoryId(c.category_id || '');
+    setOwnerType('none'); setOwnerId(''); setBenefitDescription('');
     setFormBatchIds([]); setFormRuleDiscountType(''); setFormRuleDiscountValue('');
     setShowForm(true);
   };
@@ -1154,6 +1177,29 @@ function CuponsTab({ eventId }: { eventId: string }) {
                     <p className="text-xs text-zinc-500 mt-1">
                       {u}{c.max_uses ? ` / ${c.max_uses}` : ''} usos confirmados{!c.active && ' • Inativo'}
                     </p>
+                    {(c.squad_member_id || c.location_id) && (() => {
+                      const member = c.squad_member_id ? (squadMembers || []).find(m => m.id === c.squad_member_id) : null;
+                      const loc = c.location_id ? (trainingLocations || []).find(l => l.id === c.location_id) : null;
+                      return (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {member && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] font-bold">
+                              👤 SQUAD: {member.full_name}
+                            </span>
+                          )}
+                          {loc && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[10px] font-bold">
+                              📍 PARCEIRO: {loc.name}
+                            </span>
+                          )}
+                          {c.benefit_description && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/20 text-[#EDAC02] text-[10px]">
+                              🎁 {c.benefit_description}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
@@ -1227,6 +1273,42 @@ function CuponsTab({ eventId }: { eventId: string }) {
           </div>
           <div><label className={labelClass}>Máx. Usos</label><input type="number" value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="Ilimitado" className={inputClass} /></div>
           <div><label className={labelClass}>Link de Pagamento</label><input value={paymentLink} onChange={e => setPaymentLink(e.target.value)} placeholder="https://..." className={inputClass} /></div>
+
+          {/* Vincular a Squad / Parceiro */}
+          <div className="pt-1 space-y-3">
+            <label className={labelClass}>🔗 Vincular a <span className="text-zinc-600 font-normal normal-case tracking-normal">(Opcional)</span></label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['none', 'squad', 'location'] as const).map(t => (
+                <button key={t} type="button"
+                  onClick={() => { setOwnerType(t); setOwnerId(''); }}
+                  className={`px-3 py-2 rounded-lg border text-xs font-bold transition-all ${ownerType === t ? 'bg-[#EDAC02]/10 border-[#EDAC02]/40 text-[#EDAC02]' : 'border-[#262626] text-zinc-500 hover:border-zinc-500'}`}>
+                  {t === 'none' ? 'Nenhum' : t === 'squad' ? '👤 Squad' : '📍 Parceiro'}
+                </button>
+              ))}
+            </div>
+            {ownerType === 'squad' && (
+              <select value={ownerId} onChange={e => handleOwnerChange('squad', e.target.value)} className={inputClass}>
+                <option value="">Selecione um membro...</option>
+                {(squadMembers || []).map(m => (
+                  <option key={m.id} value={m.id}>{m.full_name}{m.coupon_code ? ` — ${m.coupon_code}` : ''}</option>
+                ))}
+              </select>
+            )}
+            {ownerType === 'location' && (
+              <select value={ownerId} onChange={e => handleOwnerChange('location', e.target.value)} className={inputClass}>
+                <option value="">Selecione um parceiro...</option>
+                {(trainingLocations || []).map(l => (
+                  <option key={l.id} value={l.id}>{l.name}{l.coupon_code ? ` — ${l.coupon_code}` : ''}</option>
+                ))}
+              </select>
+            )}
+            {ownerType !== 'none' && (
+              <div>
+                <label className={labelClass}>Benefício neste evento <span className="text-zinc-600 font-normal normal-case tracking-normal">(descrição do prêmio)</span></label>
+                <input value={benefitDescription} onChange={e => setBenefitDescription(e.target.value)} placeholder="Ex: 1 camisa + 1 inscrição free após 10 usos" className={inputClass} />
+              </div>
+            )}
+          </div>
 
           {/* Travas de Lote */}
           <div className="pt-1">
