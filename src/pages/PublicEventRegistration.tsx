@@ -1319,6 +1319,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         team_name: isTeam ? teamName.trim() : null, team_members: teamMembersData,
         ...(event?.slug === 'selecao' && selectedFreight ? {
           shipping_address: shippingAddress,
+          shipping_service_id: selectedFreight.id,
           shipping_service_name: selectedFreight.name,
           shipping_freight_amount: selectedFreight.price,
         } : {}),
