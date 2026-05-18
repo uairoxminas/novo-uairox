@@ -25,6 +25,7 @@ import * as XLSX from 'xlsx';
 import { sendWebhook } from '@/lib/botconversa';
 import AdminPixParceladoTab from './AdminPixParceladoTab';
 import AdminSorteioTab from './AdminSorteioTab';
+import AdminChallengeTab from './AdminChallengeTab';
 
 // ============ Shared Components / Styles ============
 const GOLD = '#EDAC02';
@@ -4132,6 +4133,7 @@ const TABS = [
   { key: 'pix_parcelado', label: '💰 PIX Parcelado' },
   { key: 'espera', label: '⏳ Lista de Espera' },
   { key: 'sorteio', label: '🎰 Sorteio' },
+  { key: 'desafio', label: '💪 Desafio' },
 ];
 
 export default function AdminEventConfig() {
@@ -4233,6 +4235,7 @@ export default function AdminEventConfig() {
         { activeTab === 'botconversa' && <BotconversaTab eventId={id!} /> }
         { activeTab === 'pix_parcelado' && <AdminPixParceladoTab eventId={id!} /> }
         { activeTab === 'sorteio' && <AdminSorteioTab eventId={id!} /> }
+        { activeTab === 'desafio' && <AdminChallengeTab eventId={id!} /> }
       </div>
     </div>
   );
