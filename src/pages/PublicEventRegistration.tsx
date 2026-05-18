@@ -50,7 +50,7 @@ function usePublicEvent(idOrSlug?: string) {
       const [catRes, batchRes, kitRes, stgRes, regCountRes] = await Promise.all([
         supabase.from('categories').select('*').eq('event_id', eid).order('created_at'),
         supabase.from('price_batches').select('*').eq('event_id', eid).eq('active', true).order('order_index'),
-        supabase.from('athlete_kits').select('*').eq('event_id', eid).eq('active', true).order('created_at'),
+        supabase.from('athlete_kits').select('*, shirt_models(*)').eq('event_id', eid).eq('active', true).order('created_at'),
         supabase.from('event_stages').select('*').eq('event_id', eid).order('order_index'),
         // Count only active registrations (not waitlist/cancelled)
         supabase.from('registrations').select('id', { count: 'exact', head: true }).eq('event_id', eid).in('status', ['pending', 'confirmed']),
