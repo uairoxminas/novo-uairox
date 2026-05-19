@@ -6,6 +6,17 @@ const db = supabase as any;
 
 // ── Types ─────────────────────────────────────────────────
 
+export interface ChallengeConfig {
+  id: string;
+  event_id: string;
+  is_active: boolean;
+  goal: number;
+  start_date: string | null;
+  end_date: string | null;
+  title: string | null;
+  description: string | null;
+}
+
 export interface ChallengeWorkout {
   id: string;
   event_id: string;
@@ -36,6 +47,51 @@ export interface LeaderboardEntry {
   athlete_name: string | null;
   workout_count: number;
   last_workout_at: string | null;
+}
+
+// ── Challenge Config ──────────────────────────────────────
+
+export function useChallengeConfig(eventId?: string) {
+  return useQuery({
+    queryKey: ['challenge-config', eventId],
+    queryFn: async () => {
+      const { data } = await db
+        .from('challenge_configs')
+        .select('*')
+        .eq('event_id', eventId)
+        .maybeSingle();
+      return (data ?? null) as ChallengeConfig | null;
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useUpsertChallengeConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (cfg: {
+      event_id: string;
+      is_active: boolean;
+      goal: number;
+      start_date?: string | null;
+      end_date?: string | null;
+      title?: string | null;
+      description?: string | null;
+    }) => {
+      const { data, error } = await db
+        .from('challenge_configs')
+        .upsert({ ...cfg, updated_at: new Date().toISOString() }, { onConflict: 'event_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ChallengeConfig;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['challenge-config', vars.event_id] });
+      toast.success('Configuração salva!');
+    },
+    onError: (e: any) => toast.error('Erro ao salvar: ' + e.message),
+  });
 }
 
 // ── Leaderboard ───────────────────────────────────────────

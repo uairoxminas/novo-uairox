@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   useAdminWorkouts,
   useChallengeLeaderboard,
   useUpdateWorkoutStatus,
+  useChallengeConfig,
+  useUpsertChallengeConfig,
   ChallengeWorkout,
 } from '@/hooks/useChallenge';
 
@@ -229,6 +231,125 @@ function WorkoutRow({
   );
 }
 
+// ── Config form ───────────────────────────────────────────────
+function ChallengeConfigForm({ eventId }: { eventId: string }) {
+  const { data: cfg, isLoading } = useChallengeConfig(eventId);
+  const upsert = useUpsertChallengeConfig();
+
+  const [isActive,    setIsActive]    = useState(false);
+  const [goal,        setGoal]        = useState(30);
+  const [startDate,   setStartDate]   = useState('');
+  const [endDate,     setEndDate]     = useState('');
+  const [title,       setTitle]       = useState('');
+  const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (!cfg) return;
+    setIsActive(cfg.is_active);
+    setGoal(cfg.goal);
+    setStartDate(cfg.start_date ?? '');
+    setEndDate(cfg.end_date ?? '');
+    setTitle(cfg.title ?? '');
+    setDescription(cfg.description ?? '');
+  }, [cfg]);
+
+  const handleSave = () => {
+    upsert.mutate({
+      event_id: eventId,
+      is_active: isActive,
+      goal,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      title: title.trim() || null,
+      description: description.trim() || null,
+    });
+  };
+
+  const inputClass = 'bg-[#050505] border border-[#262626] rounded-xl px-3 py-2 text-white text-sm focus:border-[#EDAC02] focus:outline-none transition-colors w-full';
+  const labelClass = 'text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1';
+
+  if (isLoading) return null;
+
+  return (
+    <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-5 space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-white">Configuração do Desafio</p>
+          <p className="text-xs text-zinc-500 mt-0.5">Defina a meta, datas e ative o desafio para os atletas</p>
+        </div>
+        <button
+          onClick={() => setIsActive(v => !v)}
+          className={`relative w-12 h-6 rounded-full transition-colors ${isActive ? 'bg-[#EDAC02]' : 'bg-[#262626]'}`}
+        >
+          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isActive ? 'left-7' : 'left-1'}`} />
+        </button>
+      </div>
+
+      {!isActive && (
+        <p className="text-xs text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
+          ⚠ Desafio desativado — o portal funciona mas não enviará alertas automáticos até ser ativado.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <p className={labelClass}>Meta de treinos para o sorteio</p>
+          <input
+            type="number" min={1} max={365}
+            value={goal}
+            onChange={e => setGoal(Number(e.target.value))}
+            className={inputClass}
+          />
+          <p className="text-[10px] text-zinc-600 mt-1">Padrão: 30 treinos</p>
+        </div>
+        <div>
+          <p className={labelClass}>Título do Desafio (opcional)</p>
+          <input
+            type="text" value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Ex: Desafio 30 Dias UAIROX"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <p className={labelClass}>Data de início</p>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <p className={labelClass}>Data de encerramento</p>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputClass} />
+        </div>
+        <div className="sm:col-span-2">
+          <p className={labelClass}>Descrição / Regulamento resumido (opcional)</p>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Ex: Registre 30 treinos até o dia do evento e garanta sua vaga no sorteio de R$ 500!"
+            rows={2}
+            className={`${inputClass} resize-none`}
+          />
+        </div>
+      </div>
+
+      <div className="bg-[#050505] border border-[#1a1a1a] rounded-xl p-3">
+        <p className={labelClass}>Link do portal do atleta</p>
+        <p className="text-xs text-zinc-400 font-mono break-all">
+          uairox.com.br/desafio/<span className="text-[#EDAC02]">{'{slug}'}</span>/<span className="text-[#EDAC02]">{'{registration_id}'}</span>
+        </p>
+        <p className="text-[10px] text-zinc-600 mt-1">Cada atleta recebe seu próprio link personalizado</p>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={upsert.isPending}
+        className="w-full py-3 rounded-xl bg-[#EDAC02] text-black font-black text-sm disabled:opacity-50 hover:bg-[#d49b02] transition-colors"
+      >
+        {upsert.isPending ? 'Salvando...' : 'Salvar Configuração'}
+      </button>
+    </div>
+  );
+}
+
 // ── Main tab ───────────────────────────────────────────────────
 export default function AdminChallengeTab({ eventId }: { eventId: string }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -237,13 +358,16 @@ export default function AdminChallengeTab({ eventId }: { eventId: string }) {
 
   const { data: allWorkouts = [], isLoading: loadingW } = useAdminWorkouts(eventId);
   const { data: leaderboard = [], isLoading: loadingL }  = useChallengeLeaderboard(eventId);
+  const { data: cfg } = useChallengeConfig(eventId);
   const updateStatus = useUpdateWorkoutStatus();
+
+  const goal = cfg?.goal ?? GOAL;
 
   const approved  = allWorkouts.filter(w => w.status === 'approved');
   const pending   = allWorkouts.filter(w => w.status === 'pending');
   const rejected  = allWorkouts.filter(w => w.status === 'rejected');
   const athletes  = new Set(allWorkouts.map(w => w.registration_id)).size;
-  const eligible  = leaderboard.filter(e => Number(e.workout_count) >= GOAL).length;
+  const eligible  = leaderboard.filter(e => Number(e.workout_count) >= goal).length;
 
   const filtered = allWorkouts
     .filter(w => statusFilter === 'all' || w.status === statusFilter)
@@ -286,6 +410,9 @@ export default function AdminChallengeTab({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-5">
+      {/* ── Configuração ──────────────────────────────────── */}
+      <ChallengeConfigForm eventId={eventId} />
+
       {/* ── Stats ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
@@ -293,7 +420,7 @@ export default function AdminChallengeTab({ eventId }: { eventId: string }) {
           { label: 'Aprovados',        value: approved.length,     color: 'text-green-400' },
           { label: 'Pendentes',        value: pending.length,      color: 'text-yellow-400' },
           { label: 'Atletas ativos',   value: athletes,            color: 'text-[#EDAC02]' },
-          { label: `Elegíveis (${GOAL}+)`, value: eligible,        color: 'text-blue-400' },
+          { label: `Elegíveis (${goal}+)`, value: eligible,        color: 'text-blue-400' },
         ].map(s => (
           <div key={s.label} className={cardClass}>
             <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>

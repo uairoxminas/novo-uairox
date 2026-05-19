@@ -11,12 +11,13 @@ import {
   useAthleteWorkouts,
   useSubmitWorkout,
   useToggleReaction,
+  useChallengeConfig,
   uploadWorkoutPhoto,
 } from '@/hooks/useChallenge';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const db = supabase as any;
-const GOAL = 30;
+const DEFAULT_GOAL = 30;
 const EMOJIS = ['👊', '🔥', '❤️', '💪', '⚡'] as const;
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -561,11 +562,14 @@ export default function ChallengePortalPage() {
     };
   }, [eventId, registrationId, queryClient]);
 
-  const { data: leaderboard = [] } = useChallengeLeaderboard(eventId);
-  const { data: feed = [] }        = useChallengeWorkouts(eventId);
-  const { data: myWorkouts = [] }  = useAthleteWorkouts(eventId, registrationId);
+  const { data: leaderboard = [] }  = useChallengeLeaderboard(eventId);
+  const { data: feed = [] }         = useChallengeWorkouts(eventId);
+  const { data: myWorkouts = [] }   = useAthleteWorkouts(eventId, registrationId);
+  const { data: challengeCfg }      = useChallengeConfig(eventId);
 
   const push = usePushNotifications(registrationId);
+
+  const GOAL = challengeCfg?.goal ?? DEFAULT_GOAL;
 
   const myCount   = myWorkouts.filter(w => w.status === 'approved').length;
   const myRank    = leaderboard.findIndex(e => e.registration_id === registrationId) + 1;
