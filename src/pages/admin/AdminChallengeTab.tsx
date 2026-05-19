@@ -381,7 +381,7 @@ export default function AdminChallengeTab({
       const db = supabase as any;
       const [{ data: registrations }, { data: bcCfg }, { data: cc }] = await Promise.all([
         db.from('registrations').select('id, athlete_name, athlete_phone').eq('event_id', eventId).eq('status', 'confirmed'),
-        db.from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
+        db.from('botconversa_config').select('trigger_inscricao_url, msg_desafio').eq('event_id', eventId).maybeSingle(),
         db.from('challenge_configs').select('is_active, goal, title').eq('event_id', eventId).maybeSingle(),
       ]);
       if (!bcCfg?.trigger_inscricao_url) {
@@ -395,15 +395,21 @@ export default function AdminChallengeTab({
         setBatchSending(false);
         return;
       }
-      const meta = cc?.goal ?? 30;
+      const meta = String(cc?.goal ?? 30);
       const titulo = cc?.title || 'UAIROX Challenge';
+      const template = bcCfg.msg_desafio || '🏋️ *{titulo} ativado!*\nOlá, {nome}! Você está inscrito no *{evento}*.\n\nSeu desafio: complete *{meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n{link}\n\n💪 Vamos nessa!';
       let sent = 0, failed = 0;
       setBatchProgress({ sent: 0, failed: 0, total: athletes.length });
       for (const r of athletes) {
         const phone = (r.athlete_phone || '').replace(/\D/g, '');
         const portalUrl = `https://www.uairox.com.br/desafio/${eventSlug}/${r.id}`;
-        const msg = `🏋️ *${titulo}!*\nOlá, ${r.athlete_name}! Você está inscrito no *${eventTitle}*.\n\nSeu desafio: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
-        const { ok } = await sendWebhook(bcCfg.trigger_inscricao_url, { telefone: phone, message: msg }, { maxAttempts: 1 });
+        const msg = template
+          .replace(/\{nome\}/g, r.athlete_name || '')
+          .replace(/\{evento\}/g, eventTitle)
+          .replace(/\{meta\}/g, meta)
+          .replace(/\{link\}/g, portalUrl)
+          .replace(/\{titulo\}/g, titulo);
+        const { ok } = await sendWebhook(bcCfg.trigger_inscricao_url, { telefone: phone, nome: r.athlete_name || '', evento: eventTitle, message: msg }, { maxAttempts: 1 });
         if (ok) sent++; else failed++;
         setBatchProgress({ sent, failed, total: athletes.length });
         await new Promise(res => setTimeout(res, 350));

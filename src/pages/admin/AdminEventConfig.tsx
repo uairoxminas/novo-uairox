@@ -1451,6 +1451,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const [msgPix1d, setMsgPix1d] = useState(DEFAULT_MESSAGES.pix_1d);
   const [msgPix5d, setMsgPix5d] = useState(DEFAULT_MESSAGES.pix_5d);
   const [msgMarco, setMsgMarco] = useState(DEFAULT_MESSAGES.marco);
+  const [msgDesafio, setMsgDesafio] = useState('🏋️ *{titulo} ativado!*\nOlá, {nome}! Sua inscrição no *{evento}* foi confirmada.\n\nSeu desafio começa agora: complete *{meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n{link}\n\n💪 Vamos nessa!');
   const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -1468,6 +1469,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     setPix5dAtivo(cfg.pix_cancelamento_5d_ativo ?? true);
     setPixCancelarAuto(cfg.pix_cancelar_automatico ?? false);
     if (cfg.msg_inscricao)  setMsgInscricao(cfg.msg_inscricao);
+    if (cfg.msg_desafio)    setMsgDesafio(cfg.msg_desafio);
     if (cfg.msg_confirmado) setMsgConfirmado(cfg.msg_confirmado);
     if (cfg.msg_cancelado)  setMsgCancelado(cfg.msg_cancelado);
     if (cfg.msg_pix_2d)     setMsgPix2d(cfg.msg_pix_2d);
@@ -1488,6 +1490,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     pix_cancelar_automatico: pixCancelarAuto,
     trigger_broadcast_url: webhookUrl || null,
     msg_inscricao:  msgInscricao  || null,
+    msg_desafio:    msgDesafio    || null,
     msg_confirmado: msgConfirmado || null,
     msg_cancelado:  msgCancelado  || null,
     msg_pix_2d:     msgPix2d      || null,
@@ -1612,6 +1615,19 @@ function BotconversaTab({ eventId }: { eventId: string }) {
             <MsgEditor label="Editar mensagem de confirmação" value={msgConfirmado} onChange={setMsgConfirmado}
               defaultMsg={DEFAULT_MESSAGES.confirmado}
               vars={['nome','evento','categoria','codigo','grupo']} />
+          </div>
+        </div>
+        {/* ── UAIROX Challenge ─────────────────────────────── */}
+        <div className={cardClass}>
+          <div className="p-3.5 flex items-center gap-3">
+            <span className="text-sm font-bold text-white">⚡ UAIROX Challenge — Convite</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">desafio</span>
+            <span className="text-[10px] text-zinc-500 ml-auto">Enviado ao confirmar inscrição (se desafio ativo)</span>
+          </div>
+          <div className="px-3.5 pb-3.5">
+            <MsgEditor label="Editar mensagem do UAIROX Challenge" value={msgDesafio} onChange={setMsgDesafio}
+              defaultMsg='🏋️ *{titulo} ativado!*\nOlá, {nome}! Sua inscrição no *{evento}* foi confirmada.\n\nSeu desafio começa agora: complete *{meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n{link}\n\n💪 Vamos nessa!'
+              vars={['nome','evento','titulo','meta','link']} />
           </div>
         </div>
         <div className={cardClass}>
@@ -2493,15 +2509,22 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           if (phone.length >= 10) {
             Promise.all([
               (supabase as any).from('challenge_configs').select('is_active,goal,title').eq('event_id', eventId).maybeSingle(),
-              (supabase as any).from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
+              (supabase as any).from('botconversa_config').select('trigger_inscricao_url,msg_desafio').eq('event_id', eventId).maybeSingle(),
             ]).then(([{ data: cc }, { data: bc }]: any[]) => {
               if (!cc?.is_active || !bc?.trigger_inscricao_url) return;
               const slug = (event as any)?.slug || eventId;
               const portalUrl = `https://www.uairox.com.br/desafio/${slug}/${editingReg.id}`;
-              const meta = cc.goal ?? 30;
+              const meta = String(cc.goal ?? 30);
               const titulo = cc.title || 'UAIROX Challenge';
-              const msg = `🏋️ *${titulo} ativado!*\nOlá, ${a1.name}! Sua inscrição no *${event?.title}* foi confirmada.\n\nSeu desafio começa agora: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
-              sendWebhook(bc.trigger_inscricao_url, { telefone: phone, message: msg }, { maxAttempts: 2 });
+              const eventoTitle = event?.title || '';
+              const template = bc.msg_desafio || '🏋️ *{titulo} ativado!*\nOlá, {nome}! Sua inscrição no *{evento}* foi confirmada.\n\nSeu desafio começa agora: complete *{meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n{link}\n\n💪 Vamos nessa!';
+              const msg = template
+                .replace(/\{nome\}/g, a1.name)
+                .replace(/\{evento\}/g, eventoTitle)
+                .replace(/\{meta\}/g, meta)
+                .replace(/\{link\}/g, portalUrl)
+                .replace(/\{titulo\}/g, titulo);
+              sendWebhook(bc.trigger_inscricao_url, { telefone: phone, nome: a1.name, evento: eventoTitle, message: msg }, { maxAttempts: 2 });
             });
           }
         }
