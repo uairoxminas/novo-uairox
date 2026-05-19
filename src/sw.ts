@@ -6,9 +6,13 @@ import { ExpirationPlugin } from 'workbox-expiration';
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Injected by vite-plugin-pwa at build time
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
+
+// Required by vite-plugin-pwa: activates waiting SW when user confirms update
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 // ── Workout photos from Supabase Storage — CacheFirst, 30d ──────
 registerRoute(

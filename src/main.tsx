@@ -5,7 +5,7 @@ import './index.css';
 import App from './App';
 
 function PWAUpdatePrompt() {
-  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+  const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW();
   if (!needRefresh) return null;
   return (
     <div className="fixed bottom-4 left-4 right-4 z-[999] max-w-sm mx-auto bg-[#0a0a0a] border border-[#EDAC02]/40 rounded-2xl p-4 flex items-center gap-3 shadow-xl">
@@ -19,6 +19,13 @@ function PWAUpdatePrompt() {
         className="shrink-0 px-3 py-1.5 rounded-lg bg-[#EDAC02] text-black text-xs font-black"
       >
         Atualizar
+      </button>
+      <button
+        onClick={() => setNeedRefresh(false)}
+        className="shrink-0 w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-white text-sm"
+        aria-label="Fechar"
+      >
+        ✕
       </button>
     </div>
   );
