@@ -148,6 +148,7 @@ export function useToggleReaction() {
       emoji: string;
       eventId: string;
       existing?: WorkoutReaction;
+      workoutOwnerRegistrationId?: string;
     }) => {
       if (existing) {
         if (existing.emoji === emoji) {
@@ -168,8 +169,21 @@ export function useToggleReaction() {
       });
       return emoji;
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (result, vars) => {
       qc.invalidateQueries({ queryKey: ['challenge-workouts', vars.eventId] });
+      // Push notification para o dono do treino quando alguém reage (não a si mesmo)
+      if (result !== null && vars.workoutOwnerRegistrationId && vars.workoutOwnerRegistrationId !== vars.registrationId) {
+        fetch('/api/push-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'reaction',
+            registration_id: vars.workoutOwnerRegistrationId,
+            reactor_name: vars.reactorName,
+            emoji: vars.emoji,
+          }),
+        }).catch(() => {});
+      }
     },
     onError: (e: any) => toast.error('Erro: ' + e.message),
   });

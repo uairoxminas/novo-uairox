@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
           registrations (
              athlete_name, 
              team_name, 
-             categories (name)
+             categories (name, team_size)
           )
         `)
         .eq('event_id', selectedEventId)
@@ -78,7 +78,10 @@ export default function LeaderboardPage() {
   const getRankData = (index: number) => {
     if (filteredResults.length <= index) return null;
     const r = filteredResults[index];
-    const name = r.registrations?.athlete_name || r.registrations?.team_name || 'Desconhecido';
+    const teamSize = r.registrations?.categories?.team_size ?? 1;
+    const name = teamSize > 1
+      ? (r.registrations?.team_name || 'Sem Equipe')
+      : (r.registrations?.athlete_name || 'Desconhecido');
     return {
       name,
       time: r.status === 'validated' ? formatMs(r.final_adjusted_time_ms) : r.status.toUpperCase(),
@@ -227,8 +230,7 @@ export default function LeaderboardPage() {
                       <tr className="border-b border-dark-border text-brand-500 text-[11px] sm:text-xs font-black uppercase tracking-widest bg-black/40">
                          <th className="py-4 px-6 w-20 text-center">Pos</th>
                          <th className="py-4 px-6 w-20 text-center">Nº</th>
-                         <th className="py-4 px-6">Atleta</th>
-                         <th className="py-4 px-6">Equipe</th>
+                         <th className="py-4 px-6">Atleta / Equipe</th>
                          <th className="py-4 px-6">Categoria</th>
                          <th className="py-4 px-6 text-center">Penalidades</th>
                          <th className="py-4 px-6 text-right">Tempo</th>
@@ -236,8 +238,14 @@ export default function LeaderboardPage() {
                     </thead>
                     <tbody className="divide-y divide-dark-border">
                       {filteredResults.map((r: any, idx: number) => {
-                         const name = r.registrations?.athlete_name || 'Desconhecido';
-                         const team = r.registrations?.team_name || '--';
+                         const teamSize = r.registrations?.categories?.team_size ?? 1;
+                         const isTeamCategory = teamSize > 1;
+                         const displayName = isTeamCategory
+                           ? (r.registrations?.team_name || 'Sem Equipe')
+                           : (r.registrations?.athlete_name || 'Desconhecido');
+                         const displaySub = isTeamCategory
+                           ? null
+                           : (r.registrations?.team_name || null);
                          const category = r.registrations?.categories?.name || 'Sem Categoria';
                          const isPodium = r.status === 'validated' && idx < 3;
                          const isDNF = r.status !== 'validated';
@@ -271,16 +279,16 @@ export default function LeaderboardPage() {
                                  {r.bib_number}
                               </td>
 
-                              {/* ATLETA */}
+                              {/* ATLETA / EQUIPE — dinâmico por team_size da categoria */}
                               <td className="py-4 px-6">
-                                 <div className={`font-black italic uppercase text-sm ${isDNF ? 'text-zinc-600 line-through' : 'text-white'}`}>
-                                    {name}
-                                 </div>
-                              </td>
-
-                              {/* EQUIPE */}
-                              <td className="py-4 px-6 text-zinc-400 text-xs font-bold uppercase tracking-wider">
-                                 {team}
+                                <div className={`font-black italic uppercase text-sm ${isDNF ? 'text-zinc-600 line-through' : 'text-white'}`}>
+                                  {displayName}
+                                </div>
+                                {displaySub && (
+                                  <div className="text-zinc-500 text-[11px] font-bold uppercase tracking-wider mt-0.5">
+                                    {displaySub}
+                                  </div>
+                                )}
                               </td>
 
                               {/* CATEGORIA */}

@@ -13,6 +13,7 @@ import {
   useToggleReaction,
   uploadWorkoutPhoto,
 } from '@/hooks/useChallenge';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const db = supabase as any;
 const GOAL = 30;
@@ -121,6 +122,7 @@ function WorkoutCard({
       emoji,
       eventId,
       existing: myReaction,
+      workoutOwnerRegistrationId: w.registration_id,
     });
   };
 
@@ -268,6 +270,17 @@ function WorkoutModal({
         } catch {
           // Silencioso — falha na mensagem não quebra o fluxo
         }
+        // Push notification complementar (fire-and-forget)
+        fetch('/api/push-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'milestone',
+            registration_id: registration.id,
+            milestone: newCount,
+            name: registration.athlete_name,
+          }),
+        }).catch(() => {});
       }
 
       setSuccess(true);
@@ -552,6 +565,8 @@ export default function ChallengePortalPage() {
   const { data: feed = [] }        = useChallengeWorkouts(eventId);
   const { data: myWorkouts = [] }  = useAthleteWorkouts(eventId, registrationId);
 
+  const push = usePushNotifications(registrationId);
+
   const myCount   = myWorkouts.filter(w => w.status === 'approved').length;
   const myRank    = leaderboard.findIndex(e => e.registration_id === registrationId) + 1;
   const pctToGoal = Math.min(myCount / GOAL, 1);
@@ -651,6 +666,30 @@ export default function ChallengePortalPage() {
                 </p>
               )}
             </div>
+
+            {/* ── Botão de notificações ── */}
+            {push.isSupported && push.permission !== 'denied' && (
+              <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
+                {push.isSubscribed ? (
+                  <button
+                    onClick={push.unsubscribe}
+                    disabled={push.loading}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    🔔 Notificações ativadas
+                    <span className="text-zinc-700">(toque para desativar)</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={push.subscribe}
+                    disabled={push.loading}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[#1a1a1a] text-xs font-bold text-zinc-400 hover:text-white hover:bg-[#222] transition-all disabled:opacity-40"
+                  >
+                    {push.loading ? '...' : '🔔 Ativar notificações de reações'}
+                  </button>
+                )}
+              </div>
+            )}
           </motion.div>
 
           {/* ── Tabs ───────────────────────────────────── */}
