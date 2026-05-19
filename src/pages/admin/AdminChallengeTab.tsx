@@ -394,27 +394,27 @@ export default function AdminChallengeTab({ eventId }: { eventId: string }) {
     );
   }
 
-  if (allWorkouts.length === 0 && leaderboard.length === 0) {
-    return (
-      <div className="text-center py-20 space-y-3">
-        <p className="text-5xl">💪</p>
-        <p className="text-white font-bold">Nenhum treino registrado ainda</p>
-        <p className="text-zinc-500 text-sm">
-          Compartilhe os links{' '}
-          <code className="text-[#EDAC02] font-mono text-xs">/desafio/slug/registrationId</code>{' '}
-          com os atletas inscritos.
-        </p>
-      </div>
-    );
-  }
+  const isEmpty = allWorkouts.length === 0 && leaderboard.length === 0;
 
   return (
     <div className="space-y-5">
-      {/* ── Configuração ──────────────────────────────────── */}
+      {/* ── Configuração — sempre visível ─────────────────── */}
       <ChallengeConfigForm eventId={eventId} />
 
-      {/* ── Stats ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {isEmpty && (
+        <div className="text-center py-16 space-y-3">
+          <p className="text-5xl">💪</p>
+          <p className="text-white font-bold">Nenhum treino registrado ainda</p>
+          <p className="text-zinc-500 text-sm">
+            Configure o desafio acima e compartilhe os links{' '}
+            <code className="text-[#EDAC02] font-mono text-xs">/desafio/slug/registrationId</code>{' '}
+            com os atletas inscritos.
+          </p>
+        </div>
+      )}
+
+      {/* ── Stats + Listas — só quando há treinos ─────────── */}
+      {!isEmpty && <><div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { label: 'Treinos enviados', value: allWorkouts.length,  color: 'text-white' },
           { label: 'Aprovados',        value: approved.length,     color: 'text-green-400' },
@@ -552,6 +552,7 @@ export default function AdminChallengeTab({ eventId }: { eventId: string }) {
           />
         )}
       </AnimatePresence>
+      </>}
     </div>
   );
 }
