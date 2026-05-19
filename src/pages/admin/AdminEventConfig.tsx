@@ -2140,6 +2140,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const [generatingLabel, setGeneratingLabel] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchUpdating, setBatchUpdating] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
 
   const toggleSelect = (id: string) => setSelectedIds(prev => {
     const next = new Set(prev);
@@ -2222,6 +2223,58 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           }, idx * 30_000);
         });
       }
+    }
+  };
+
+  const handleDownloadPhotosZip = async () => {
+    const allRegs = (registrations || []) as any[];
+    const entries: { url: string; filename: string }[] = [];
+
+    allRegs.forEach((reg, regIdx) => {
+      const teamOrName = (reg.team_name || reg.athlete_name || `inscricao${regIdx + 1}`).replace(/[^a-zA-Z0-9À-ÿ _-]/g, '_');
+      const members = [
+        { photo_url: reg.athlete_photo_url, name: reg.athlete_name },
+        ...((reg.team_members as any[] || []).map((m: any) => ({ photo_url: m.photo_url, name: m.name }))),
+      ].filter(m => m.photo_url?.trim());
+
+      members.forEach((m, mIdx) => {
+        const ext = (m.photo_url.split('?')[0].split('.').pop() || 'jpg').toLowerCase();
+        const memberName = (m.name || `membro${mIdx + 1}`).replace(/[^a-zA-Z0-9À-ÿ _-]/g, '_');
+        const filename = `${String(regIdx + 1).padStart(3, '0')}_${teamOrName}_${memberName}.${ext}`;
+        entries.push({ url: m.photo_url, filename });
+      });
+    });
+
+    if (entries.length === 0) {
+      toast.error('Nenhuma foto de treino encontrada nas inscrições.');
+      return;
+    }
+
+    setDownloadingZip(true);
+    toast.info(`Preparando ${entries.length} foto(s)...`);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      await Promise.all(entries.map(async ({ url, filename }) => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return;
+          zip.file(filename, await res.blob());
+        } catch { /* pula fotos inacessíveis */ }
+      }));
+
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `fotos-treino-${eventId.slice(0, 8)}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast.success(`ZIP com ${entries.length} foto(s) baixado!`);
+    } catch (err: any) {
+      toast.error('Erro ao gerar ZIP: ' + err.message);
+    } finally {
+      setDownloadingZip(false);
     }
   };
 
@@ -2694,6 +2747,9 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         <div className="flex-1" />
         <button onClick={handleExport} className="px-4 py-1.5 bg-[#111] border border-[#262626] text-zinc-300 text-xs font-bold rounded-lg hover:border-green-500 hover:text-green-500 transition-all flex items-center gap-2 shadow-sm mr-2">
           📊 Exportar
+        </button>
+        <button onClick={handleDownloadPhotosZip} disabled={downloadingZip} className="px-4 py-1.5 bg-[#111] border border-[#262626] text-zinc-300 text-xs font-bold rounded-lg hover:border-purple-500 hover:text-purple-400 transition-all flex items-center gap-2 shadow-sm mr-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          {downloadingZip ? '⏳ Gerando ZIP...' : '📸 Fotos ZIP'}
         </button>
         <button onClick={openNewRegModal} className="px-4 py-1.5 bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-bold rounded-lg hover:bg-[#EDAC02] hover:text-black transition-all flex items-center gap-2 shadow-sm mr-2">
           + Nova Inscrição
