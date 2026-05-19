@@ -1455,11 +1455,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       }
 
       setSuccess(true);
+      sendConfirmationMessages(data.id);
     } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }
     finally { setSubmitting(false); }
   };
 
-  const sendConfirmationMessages = () => {
+  const sendConfirmationMessages = (regId?: string) => {
     if (!athletes.length) return;
 
     const sharedFields = {
@@ -1509,7 +1510,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         if (!bcfg?.trigger_inscricao_ativo || !bcfg?.trigger_inscricao_url) return;
         const template = bcfg.msg_inscricao || DEFAULT_MESSAGES.inscricao;
         const valorFmt = `R$ ${totalPrice.toFixed(2).replace('.', ',')}`;
-        const codigo = registrationId?.slice(0, 8) || '';
+        const codigo = (regId || registrationId)?.slice(0, 8) || '';
         for (const athlete of athletes) {
           if (!athlete.phone?.trim()) continue;
           const message = interpolate(template, {
@@ -1526,7 +1527,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
           const payload = { telefone: athlete.phone.trim(), message };
           const { ok, error } = await sendWebhook(bcfg.trigger_inscricao_url, payload);
           (supabase as any).from('botconversa_logs').insert({
-            event_id: eventId, registration_id: registrationId,
+            event_id: eventId, registration_id: regId || registrationId,
             trigger_type: 'inscricao', webhook_url: bcfg.trigger_inscricao_url,
             payload, status: ok ? 'sent' : 'failed',
             error_message: ok ? null : error,
@@ -1567,9 +1568,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
       setReceiptUrl(url);
       toast.success('Comprovante recebido!');
 
-      // Trigger confirmation: show processing animation, fire messages, then open overlay
       setProcessingConfirmation(true);
-      sendConfirmationMessages();
       setTimeout(() => {
         setProcessingConfirmation(false);
         setShowSuccessOverlay(true);
