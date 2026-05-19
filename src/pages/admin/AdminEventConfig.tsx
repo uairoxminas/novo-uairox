@@ -2155,12 +2155,74 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     if (!confirm(`Alterar ${selectedIds.size} inscrição(ões) para "${newStatus}"?`)) return;
     setBatchUpdating(true);
     const { supabase } = await import('@/integrations/supabase/client');
+
+    // Captura status antigo antes do update para saber quais realmente mudaram
+    const affectedRegs = (registrations || []).filter((r: any) =>
+      selectedIds.has(r.id) && r.status !== newStatus
+    );
+
     const { error } = await supabase.from('registrations').update({ status: newStatus } as any).in('id', [...selectedIds]);
     setBatchUpdating(false);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success(`${selectedIds.size} inscrição(ões) atualizadas!`);
     setSelectedIds(new Set());
     refetch();
+
+    // BotConversa: envia para confirmado/cancelado com intervalo de 30s entre disparos
+    if ((newStatus === 'confirmed' || newStatus === 'cancelled') && affectedRegs.length > 0) {
+      const triggerKey = newStatus === 'confirmed' ? 'confirmado' : 'cancelado';
+      const cfgField = newStatus === 'confirmed'
+        ? 'trigger_confirmado_ativo,trigger_confirmado_url,msg_confirmado'
+        : 'trigger_cancelado_ativo,trigger_cancelado_url,msg_cancelado';
+
+      const { data: bcfg } = await (supabase as any)
+        .from('botconversa_config')
+        .select(cfgField)
+        .eq('event_id', eventId)
+        .maybeSingle();
+
+      const aField = newStatus === 'confirmed' ? bcfg?.trigger_confirmado_ativo : bcfg?.trigger_cancelado_ativo;
+      const uField = newStatus === 'confirmed' ? bcfg?.trigger_confirmado_url : bcfg?.trigger_cancelado_url;
+      if (!aField || !uField) return;
+
+      const msgTemplate = newStatus === 'confirmed'
+        ? (bcfg?.msg_confirmado || DEFAULT_MESSAGES.confirmado)
+        : (bcfg?.msg_cancelado || DEFAULT_MESSAGES.cancelado);
+
+      // Lista plana de todos os membros com telefone de todas as inscrições afetadas
+      const dispatches: { phone: string; name: string; reg: any }[] = [];
+      for (const reg of affectedRegs as any[]) {
+        const members = [
+          { phone: reg.athlete_phone, name: reg.athlete_name },
+          ...((reg.team_members as any[] || []).map((m: any) => ({ phone: m.phone, name: m.name }))),
+        ].filter(m => m.phone?.trim());
+        for (const m of members) dispatches.push({ phone: m.phone, name: m.name, reg });
+      }
+
+      if (dispatches.length > 0) {
+        toast.info(`📱 Enviando ${dispatches.length} mensagem(ns) WhatsApp com intervalo de 30s...`);
+        dispatches.forEach(({ phone, name, reg }, idx) => {
+          setTimeout(async () => {
+            const message = interpolate(msgTemplate, {
+              nome: name,
+              evento: event?.title || eventId,
+              categoria: reg.categories?.name || '',
+              codigo: reg.id?.slice(0, 8) || '',
+              grupo: (event as any)?.whatsapp_group_link || '',
+            });
+            const bcPayload = { telefone: phone, message, nome: name, evento: event?.title || eventId, categoria: reg.categories?.name || '' };
+            const { ok, error: whErr } = await sendWebhook(uField, bcPayload);
+            if (!ok) toast.warning(`Webhook BotConversa (${name}) não entregue${whErr ? ` (${whErr})` : ''}`);
+            (supabase as any).from('botconversa_logs').insert({
+              event_id: eventId, registration_id: reg.id,
+              trigger_type: triggerKey, webhook_url: uField,
+              payload: bcPayload, status: ok ? 'sent' : 'failed',
+              error_message: ok ? null : whErr,
+            }).then(() => {});
+          }, idx * 30_000);
+        });
+      }
+    }
   };
 
   const handleGenerateLabel = async (reg: any) => {
