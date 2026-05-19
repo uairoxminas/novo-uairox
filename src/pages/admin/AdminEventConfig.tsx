@@ -2726,7 +2726,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               
               return (
                 <tr key={reg.id} onClick={() => openEditModal(reg)} className={`border-b border-[#0f0f0f] hover:bg-[#0a0a0a] transition-colors cursor-pointer ${selectedIds.has(reg.id) ? 'bg-[#EDAC02]/5' : ''}`}>
-                  <td className="py-2 px-2" onClick={e => { e.stopPropagation(); toggleSelect(reg.id); }}>
+                  <td className="py-2 px-2" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={selectedIds.has(reg.id)} onChange={() => toggleSelect(reg.id)}
                       className="accent-[#EDAC02] w-4 h-4 cursor-pointer" />
                   </td>
