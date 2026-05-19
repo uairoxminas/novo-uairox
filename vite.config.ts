@@ -13,7 +13,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
