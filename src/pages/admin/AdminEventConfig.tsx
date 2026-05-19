@@ -2138,6 +2138,30 @@ function InscricoesTab({ eventId }: { eventId: string }) {
   const [editAthletes, setEditAthletes] = useState<AthEdit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [generatingLabel, setGeneratingLabel] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchUpdating, setBatchUpdating] = useState(false);
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const toggleSelectAll = () => {
+    const ids = (filtered || []).map((r: any) => r.id);
+    setSelectedIds(prev => prev.size === ids.length ? new Set() : new Set(ids));
+  };
+  const handleBatchStatus = async (newStatus: string) => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Alterar ${selectedIds.size} inscrição(ões) para "${newStatus}"?`)) return;
+    setBatchUpdating(true);
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase.from('registrations').update({ status: newStatus } as any).in('id', [...selectedIds]);
+    setBatchUpdating(false);
+    if (error) { toast.error('Erro: ' + error.message); return; }
+    toast.success(`${selectedIds.size} inscrição(ões) atualizadas!`);
+    setSelectedIds(new Set());
+    refetch();
+  };
 
   const handleGenerateLabel = async (reg: any) => {
     if (!reg.shipping_address || !reg.shipping_service_id) {
@@ -2574,7 +2598,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         ].map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setFilter(key === 'all' ? null : key)}
+            onClick={() => { setFilter(key === 'all' ? null : key); setSelectedIds(new Set()); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
               (key === 'all' && !filter) || filter === key
                 ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
@@ -2655,10 +2679,31 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         </div>
       )}
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-[#0a0a0a] border border-[#EDAC02]/30 rounded-xl flex-wrap">
+          <span className="text-xs font-bold text-[#EDAC02]">{selectedIds.size} selecionada{selectedIds.size > 1 ? 's' : ''}</span>
+          <span className="text-zinc-600 text-xs">→ alterar para:</span>
+          {[['confirmed','✅ Confirmado','text-green-400 border-green-500/30 hover:bg-green-500/10'],['pending','⏳ Pendente','text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/10'],['cancelled','❌ Cancelado','text-red-400 border-red-500/30 hover:bg-red-500/10'],['waitlist','📋 Lista de Espera','text-blue-400 border-blue-500/30 hover:bg-blue-500/10']].map(([s, label, cls]) => (
+            <button key={s} onClick={() => handleBatchStatus(s)} disabled={batchUpdating}
+              className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all disabled:opacity-40 ${cls}`}>
+              {label}
+            </button>
+          ))}
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-zinc-500 hover:text-white transition-colors">✕ Limpar</button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#1a1a1a]">
+              <th className="py-3 px-2">
+                <input type="checkbox"
+                  checked={(filtered?.length || 0) > 0 && selectedIds.size === (filtered?.length || 0)}
+                  onChange={toggleSelectAll}
+                  className="accent-[#EDAC02] w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Nº</th>
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Equipe / Atleta</th>
               <th className="text-left py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Categoria</th>
@@ -2680,7 +2725,11 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               const allPhotos = [reg.athlete_photo_url, ...(reg.team_members?.map((m: any) => m.photo_url) || [])].filter(Boolean);
               
               return (
-                <tr key={reg.id} onClick={() => openEditModal(reg)} className="border-b border-[#0f0f0f] hover:bg-[#0a0a0a] transition-colors cursor-pointer">
+                <tr key={reg.id} onClick={() => openEditModal(reg)} className={`border-b border-[#0f0f0f] hover:bg-[#0a0a0a] transition-colors cursor-pointer ${selectedIds.has(reg.id) ? 'bg-[#EDAC02]/5' : ''}`}>
+                  <td className="py-2 px-2" onClick={e => { e.stopPropagation(); toggleSelect(reg.id); }}>
+                    <input type="checkbox" checked={selectedIds.has(reg.id)} onChange={() => toggleSelect(reg.id)}
+                      className="accent-[#EDAC02] w-4 h-4 cursor-pointer" />
+                  </td>
                   <td className="py-3 px-3 font-mono text-zinc-400">{reg.bib_number || '—'}</td>
                   <td className="py-3 px-3">
                     <div className="font-medium text-white">{displayName}</div>
