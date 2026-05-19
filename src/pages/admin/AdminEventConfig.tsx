@@ -2240,52 +2240,8 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         const igFontSize = Math.max(10, Math.round(img.naturalHeight * 0.015));
         const padding = Math.round(igFontSize * 1.2);
 
-        // === CONFIRMED — texto grunge amarelo ===
-        const confFontSize = Math.round(img.naturalWidth * 0.15);
-        const confFont = `900 ${confFontSize}px Impact, Arial Black, sans-serif`;
-        const confText = 'CONFIRMED';
-        const confX = padding;
-        // posição Y: acima do @instagram, com espaço
-        const confY = img.naturalHeight - padding - igFontSize * 2.5;
-
-        // Mede largura para calcular densidade do grunge
-        ctx.font = confFont;
-        const textW = ctx.measureText(confText).width;
-
-        // Offscreen canvas: desenha o texto e aplica grunge
-        const off = document.createElement('canvas');
-        off.width = canvas.width;
-        off.height = canvas.height;
-        const offCtx = off.getContext('2d')!;
-        offCtx.font = confFont;
-
-        // Contorno preto para profundidade
-        offCtx.lineJoin = 'round';
-        offCtx.lineWidth = confFontSize * 0.07;
-        offCtx.strokeStyle = 'rgba(0,0,0,0.9)';
-        offCtx.strokeText(confText, confX, confY);
-
-        // Preenchimento amarelo UAIROX
-        offCtx.fillStyle = '#EDAC02';
-        offCtx.fillText(confText, confX, confY);
-
-        // Grunge: furos aleatórios removem partes do texto
-        offCtx.globalCompositeOperation = 'destination-out';
-        const numHoles = Math.round(textW * confFontSize * 0.10);
-        for (let i = 0; i < numHoles; i++) {
-          const hx = confX + Math.random() * textW;
-          const hy = confY - confFontSize * 0.85 + Math.random() * confFontSize;
-          const hr = Math.random() * 3.5 + 0.5;
-          offCtx.beginPath();
-          offCtx.arc(hx, hy, hr, 0, Math.PI * 2);
-          offCtx.fill();
-        }
-
-        // Composita o texto grunge na imagem principal
-        ctx.drawImage(off, 0, 0);
-
-        // === @instagram — texto branco com sombra ===
-        if (instagram.trim()) {
+        const drawInstagram = () => {
+          if (!instagram.trim()) return;
           const handle = instagram.startsWith('@') ? instagram : `@${instagram}`;
           ctx.font = `bold ${igFontSize}px sans-serif`;
           ctx.shadowColor = 'rgba(0,0,0,0.85)';
@@ -2294,10 +2250,59 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           ctx.shadowOffsetY = 2;
           ctx.fillStyle = 'white';
           ctx.fillText(handle, padding, img.naturalHeight - padding);
-        }
+          ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+        };
 
-        URL.revokeObjectURL(objUrl);
-        canvas.toBlob((b) => resolve(b ?? blob), 'image/jpeg', 0.92);
+        // === CONFIRMED PNG com remoção de fundo branco ===
+        const confirmed = new Image();
+        confirmed.onload = () => {
+          // Escala para 65% da largura da foto
+          const confW = Math.round(img.naturalWidth * 0.65);
+          const confH = Math.round(confirmed.naturalHeight * (confW / confirmed.naturalWidth));
+
+          // Offscreen: desenha o PNG e remove pixels brancos
+          const off = document.createElement('canvas');
+          off.width = confW;
+          off.height = confH;
+          const offCtx = off.getContext('2d')!;
+          offCtx.drawImage(confirmed, 0, 0, confW, confH);
+
+          const imgData = offCtx.getImageData(0, 0, confW, confH);
+          const d = imgData.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            const maxC = Math.max(r, g, b);
+            const minC = Math.min(r, g, b);
+            const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            // Remove pixels brancos/acinzentados (baixa saturação + alto brilho)
+            if (saturation < 0.25 && brightness > 180) {
+              const t = Math.min(1, (brightness - 180) / 30);
+              d[i + 3] = Math.round(d[i + 3] * (1 - t));
+            }
+          }
+          offCtx.putImageData(imgData, 0, 0);
+
+          // Posição: canto inferior esquerdo, acima do @instagram
+          const confX = padding;
+          const confY = img.naturalHeight - padding - igFontSize * 2.5 - confH;
+
+          // Sombra sutil para legibilidade em fundos claros
+          ctx.shadowColor = 'rgba(0,0,0,0.4)';
+          ctx.shadowBlur = 8;
+          ctx.drawImage(off, confX, confY);
+          ctx.shadowBlur = 0;
+
+          drawInstagram();
+          URL.revokeObjectURL(objUrl);
+          canvas.toBlob((b) => resolve(b ?? blob), 'image/jpeg', 0.92);
+        };
+        confirmed.onerror = () => {
+          drawInstagram();
+          URL.revokeObjectURL(objUrl);
+          canvas.toBlob((b) => resolve(b ?? blob), 'image/jpeg', 0.92);
+        };
+        confirmed.src = '/confirmed.png';
       };
       img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(blob); };
       img.src = objUrl;
