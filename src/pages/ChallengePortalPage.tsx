@@ -15,6 +15,7 @@ import {
   uploadWorkoutPhoto,
 } from '@/hooks/useChallenge';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 
 const db = supabase as any;
 const DEFAULT_GOAL = 30;
@@ -567,7 +568,9 @@ export default function ChallengePortalPage() {
   const { data: myWorkouts = [] }   = useAthleteWorkouts(eventId, registrationId);
   const { data: challengeCfg }      = useChallengeConfig(eventId);
 
-  const push = usePushNotifications(registrationId);
+  const push    = usePushNotifications(registrationId);
+  const pwa     = useInstallPrompt();
+  const [showIOSHint, setShowIOSHint] = useState(false);
 
   const GOAL = challengeCfg?.goal ?? DEFAULT_GOAL;
 
@@ -671,10 +674,56 @@ export default function ChallengePortalPage() {
               )}
             </div>
 
-            {/* ── Botão de notificações ── */}
-            {push.isSupported && push.permission !== 'denied' && (
-              <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
-                {push.isSubscribed ? (
+            {/* ── Instalar PWA + Notificações ── */}
+            <div className="mt-3 pt-3 border-t border-[#1a1a1a] space-y-2">
+
+              {/* Android: botão nativo de instalar */}
+              {pwa.canInstall && (
+                <button
+                  onClick={pwa.install}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-xs font-bold text-[#EDAC02] hover:bg-[#EDAC02]/20 transition-all"
+                >
+                  📲 Adicionar à tela inicial
+                </button>
+              )}
+
+              {/* iOS: instrução manual */}
+              {pwa.isIOS && !pwa.isInstalled && (
+                <>
+                  <button
+                    onClick={() => setShowIOSHint(v => !v)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1a1a1a] text-xs font-bold text-zinc-400 hover:text-white transition-all"
+                  >
+                    📲 Adicionar à tela inicial
+                  </button>
+                  <AnimatePresence>
+                    {showIOSHint && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="bg-[#0a0a0a] border border-[#262626] rounded-xl p-3 space-y-1.5 text-xs text-zinc-400">
+                          <p className="font-bold text-white">No iPhone / iPad:</p>
+                          <p>1. Toque no ícone <span className="text-[#EDAC02]">⬆ Compartilhar</span> no Safari</p>
+                          <p>2. Role e toque em <span className="text-[#EDAC02]">"Adicionar à Tela de Início"</span></p>
+                          <p>3. Confirme com <span className="text-[#EDAC02]">"Adicionar"</span></p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+
+              {/* Já instalado */}
+              {pwa.isInstalled && (
+                <p className="text-center text-[10px] text-zinc-600 py-1">✓ App instalado na tela inicial</p>
+              )}
+
+              {/* Notificações */}
+              {push.isSupported && push.permission !== 'denied' && (
+                push.isSubscribed ? (
                   <button
                     onClick={push.unsubscribe}
                     disabled={push.loading}
@@ -691,9 +740,9 @@ export default function ChallengePortalPage() {
                   >
                     {push.loading ? '...' : '🔔 Ativar notificações de reações'}
                   </button>
-                )}
-              </div>
-            )}
+                )
+              )}
+            </div>
           </motion.div>
 
           {/* ── Tabs ───────────────────────────────────── */}
