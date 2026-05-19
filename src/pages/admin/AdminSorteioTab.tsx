@@ -106,6 +106,7 @@ function DrawModal({
         setDisplayNum(result.raffle_tickets.ticket_number);
         setPhase("winner");
         broadcastDraw({ type: "DONE" });
+      }
     } catch {
       setPhase("idle");
     }
