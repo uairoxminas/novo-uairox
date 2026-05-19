@@ -2513,23 +2513,28 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             });
           });
 
-        // UAIROX Challenge: se evento tem desafio ativo, envia link ao atleta confirmado
+        // UAIROX Challenge: se evento tem desafio configurado, envia link ao atleta confirmado
+        // Delay de 5s para evitar colisão com o webhook de confirmação no BotConversa
         if (editStatus === 'confirmed') {
           const phone = (a1.phone || '').replace(/\D/g, '');
+          const capturedRegId = editingReg.id;
+          const capturedSlug = (event as any)?.slug || eventId;
+          const capturedEventTitle = event?.title || '';
+          const capturedName = a1.name;
           if (phone.length >= 10) {
-            Promise.all([
-              (supabase as any).from('challenge_configs').select('is_active,goal,title').eq('event_id', eventId).maybeSingle(),
-              (supabase as any).from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
-            ]).then(([{ data: cc }, { data: bc }]: any[]) => {
-              if (!cc?.is_active || !bc?.trigger_inscricao_url) return;
-              const slug = (event as any)?.slug || eventId;
-              const portalUrl = `https://www.uairox.com.br/desafio/${slug}/${editingReg.id}`;
-              const meta = String(cc.goal ?? 30);
-              const titulo = cc.title || 'UAIROX Challenge';
-              const eventoTitle = event?.title || '';
-              const msg = `🏋️ *${titulo} ativado!*\nOlá, ${a1.name}! Sua inscrição no *${eventoTitle}* foi confirmada.\n\nSeu desafio começa agora: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
-              sendWebhook(bc.trigger_inscricao_url, { telefone: phone, nome: a1.name, evento: eventoTitle, message: msg }, { maxAttempts: 2 });
-            });
+            setTimeout(() => {
+              Promise.all([
+                (supabase as any).from('challenge_configs').select('is_active,goal,title').eq('event_id', eventId).maybeSingle(),
+                (supabase as any).from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
+              ]).then(([{ data: cc }, { data: bc }]: any[]) => {
+                if (!cc || !bc?.trigger_inscricao_url) return;
+                const portalUrl = `https://www.uairox.com.br/desafio/${capturedSlug}/${capturedRegId}`;
+                const meta = String(cc.goal ?? 30);
+                const titulo = cc.title || 'UAIROX Challenge';
+                const msg = `🏋️ *${titulo} ativado!*\nOlá, ${capturedName}! Sua inscrição no *${capturedEventTitle}* foi confirmada.\n\nSeu desafio começa agora: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
+                sendWebhook(bc.trigger_inscricao_url, { telefone: phone, nome: capturedName, evento: capturedEventTitle, message: msg }, { maxAttempts: 2 });
+              });
+            }, 5000);
           }
         }
       }
