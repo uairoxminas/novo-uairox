@@ -2226,22 +2226,51 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     }
   };
 
+  const stampInstagram = (blob: Blob, instagram: string): Promise<Blob> =>
+    new Promise((resolve) => {
+      const img = new Image();
+      const objUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+
+        const fontSize = Math.max(28, Math.round(img.naturalHeight * 0.045));
+        const padding = Math.round(fontSize * 0.7);
+        const text = instagram.startsWith('@') ? instagram : `@${instagram}`;
+
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        ctx.fillStyle = 'white';
+        ctx.fillText(text, padding, img.naturalHeight - padding);
+
+        URL.revokeObjectURL(objUrl);
+        canvas.toBlob((b) => resolve(b ?? blob), 'image/jpeg', 0.92);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(blob); };
+      img.src = objUrl;
+    });
+
   const handleDownloadPhotosZip = async () => {
     const allRegs = (registrations || []) as any[];
-    const entries: { url: string; filename: string }[] = [];
+    const entries: { url: string; filename: string; instagram: string }[] = [];
 
     allRegs.forEach((reg, regIdx) => {
       const teamOrName = (reg.team_name || reg.athlete_name || `inscricao${regIdx + 1}`).replace(/[^a-zA-Z0-9À-ÿ _-]/g, '_');
       const members = [
-        { photo_url: reg.athlete_photo_url, name: reg.athlete_name },
-        ...((reg.team_members as any[] || []).map((m: any) => ({ photo_url: m.photo_url, name: m.name }))),
+        { photo_url: reg.athlete_photo_url, name: reg.athlete_name, instagram: reg.athlete_instagram },
+        ...((reg.team_members as any[] || []).map((m: any) => ({ photo_url: m.photo_url, name: m.name, instagram: m.instagram }))),
       ].filter(m => m.photo_url?.trim());
 
       members.forEach((m, mIdx) => {
-        const ext = (m.photo_url.split('?')[0].split('.').pop() || 'jpg').toLowerCase();
         const memberName = (m.name || `membro${mIdx + 1}`).replace(/[^a-zA-Z0-9À-ÿ _-]/g, '_');
-        const filename = `${String(regIdx + 1).padStart(3, '0')}_${teamOrName}_${memberName}.${ext}`;
-        entries.push({ url: m.photo_url, filename });
+        const filename = `${String(regIdx + 1).padStart(3, '0')}_${teamOrName}_${memberName}.jpg`;
+        entries.push({ url: m.photo_url, filename, instagram: m.instagram || '' });
       });
     });
 
@@ -2256,11 +2285,13 @@ function InscricoesTab({ eventId }: { eventId: string }) {
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
 
-      await Promise.all(entries.map(async ({ url, filename }) => {
+      await Promise.all(entries.map(async ({ url, filename, instagram }) => {
         try {
           const res = await fetch(url);
           if (!res.ok) return;
-          zip.file(filename, await res.blob());
+          const raw = await res.blob();
+          const final = instagram.trim() ? await stampInstagram(raw, instagram.trim()) : raw;
+          zip.file(filename, final);
         } catch { /* pula fotos inacessíveis */ }
       }));
 
