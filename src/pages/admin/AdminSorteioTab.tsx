@@ -606,9 +606,29 @@ export default function AdminSorteioTab({ eventId }: { eventId: string }) {
       </div>
 
       {/* ── Realizar Sorteio ─────────────────────────── */}
-      {tickets.length > 0 && remaining > 0 && prizes.length > 0 && (
-        <div className={`${cardClass} p-5 space-y-4`}>
-          <h3 className="text-sm font-bold text-white">Realizar Sorteio</h3>
+      <div className={`${cardClass} p-5 space-y-4`}>
+        <h3 className="text-sm font-bold text-white">🎰 Realizar Sorteio</h3>
+
+        {/* Checklist de pré-requisitos */}
+        {(prizes.length === 0 || tickets.length === 0 || remaining === 0) && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-zinc-500 mb-2">Complete os passos abaixo para liberar o sorteio:</p>
+            <div className={`flex items-center gap-2 text-xs ${prizes.length > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
+              <span>{prizes.length > 0 ? '✓' : '○'}</span>
+              <span>Adicionar pelo menos 1 prêmio (clique "+ Adicionar" acima)</span>
+            </div>
+            <div className={`flex items-center gap-2 text-xs ${tickets.length > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
+              <span>{tickets.length > 0 ? '✓' : '○'}</span>
+              <span>Gerar tickets (botão "Re-gerar Tickets" na seção acima)</span>
+            </div>
+            <div className={`flex items-center gap-2 text-xs ${remaining > 0 ? 'text-green-400' : 'text-zinc-500'}`}>
+              <span>{remaining > 0 ? '✓' : '○'}</span>
+              <span>Ter tickets disponíveis (não sorteados)</span>
+            </div>
+          </div>
+        )}
+
+        {prizes.length > 0 && tickets.length > 0 && remaining > 0 && (
           <div>
             <label className={labelClass}>Próximo prêmio a sortear</label>
             <div className="space-y-2">
@@ -644,14 +664,16 @@ export default function AdminSorteioTab({ eventId }: { eventId: string }) {
               })}
             </div>
           </div>
-          <button
-            onClick={() => setShowDrawModal(true)}
-            className="w-full py-4 bg-[#EDAC02] text-black font-black text-lg rounded-xl hover:bg-[#d49b02] transition-colors shadow-[0_0_30px_rgba(237,172,2,0.3)]"
-          >
-            🎰 REALIZAR SORTEIO
-          </button>
-        </div>
-      )}
+        )}
+
+        <button
+          onClick={() => setShowDrawModal(true)}
+          disabled={prizes.length === 0 || tickets.length === 0 || remaining === 0}
+          className="w-full py-4 bg-[#EDAC02] text-black font-black text-lg rounded-xl hover:bg-[#d49b02] transition-colors shadow-[0_0_30px_rgba(237,172,2,0.3)] disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
+        >
+          🎰 REALIZAR SORTEIO
+        </button>
+      </div>
 
       {/* ── Vencedores ───────────────────────────────── */}
       {winners.length > 0 && (
