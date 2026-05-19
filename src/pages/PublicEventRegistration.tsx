@@ -1881,6 +1881,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
                       {methodToShow === 'pix' && effectivePixKey && (
                         <div>
+                          <p className="text-xs text-zinc-500 mb-2 font-bold uppercase tracking-wider">Valor a pagar:</p>
+                          <p className="text-4xl font-black text-[#EDAC02] mb-4 tracking-tight">{formatCurrency(totalPrice)}</p>
                           <p className="text-xs text-zinc-500 mb-1 font-bold">CHAVE PIX:</p>
                           <div className="flex items-center gap-2 mb-4">
                             <code className="flex-1 bg-[#111] px-3 py-2.5 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all shadow-inner">{effectivePixKey}</code>
