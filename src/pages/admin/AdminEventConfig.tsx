@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DEFAULT_MESSAGES } from '@/lib/botconversaMessages';
+import { DEFAULT_MESSAGES, interpolate } from '@/lib/botconversaMessages';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvent, useUpdateEvent, EVENT_STATUS_MAP, type EventStatus } from '@/hooks/useEvents';
 import {
@@ -2481,8 +2481,8 @@ function InscricoesTab({ eventId }: { eventId: string }) {
       if (!error && editingReg.status !== editStatus && (editStatus === 'confirmed' || editStatus === 'cancelled')) {
         const triggerKey = editStatus === 'confirmed' ? 'confirmado' : 'cancelado';
         const cfgField = editStatus === 'confirmed'
-          ? 'trigger_confirmado_ativo,trigger_confirmado_url'
-          : 'trigger_cancelado_ativo,trigger_cancelado_url';
+          ? 'trigger_confirmado_ativo,trigger_confirmado_url,msg_confirmado'
+          : 'trigger_cancelado_ativo,trigger_cancelado_url,msg_cancelado';
         supabase.from('botconversa_config' as any)
           .select(cfgField)
           .eq('event_id', eventId)
@@ -2491,7 +2491,17 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             const aField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_ativo : bcfg?.trigger_cancelado_ativo;
             const uField = editStatus === 'confirmed' ? bcfg?.trigger_confirmado_url : bcfg?.trigger_cancelado_url;
             if (!aField || !uField) return;
-            const bcPayload = { trigger: triggerKey, nome: a1.name, telefone: a1.phone, email: a1.email, evento: event?.title || eventId, categoria: editingReg.categories?.name || 'Sem Categoria' };
+            const msgTemplate = editStatus === 'confirmed'
+              ? (bcfg?.msg_confirmado || DEFAULT_MESSAGES.confirmado)
+              : (bcfg?.msg_cancelado || DEFAULT_MESSAGES.cancelado);
+            const message = interpolate(msgTemplate, {
+              nome: a1.name,
+              evento: event?.title || eventId,
+              categoria: editingReg.categories?.name || '',
+              codigo: editingReg.id?.slice(0, 8) || '',
+              grupo: (event as any)?.whatsapp_group_link || '',
+            });
+            const bcPayload = { telefone: a1.phone, message, nome: a1.name, evento: event?.title || eventId, categoria: editingReg.categories?.name || '' };
             sendWebhook(uField, bcPayload).then(({ ok, error }) => {
               if (!ok) toast.warning(`Webhook BotConversa não entregue${error ? ` (${error})` : ''}`);
               supabase.from('botconversa_logs' as any).insert({
