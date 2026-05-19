@@ -2518,22 +2518,28 @@ function InscricoesTab({ eventId }: { eventId: string }) {
             const msgTemplate = editStatus === 'confirmed'
               ? (bcfg?.msg_confirmado || DEFAULT_MESSAGES.confirmado)
               : (bcfg?.msg_cancelado || DEFAULT_MESSAGES.cancelado);
-            const message = interpolate(msgTemplate, {
-              nome: a1.name,
-              evento: event?.title || eventId,
-              categoria: editingReg.categories?.name || '',
-              codigo: editingReg.id?.slice(0, 8) || '',
-              grupo: (event as any)?.whatsapp_group_link || '',
-            });
-            const bcPayload = { telefone: a1.phone, message, nome: a1.name, evento: event?.title || eventId, categoria: editingReg.categories?.name || '' };
-            sendWebhook(uField, bcPayload).then(({ ok, error }) => {
-              if (!ok) toast.warning(`Webhook BotConversa não entregue${error ? ` (${error})` : ''}`);
-              supabase.from('botconversa_logs' as any).insert({
-                event_id: eventId, registration_id: editingReg.id,
-                trigger_type: triggerKey, webhook_url: uField,
-                payload: bcPayload, status: ok ? 'sent' : 'failed',
-                error_message: ok ? null : error,
-              }).then(() => {});
+
+            // Envia para cada membro que tiver telefone, com 30s de intervalo entre disparos
+            const membersWithPhone = editAthletes.filter(m => m.phone?.trim());
+            membersWithPhone.forEach((member, idx) => {
+              setTimeout(async () => {
+                const message = interpolate(msgTemplate, {
+                  nome: member.name,
+                  evento: event?.title || eventId,
+                  categoria: editingReg.categories?.name || '',
+                  codigo: editingReg.id?.slice(0, 8) || '',
+                  grupo: (event as any)?.whatsapp_group_link || '',
+                });
+                const bcPayload = { telefone: member.phone, message, nome: member.name, evento: event?.title || eventId, categoria: editingReg.categories?.name || '' };
+                const { ok, error: whErr } = await sendWebhook(uField, bcPayload);
+                if (!ok) toast.warning(`Webhook BotConversa (${member.name}) não entregue${whErr ? ` (${whErr})` : ''}`);
+                supabase.from('botconversa_logs' as any).insert({
+                  event_id: eventId, registration_id: editingReg.id,
+                  trigger_type: triggerKey, webhook_url: uField,
+                  payload: bcPayload, status: ok ? 'sent' : 'failed',
+                  error_message: ok ? null : whErr,
+                }).then(() => {});
+              }, idx * 30_000);
             });
           });
 
