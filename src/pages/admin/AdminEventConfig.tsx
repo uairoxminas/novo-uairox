@@ -2486,6 +2486,25 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               }).then(() => {});
             });
           });
+
+        // UAIROX Challenge: se evento tem desafio ativo, envia link ao atleta confirmado
+        if (editStatus === 'confirmed') {
+          const phone = (a1.phone || '').replace(/\D/g, '');
+          if (phone.length >= 10) {
+            Promise.all([
+              (supabase as any).from('challenge_configs').select('is_active,goal,title').eq('event_id', eventId).maybeSingle(),
+              (supabase as any).from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
+            ]).then(([{ data: cc }, { data: bc }]: any[]) => {
+              if (!cc?.is_active || !bc?.trigger_inscricao_url) return;
+              const slug = (event as any)?.slug || eventId;
+              const portalUrl = `https://www.uairox.com.br/desafio/${slug}/${editingReg.id}`;
+              const meta = cc.goal ?? 30;
+              const titulo = cc.title || 'UAIROX Challenge';
+              const msg = `🏋️ *${titulo} ativado!*\nOlá, ${a1.name}! Sua inscrição no *${event?.title}* foi confirmada.\n\nSeu desafio começa agora: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
+              sendWebhook(bc.trigger_inscricao_url, { telefone: phone, message: msg }, { maxAttempts: 2 });
+            });
+          }
+        }
       }
     }
     
@@ -4133,7 +4152,7 @@ const TABS = [
   { key: 'pix_parcelado', label: '💰 PIX Parcelado' },
   { key: 'espera', label: '⏳ Lista de Espera' },
   { key: 'sorteio', label: '🎰 Sorteio' },
-  { key: 'desafio', label: '💪 Desafio' },
+  { key: 'desafio', label: '⚡ UAIROX Challenge' },
 ];
 
 export default function AdminEventConfig() {
@@ -4235,7 +4254,7 @@ export default function AdminEventConfig() {
         { activeTab === 'botconversa' && <BotconversaTab eventId={id!} /> }
         { activeTab === 'pix_parcelado' && <AdminPixParceladoTab eventId={id!} /> }
         { activeTab === 'sorteio' && <AdminSorteioTab eventId={id!} /> }
-        { activeTab === 'desafio' && <AdminChallengeTab eventId={id!} /> }
+        { activeTab === 'desafio' && <AdminChallengeTab eventId={id!} eventSlug={(event as any).slug || id!} eventTitle={event.title} /> }
       </div>
     </div>
   );

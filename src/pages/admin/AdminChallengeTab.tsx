@@ -9,6 +9,8 @@ import {
   useUpsertChallengeConfig,
   ChallengeWorkout,
 } from '@/hooks/useChallenge';
+import { supabase } from '@/integrations/supabase/client';
+import { sendWebhook } from '@/lib/botconversa';
 
 const GOAL = 30;
 
@@ -351,15 +353,68 @@ function ChallengeConfigForm({ eventId }: { eventId: string }) {
 }
 
 // ── Main tab ───────────────────────────────────────────────────
-export default function AdminChallengeTab({ eventId }: { eventId: string }) {
+export default function AdminChallengeTab({
+  eventId,
+  eventSlug,
+  eventTitle,
+}: {
+  eventId: string;
+  eventSlug: string;
+  eventTitle: string;
+}) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [rejectTarget, setRejectTarget] = useState<ChallengeWorkout | null>(null);
   const [athleteFilter, setAthleteFilter] = useState<string>('');
+  const [batchSending, setBatchSending] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ sent: number; failed: number; total: number } | null>(null);
 
   const { data: allWorkouts = [], isLoading: loadingW } = useAdminWorkouts(eventId);
   const { data: leaderboard = [], isLoading: loadingL }  = useChallengeLeaderboard(eventId);
   const { data: cfg } = useChallengeConfig(eventId);
   const updateStatus = useUpdateWorkoutStatus();
+
+  const handleBatchSend = async () => {
+    if (!confirm('Enviar convite UAIROX Challenge para todos os atletas confirmados?')) return;
+    setBatchSending(true);
+    setBatchProgress(null);
+    try {
+      const db = supabase as any;
+      const [{ data: registrations }, { data: bcCfg }, { data: cc }] = await Promise.all([
+        db.from('registrations').select('id, athlete_name, athlete_phone').eq('event_id', eventId).eq('status', 'confirmed'),
+        db.from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
+        db.from('challenge_configs').select('is_active, goal, title').eq('event_id', eventId).maybeSingle(),
+      ]);
+      if (!bcCfg?.trigger_inscricao_url) {
+        toast.error('Webhook BotConversa (inscrição) não configurado');
+        setBatchSending(false);
+        return;
+      }
+      const athletes = (registrations || []).filter((r: any) => (r.athlete_phone || '').replace(/\D/g, '').length >= 10);
+      if (athletes.length === 0) {
+        toast.error('Nenhum atleta confirmado com telefone válido');
+        setBatchSending(false);
+        return;
+      }
+      const meta = cc?.goal ?? 30;
+      const titulo = cc?.title || 'UAIROX Challenge';
+      let sent = 0, failed = 0;
+      setBatchProgress({ sent: 0, failed: 0, total: athletes.length });
+      for (const r of athletes) {
+        const phone = (r.athlete_phone || '').replace(/\D/g, '');
+        const portalUrl = `https://www.uairox.com.br/desafio/${eventSlug}/${r.id}`;
+        const msg = `🏋️ *${titulo}!*\nOlá, ${r.athlete_name}! Você está inscrito no *${eventTitle}*.\n\nSeu desafio: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
+        const { ok } = await sendWebhook(bcCfg.trigger_inscricao_url, { telefone: phone, message: msg }, { maxAttempts: 1 });
+        if (ok) sent++; else failed++;
+        setBatchProgress({ sent, failed, total: athletes.length });
+        await new Promise(res => setTimeout(res, 350));
+      }
+      toast.success(`✅ ${sent} mensagens enviadas${failed > 0 ? ` · ${failed} falhas` : ''}`);
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    }
+    setBatchSending(false);
+    setBatchProgress(null);
+  };
 
   const goal = cfg?.goal ?? GOAL;
 
@@ -400,6 +455,40 @@ export default function AdminChallengeTab({ eventId }: { eventId: string }) {
     <div className="space-y-5">
       {/* ── Configuração — sempre visível ─────────────────── */}
       <ChallengeConfigForm eventId={eventId} />
+
+      {/* ── Envio em massa ────────────────────────────────── */}
+      <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-5 space-y-3">
+        <div>
+          <p className="text-sm font-black text-white">⚡ Envio em Massa — UAIROX Challenge</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Envia o link do portal para todos os atletas <span className="text-green-400 font-bold">confirmados</span> via WhatsApp (BotConversa)
+          </p>
+        </div>
+        {batchProgress && (
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] text-zinc-500">
+              <span>Enviando...</span>
+              <span>{batchProgress.sent + batchProgress.failed} / {batchProgress.total}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[#1a1a1a] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#EDAC02] transition-all"
+                style={{ width: `${((batchProgress.sent + batchProgress.failed) / batchProgress.total) * 100}%` }}
+              />
+            </div>
+            {batchProgress.failed > 0 && (
+              <p className="text-[10px] text-red-400">{batchProgress.failed} falha(s)</p>
+            )}
+          </div>
+        )}
+        <button
+          onClick={handleBatchSend}
+          disabled={batchSending}
+          className="w-full py-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-bold hover:bg-green-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {batchSending ? '⏳ Enviando...' : '📨 Enviar links para todos os confirmados'}
+        </button>
+      </div>
 
       {isEmpty && (
         <div className="text-center py-16 space-y-3">
