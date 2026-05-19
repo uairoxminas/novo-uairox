@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 
 const db = supabase as any;
+
+type DrawPhase = "idle" | "countdown" | "rolling";
 
 export default function RaffleLivePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,6 +17,11 @@ export default function RaffleLivePage() {
   const [latestWinner, setLatestWinner] = useState<any>(null);
   const [showLatest, setShowLatest] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [drawPhase, setDrawPhase] = useState<DrawPhase>("idle");
+  const [drawCountdown, setDrawCountdown] = useState(5);
+  const [drawPrize, setDrawPrize] = useState("");
+  const [rollingNum, setRollingNum] = useState(1);
+  const rollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Initial data load
   useEffect(() => {
@@ -44,18 +51,35 @@ export default function RaffleLivePage() {
     load();
   }, [slug]);
 
-  // Realtime subscription on raffle_winners
+  // Realtime subscription
   useEffect(() => {
     if (!event?.id) return;
     const channel = db
       .channel(`raffle-live-${event.id}`)
+      // Live draw broadcast from admin
+      .on("broadcast", { event: "draw" }, ({ payload }: any) => {
+        if (payload.type === "COUNTDOWN") {
+          setDrawPhase("countdown");
+          setDrawCountdown(payload.count);
+          setDrawPrize(payload.prize ?? "");
+        } else if (payload.type === "ROLLING") {
+          setDrawPhase("rolling");
+          setDrawPrize(payload.prize ?? "");
+          if (rollingRef.current) clearInterval(rollingRef.current);
+          rollingRef.current = setInterval(() => {
+            setRollingNum(n => Math.floor(Math.random() * 999) + 1);
+          }, 80);
+        } else if (payload.type === "DONE") {
+          if (rollingRef.current) { clearInterval(rollingRef.current); rollingRef.current = null; }
+          setDrawPhase("idle");
+        }
+      })
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "raffle_winners",
         filter: `event_id=eq.${event.id}`,
       }, async (payload: any) => {
-        // Fetch full winner with ticket info
         const { data } = await db
           .from("raffle_winners")
           .select("*, raffle_tickets(*)")
@@ -65,7 +89,8 @@ export default function RaffleLivePage() {
           setWinners(prev => [...prev, data].sort((a, b) => a.draw_order - b.draw_order));
           setLatestWinner(data);
           setShowLatest(true);
-          setTimeout(() => setShowLatest(false), 8000);
+          setDrawPhase("idle");
+          setTimeout(() => setShowLatest(false), 12000);
         }
       })
       .on("postgres_changes", {
@@ -86,7 +111,10 @@ export default function RaffleLivePage() {
       })
       .subscribe();
 
-    return () => db.removeChannel(channel);
+    return () => {
+      if (rollingRef.current) clearInterval(rollingRef.current);
+      db.removeChannel(channel);
+    };
   }, [event?.id]);
 
   if (loading) {
@@ -108,9 +136,6 @@ export default function RaffleLivePage() {
   }
 
   const drawnIds = new Set(winners.map(w => w.raffle_ticket_id));
-  const athleteTickets = tickets.filter(t => t.participant_type === "athlete");
-  const squadTickets = tickets.filter(t => t.participant_type === "squad");
-  const locationTickets = tickets.filter(t => t.participant_type === "location");
   const prizes: { description: string }[] = config.prizes ?? [];
 
   const typeIcon = (type: string) =>
@@ -138,45 +163,115 @@ export default function RaffleLivePage() {
         </div>
       </header>
 
-      <main className="relative z-10 max-w-4xl mx-auto px-4 py-8 space-y-8">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: "Atletas", count: athleteTickets.length, color: "text-blue-400" },
-            { label: "Squad", count: squadTickets.length, color: "text-purple-400" },
-            { label: "Parceiros", count: locationTickets.length, color: "text-cyan-400" },
-          ].map(s => (
-            <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-              <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{s.label} tickets</p>
-            </div>
-          ))}
-        </div>
+      {/* ── Live draw overlays ─────────────────────────────── */}
+      <AnimatePresence>
+        {drawPhase === "countdown" && (
+          <motion.div
+            key="countdown-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/97 flex flex-col items-center justify-center"
+          >
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-6">SORTEIO EM</p>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={drawCountdown}
+                initial={{ scale: 2, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="text-[14rem] font-black text-[#EDAC02] leading-none tabular-nums"
+              >
+                {drawCountdown}
+              </motion.span>
+            </AnimatePresence>
+            <p className="text-xl font-bold text-white mt-4">{drawPrize}</p>
+          </motion.div>
+        )}
 
-        {/* Latest winner overlay */}
-        <AnimatePresence>
-          {showLatest && latestWinner && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: -30 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-[#0a0a0a] border-2 border-[#EDAC02] rounded-2xl p-8 text-center shadow-[0_0_60px_rgba(237,172,2,0.3)]"
+        {drawPhase === "rolling" && (
+          <motion.div
+            key="rolling-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/97 flex flex-col items-center justify-center gap-8"
+          >
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">SORTEANDO</p>
+            <div className="relative">
+              <div className="w-64 h-64 rounded-3xl bg-[#0a0a0a] border-2 border-[#EDAC02]/30 flex items-center justify-center shadow-[0_0_80px_rgba(237,172,2,0.2)]">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={rollingNum}
+                    initial={{ opacity: 0, y: -20, scale: 0.8 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 20, scale: 0.8 }}
+                    transition={{ duration: 0.05 }}
+                    className="font-black text-8xl text-[#EDAC02] tabular-nums"
+                  >
+                    {String(rollingNum).padStart(3, "0")}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <motion.div
+                className="absolute inset-0 rounded-3xl border-2 border-[#EDAC02]"
+                animate={{ opacity: [0.2, 1, 0.2] }}
+                transition={{ duration: 0.5, repeat: Infinity }}
+              />
+            </div>
+            <p className="text-lg font-bold text-zinc-400">{drawPrize}</p>
+          </motion.div>
+        )}
+
+        {showLatest && latestWinner && drawPhase === "idle" && (
+          <motion.div
+            key="winner-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/97 flex flex-col items-center justify-center gap-6 px-6"
+            onClick={() => setShowLatest(false)}
+          >
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+              className="text-8xl"
             >
-              <p className="text-xs text-zinc-400 uppercase tracking-widest mb-1">🎉 NOVO VENCEDOR!</p>
-              <p className="text-5xl font-black text-[#EDAC02] mb-3">
-                #{String(latestWinner.raffle_tickets.ticket_number).padStart(3, "0")}
-              </p>
-              <p className="text-xs text-zinc-500 mb-1">
+              🎉
+            </motion.span>
+            <p className="text-xs text-zinc-400 uppercase tracking-widest">VENCEDOR!</p>
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="w-44 h-44 rounded-3xl bg-[#EDAC02] flex items-center justify-center shadow-[0_0_80px_rgba(237,172,2,0.6)]"
+            >
+              <span className="font-black text-7xl text-black tabular-nums">
+                {String(latestWinner.raffle_tickets.ticket_number).padStart(3, "0")}
+              </span>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="text-center space-y-2"
+            >
+              <p className="text-xs text-zinc-500">
                 {typeIcon(latestWinner.raffle_tickets.participant_type)} {typeLabel(latestWinner.raffle_tickets.participant_type)}
               </p>
-              <p className="text-3xl font-black text-white">{latestWinner.raffle_tickets.participant_name}</p>
+              <p className="text-4xl font-black text-white">{latestWinner.raffle_tickets.participant_name}</p>
               {latestWinner.prize_description && (
-                <p className="text-sm text-[#EDAC02] mt-3 font-bold">🏆 {latestWinner.prize_description}</p>
+                <p className="text-base text-[#EDAC02] font-bold">🏆 {latestWinner.prize_description}</p>
               )}
             </motion.div>
-          )}
-        </AnimatePresence>
+            <p className="text-[10px] text-zinc-600 mt-4">Toque para fechar</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="relative z-10 max-w-4xl mx-auto px-4 py-8 space-y-8">
 
         {/* Prizes list */}
         {prizes.length > 0 && (

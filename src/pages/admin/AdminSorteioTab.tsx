@@ -48,12 +48,14 @@ function DrawModal({
   onClose,
   prize,
   celebrationImageUrl,
+  broadcastDraw,
 }: {
   totalTickets: number;
   onDraw: () => Promise<RaffleWinner | undefined>;
   onClose: () => void;
   prize: RafflePrize;
   celebrationImageUrl?: string;
+  broadcastDraw: (payload: object) => void;
 }) {
   const [phase, setPhase] = useState<"idle" | "countdown" | "rolling" | "winner">("idle");
   const [countdown, setCountdown] = useState(5);
@@ -65,10 +67,12 @@ function DrawModal({
   const startCountdown = () => {
     setPhase("countdown");
     setCountdown(5);
+    broadcastDraw({ type: "COUNTDOWN", count: 5, prize: prize.description });
     let count = 5;
     countdownRef.current = setInterval(() => {
       count -= 1;
       setCountdown(count);
+      broadcastDraw({ type: "COUNTDOWN", count, prize: prize.description });
       if (count <= 0) {
         clearInterval(countdownRef.current!);
         startRolling();
@@ -78,6 +82,7 @@ function DrawModal({
 
   const startRolling = () => {
     setPhase("rolling");
+    broadcastDraw({ type: "ROLLING", prize: prize.description });
     let speed = 50;
     let elapsed = 0;
     const totalMs = 4000;
@@ -100,7 +105,7 @@ function DrawModal({
         setWinner(result);
         setDisplayNum(result.raffle_tickets.ticket_number);
         setPhase("winner");
-      }
+        broadcastDraw({ type: "DONE" });
     } catch {
       setPhase("idle");
     }
@@ -319,13 +324,19 @@ export default function AdminSorteioTab({ eventId }: { eventId: string }) {
   const [showDrawModal, setShowDrawModal] = useState(false);
   const [selectedPrizeIdx, setSelectedPrizeIdx] = useState(0);
 
+  const broadcastChannelRef = useRef<any>(null);
+
   useEffect(() => {
     const channel = (supabase as any)
-      .channel(`raffle-admin-${eventId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "raffle_winners", filter: `event_id=eq.${eventId}` }, () => {})
+      .channel(`raffle-live-${eventId}`)
       .subscribe();
-    return () => (supabase as any).removeChannel(channel);
+    broadcastChannelRef.current = channel;
+    return () => { (supabase as any).removeChannel(channel); };
   }, [eventId]);
+
+  const broadcastDraw = (payload: object) => {
+    broadcastChannelRef.current?.send({ type: "broadcast", event: "draw", payload });
+  };
 
   const handleSaveConfig = async () => {
     await upsertConfig.mutateAsync({
@@ -718,6 +729,7 @@ export default function AdminSorteioTab({ eventId }: { eventId: string }) {
           celebrationImageUrl={celebrationImageUrl}
           onDraw={handleDraw}
           onClose={() => setShowDrawModal(false)}
+          broadcastDraw={broadcastDraw}
         />
       )}
     </div>
