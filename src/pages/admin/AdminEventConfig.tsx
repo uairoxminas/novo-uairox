@@ -2509,7 +2509,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           if (phone.length >= 10) {
             Promise.all([
               (supabase as any).from('challenge_configs').select('is_active,goal,title').eq('event_id', eventId).maybeSingle(),
-              (supabase as any).from('botconversa_config').select('trigger_inscricao_url,msg_desafio').eq('event_id', eventId).maybeSingle(),
+              (supabase as any).from('botconversa_config').select('trigger_inscricao_url').eq('event_id', eventId).maybeSingle(),
             ]).then(([{ data: cc }, { data: bc }]: any[]) => {
               if (!cc?.is_active || !bc?.trigger_inscricao_url) return;
               const slug = (event as any)?.slug || eventId;
@@ -2517,13 +2517,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               const meta = String(cc.goal ?? 30);
               const titulo = cc.title || 'UAIROX Challenge';
               const eventoTitle = event?.title || '';
-              const template = bc.msg_desafio || '🏋️ *{titulo} ativado!*\nOlá, {nome}! Sua inscrição no *{evento}* foi confirmada.\n\nSeu desafio começa agora: complete *{meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n{link}\n\n💪 Vamos nessa!';
-              const msg = template
-                .replace(/\{nome\}/g, a1.name)
-                .replace(/\{evento\}/g, eventoTitle)
-                .replace(/\{meta\}/g, meta)
-                .replace(/\{link\}/g, portalUrl)
-                .replace(/\{titulo\}/g, titulo);
+              const msg = `🏋️ *${titulo} ativado!*\nOlá, ${a1.name}! Sua inscrição no *${eventoTitle}* foi confirmada.\n\nSeu desafio começa agora: complete *${meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n${portalUrl}\n\n💪 Vamos nessa!`;
               sendWebhook(bc.trigger_inscricao_url, { telefone: phone, nome: a1.name, evento: eventoTitle, message: msg }, { maxAttempts: 2 });
             });
           }
