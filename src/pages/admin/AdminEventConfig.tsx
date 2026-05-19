@@ -2226,72 +2226,114 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     }
   };
 
-  const stampPhoto = (blob: Blob, instagram: string): Promise<Blob> =>
+  const stampPhoto = (blob: Blob, instagram: string, eventTitle: string): Promise<Blob> =>
     new Promise((resolve) => {
       const img = new Image();
       const objUrl = URL.createObjectURL(blob);
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
+        // === Crop centralizado para Stories 1080×1920 ===
+        const TW = 1080, TH = 1920;
+        const targetRatio = TW / TH;
+        const srcRatio = img.naturalWidth / img.naturalHeight;
+        let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+        if (srcRatio > targetRatio) {
+          sw = Math.round(img.naturalHeight * targetRatio);
+          sx = Math.round((img.naturalWidth - sw) / 2);
+        } else {
+          sh = Math.round(img.naturalWidth / targetRatio);
+          sy = Math.round((img.naturalHeight - sh) / 2);
+        }
 
-        const igFontSize = Math.max(10, Math.round(img.naturalHeight * 0.015));
-        const padding = Math.round(igFontSize * 1.2);
+        const canvas = document.createElement('canvas');
+        canvas.width = TW;
+        canvas.height = TH;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TW, TH);
+
+        const padding = 44;
+        const igFontSize = 30;
+
+        const setShadow = (blur = 10, alpha = 0.85) => {
+          ctx.shadowColor = `rgba(0,0,0,${alpha})`;
+          ctx.shadowBlur = blur;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+        };
+        const clearShadow = () => {
+          ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+        };
 
         const drawInstagram = () => {
           if (!instagram.trim()) return;
           const handle = instagram.startsWith('@') ? instagram : `@${instagram}`;
           ctx.font = `bold ${igFontSize}px sans-serif`;
-          ctx.shadowColor = 'rgba(0,0,0,0.85)';
-          ctx.shadowBlur = 10;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
+          setShadow();
           ctx.fillStyle = 'white';
-          ctx.fillText(handle, padding, img.naturalHeight - padding);
-          ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+          ctx.fillText(handle, padding, TH - padding);
+          clearShadow();
         };
 
-        // === CONFIRMED PNG com remoção de fundo branco ===
-        const confirmed = new Image();
-        confirmed.onload = () => {
-          // Escala para 65% da largura da foto
-          const confW = Math.round(img.naturalWidth * 0.65);
-          const confH = Math.round(confirmed.naturalHeight * (confW / confirmed.naturalWidth));
-
-          // Offscreen: desenha o PNG e remove pixels brancos
+        const removeWhiteBg = (src: HTMLImageElement, w: number, h: number): HTMLCanvasElement => {
           const off = document.createElement('canvas');
-          off.width = confW;
-          off.height = confH;
+          off.width = w; off.height = h;
           const offCtx = off.getContext('2d')!;
-          offCtx.drawImage(confirmed, 0, 0, confW, confH);
-
-          const imgData = offCtx.getImageData(0, 0, confW, confH);
+          offCtx.drawImage(src, 0, 0, w, h);
+          const imgData = offCtx.getImageData(0, 0, w, h);
           const d = imgData.data;
           for (let i = 0; i < d.length; i += 4) {
             const r = d[i], g = d[i + 1], b = d[i + 2];
-            const maxC = Math.max(r, g, b);
-            const minC = Math.min(r, g, b);
-            const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            // Remove pixels brancos/acinzentados (baixa saturação + alto brilho)
-            if (saturation < 0.25 && brightness > 180) {
-              const t = Math.min(1, (brightness - 180) / 30);
-              d[i + 3] = Math.round(d[i + 3] * (1 - t));
+            const sat = Math.max(r, g, b) > 0 ? (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b) : 0;
+            const bright = (r * 299 + g * 587 + b * 114) / 1000;
+            if (sat < 0.25 && bright > 180) {
+              d[i + 3] = Math.round(d[i + 3] * (1 - Math.min(1, (bright - 180) / 30)));
             }
           }
           offCtx.putImageData(imgData, 0, 0);
+          return off;
+        };
 
-          // Posição: canto inferior esquerdo, acima do @instagram
+        const confirmed = new Image();
+        confirmed.onload = () => {
+          const confW = Math.round(TW * 0.65);
+          const confH = Math.round(confirmed.naturalHeight * (confW / confirmed.naturalWidth));
+          const offConf = removeWhiteBg(confirmed, confW, confH);
+
+          // Posição base: CONFIRMED acima do @instagram
+          const confY = TH - padding - igFontSize * 2.5 - confH;
           const confX = padding;
-          const confY = img.naturalHeight - padding - igFontSize * 2.5 - confH;
 
-          // Sombra sutil para legibilidade em fundos claros
-          ctx.shadowColor = 'rgba(0,0,0,0.4)';
-          ctx.shadowBlur = 8;
-          ctx.drawImage(off, confX, confY);
-          ctx.shadowBlur = 0;
+          // === Nome do evento em Impact acima do CONFIRMED ===
+          if (eventTitle.trim()) {
+            const evName = eventTitle.toUpperCase();
+            // Divide em 2 linhas no separador | ou —
+            const lines = evName.includes('|')
+              ? evName.split('|').map(s => s.trim())
+              : evName.includes(' - ')
+              ? evName.split(' - ').map(s => s.trim())
+              : [evName];
+
+            const evFontSize = 58;
+            const lineH = evFontSize * 1.25;
+            // Ajusta tamanho se texto for largo demais
+            lines.forEach((line, i) => {
+              let fs = evFontSize;
+              ctx.font = `bold ${fs}px Impact, Arial Black, sans-serif`;
+              while (ctx.measureText(line).width > TW - padding * 2 && fs > 20) {
+                fs -= 2;
+                ctx.font = `bold ${fs}px Impact, Arial Black, sans-serif`;
+              }
+              const evY = confY - 16 - lineH * (lines.length - 1 - i);
+              setShadow(10, 0.9);
+              ctx.fillStyle = 'white';
+              ctx.fillText(line, padding, evY);
+              clearShadow();
+            });
+          }
+
+          // CONFIRMED
+          setShadow(8, 0.4);
+          ctx.drawImage(offConf, confX, confY);
+          clearShadow();
 
           drawInstagram();
           URL.revokeObjectURL(objUrl);
@@ -2342,7 +2384,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
           const res = await fetch(url);
           if (!res.ok) return;
           const raw = await res.blob();
-          const final = await stampPhoto(raw, instagram.trim());
+          const final = await stampPhoto(raw, instagram.trim(), (event as any)?.title || '');
           zip.file(filename, final);
         } catch { /* pula fotos inacessíveis */ }
       }));
