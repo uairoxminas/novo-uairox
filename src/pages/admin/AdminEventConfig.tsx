@@ -2237,7 +2237,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0);
 
-        const fontSize = Math.max(28, Math.round(img.naturalHeight * 0.045));
+        const fontSize = Math.max(10, Math.round(img.naturalHeight * 0.015));
         const padding = Math.round(fontSize * 0.7);
         const text = instagram.startsWith('@') ? instagram : `@${instagram}`;
 
