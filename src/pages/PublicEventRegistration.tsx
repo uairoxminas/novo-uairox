@@ -1096,6 +1096,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [processingConfirmation, setProcessingConfirmation] = useState(false);
   const [sizeChartModal, setSizeChartModal] = useState<string | null>(null);
 
+  const requireShirtSize = (event as any)?.require_shirt_size ?? true;
+
   // Installment state
   const [paymentType, setPaymentType] = useState<'full' | 'card' | 'installments'>('full');
   const [installmentCount, setInstallmentCount] = useState<2 | 3>(2);
@@ -1286,12 +1288,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
 
   const handleSubmit = async () => {
     const a1 = athletes[0];
-    if (!categoryId || !a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.shirt_size || !a1.gym.trim()) { toast.error('Preencha os campos obrigatórios do Atleta 1.'); return; }
+    if (!categoryId || !a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || (requireShirtSize && !a1.shirt_size) || !a1.gym.trim()) { toast.error('Preencha os campos obrigatórios do Atleta 1.'); return; }
     if (isTeam) {
       if (!teamName.trim()) { toast.error('Informe o nome da equipe.'); return; }
       for (let i = 1; i < athletes.length; i++) {
         const m = athletes[i];
-        if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.shirt_size || !m.gym.trim()) {
+        if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || (requireShirtSize && !m.shirt_size) || !m.gym.trim()) {
           toast.error(`Preencha os campos obrigatórios do Atleta ${i + 1}.`); return;
         }
       }
@@ -2022,14 +2024,14 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     if (step === 0) return !!categoryId;
     if (step === 1) {
       const a1 = athletes[0];
-      if (!a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || !a1.shirt_size || !a1.gym.trim()) return false;
-      if (kitShirtModels.length > 0 && !a1.shirt_model_id) return false;
+      if (!a1.name.trim() || !a1.email.trim() || !a1.phone.trim() || !a1.birth_date || !a1.gender || (requireShirtSize && !a1.shirt_size) || !a1.gym.trim()) return false;
+      if (requireShirtSize && kitShirtModels.length > 0 && !a1.shirt_model_id) return false;
       if (isTeam) {
         if (!teamName.trim()) return false;
         for (let i = 1; i < athletes.length; i++) {
           const m = athletes[i];
-          if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || !m.shirt_size || !m.gym.trim()) return false;
-          if (kitShirtModels.length > 0 && !m.shirt_model_id) return false;
+          if (!m.name.trim() || !m.email.trim() || !m.phone.trim() || !m.birth_date || !m.gender || (requireShirtSize && !m.shirt_size) || !m.gym.trim()) return false;
+          if (requireShirtSize && kitShirtModels.length > 0 && !m.shirt_model_id) return false;
         }
       }
       if (event?.slug === 'selecao') {
@@ -2211,7 +2213,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                   <div><label className={labelClass}>Data de Nascimento *</label><input type="date" value={athlete.birth_date} onChange={e => updateAthlete(idx, 'birth_date', e.target.value)} className={inputClass} /></div>
                   <div><label className={labelClass}>Gênero *</label><select value={athlete.gender} onChange={e => updateAthlete(idx, 'gender', e.target.value)} className={inputClass}><option value="">Selecione</option><option value="masculino">Masculino</option><option value="feminino">Feminino</option><option value="outro">Outro</option></select></div>
                 </div>
-                {kitShirtModels.length > 0 ? (
+                {requireShirtSize && kitShirtModels.length > 0 ? (
                   <div className="space-y-3">
                     <div>
                       <label className={labelClass}>Modelo da Camisa *</label>
@@ -2266,7 +2268,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       ) : null;
                     })()}
                   </div>
-                ) : (
+                ) : requireShirtSize ? (
                   <div>
                     <label className={labelClass}>Tamanho da Camisa *</label>
                     <select value={athlete.shirt_size} onChange={e => updateAthlete(idx, 'shirt_size', e.target.value)} className={inputClass}>
@@ -2279,7 +2281,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                       <option value="EXG">EXG</option>
                     </select>
                   </div>
-                )}
+                ) : null}
 
                 {/* Shipping address — selecao event, main athlete only */}
                 {event?.slug === 'selecao' && idx === 0 && (
