@@ -171,6 +171,20 @@ serve(async (req) => {
         continue;
       }
 
+      // Re-check opt_out in real time (contact may have unsubscribed after queue was built)
+      if (item.contact_id) {
+        const { data: liveContact } = await supabase
+          .from('marketing_contacts')
+          .select('opt_out')
+          .eq('id', item.contact_id)
+          .maybeSingle();
+        if (liveContact?.opt_out) {
+          await supabase.from('marketing_queue').update({ status: 'skipped' }).eq('id', item.id);
+          results.push({ campaign_id: campaign.id, queue_id: item.id, phone: item.phone, skipped: true, reason: 'Opt-out registrado após criação da fila' });
+          continue;
+        }
+      }
+
       const contactName = item.name || '';
       const variantCount = campaign.variants?.length || 1;
       const variantIdx = item.variant_index % variantCount;
