@@ -838,6 +838,129 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── CampaignHowItWorks ───────────────────────────────────────────────────────
+function CampaignHowItWorks() {
+  const [open, setOpen] = useState(false);
+
+  const steps = [
+    {
+      num: '1',
+      title: 'Config',
+      color: 'text-[#EDAC02]',
+      border: 'border-[#EDAC02]/30',
+      bg: 'bg-[#EDAC02]/5',
+      items: [
+        { label: 'Nome da campanha', desc: 'Identificação interna da campanha.' },
+        { label: 'Trigger BotConversa', desc: 'Valor do campo "trigger" enviado no payload ao webhook. Deve corresponder ao gatilho configurado no fluxo do BotConversa (padrão: "marketing").' },
+        { label: 'Limite diário', desc: 'Máximo de mensagens enviadas por dia. Recomendado: 30–50 para evitar bloqueios.' },
+        { label: 'Continuar automaticamente', desc: 'Se ativo, retoma no dia seguinte automaticamente. Se desligado, pausa ao fim do dia e exige reativação manual.' },
+      ],
+    },
+    {
+      num: '2',
+      title: 'WhatsApp',
+      color: 'text-[#25D366]',
+      border: 'border-[#25D366]/30',
+      bg: 'bg-[#25D366]/5',
+      items: [
+        { label: 'Mensagem base', desc: 'Texto principal da campanha. Use {nome} para personalizar por contato.' },
+        { label: 'Gerar 10 variações com Gemini', desc: 'Chama a Edge Function "marketing-generate-variants" que usa a API Gemini para criar 10 versões diferentes da mensagem (anti-spam do WhatsApp). Ao menos 6 das 10 terão {nome}.' },
+        { label: 'Revisar e editar variações', desc: 'Você pode editar cada variação ou deletar as que não aprovar antes de avançar.' },
+      ],
+    },
+    {
+      num: '3',
+      title: 'Email (opcional)',
+      color: 'text-blue-400',
+      border: 'border-blue-500/30',
+      bg: 'bg-blue-500/5',
+      items: [
+        { label: 'Toggle de ativação', desc: 'Quando ativo, envia email junto com o WhatsApp para cada contato. Requer RESEND_API_KEY configurada nas secrets do Supabase.' },
+        { label: 'Template', desc: 'Imagem de topo, título, corpo do texto e botão CTA (texto + link). Todos os campos aceitam {nome} para personalização.' },
+        { label: 'Email de teste', desc: 'Envia um preview do template para qualquer email antes de criar a campanha. Usa a Edge Function "marketing-test-email". {nome} é substituído por "João".' },
+      ],
+    },
+    {
+      num: '4',
+      title: 'Contatos',
+      color: 'text-purple-400',
+      border: 'border-purple-500/30',
+      bg: 'bg-purple-500/5',
+      items: [
+        { label: 'Seleção de destinatários', desc: 'Apenas contatos ativos (sem opt-out) são listados. Use "Selecionar todos" ou busca individual.' },
+        { label: 'Criação da campanha', desc: 'A campanha é criada em status Rascunho. Para iniciar os envios, clique em "▶ Ativar" na lista de campanhas.' },
+      ],
+    },
+  ];
+
+  return (
+    <div className={`${cardClass} overflow-hidden`}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#0f0f0f] transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-black text-white">Como funciona?</span>
+          <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-bold border border-zinc-700">Guia rápido</span>
+        </div>
+        <span className={`text-zinc-500 text-xs font-bold transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-[#1a1a1a] p-5 space-y-4">
+          {/* Steps */}
+          <div className="grid grid-cols-1 gap-4">
+            {steps.map(step => (
+              <div key={step.num} className={`rounded-xl border ${step.border} ${step.bg} p-4`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border ${step.border} ${step.color}`}>{step.num}</span>
+                  <p className={`text-xs font-black ${step.color}`}>Passo {step.num} — {step.title}</p>
+                </div>
+                <div className="space-y-2">
+                  {step.items.map(item => (
+                    <div key={item.label} className="flex gap-2">
+                      <span className="text-zinc-600 text-[10px] mt-0.5 flex-shrink-0">›</span>
+                      <div>
+                        <span className="text-[10px] font-black text-zinc-300">{item.label}: </span>
+                        <span className="text-[10px] text-zinc-500 leading-relaxed">{item.desc}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Worker section */}
+          <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+            <p className="text-xs font-black text-orange-400 mb-3">Worker de Disparo — marketing-worker</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+              {[
+                { icon: '🕐', text: 'Executa a cada minuto via cron SQL no Supabase' },
+                { icon: '📅', text: 'Só dispara seg–sex, 8h–18h BRT' },
+                { icon: '⏱', text: 'Delay aleatório de 1–30 min entre cada mensagem (anti-bloqueio WhatsApp)' },
+                { icon: '🔀', text: 'Rotaciona as variações de mensagem por contato' },
+                { icon: '📊', text: 'Respeita o limite diário configurado por campanha' },
+                { icon: '✅', text: 'Marca cada envio como: sent / failed / pending na fila' },
+              ].map(item => (
+                <div key={item.icon} className="flex gap-2 items-start">
+                  <span className="text-xs flex-shrink-0">{item.icon}</span>
+                  <span className="text-[10px] text-zinc-400 leading-relaxed">{item.text}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-orange-500/20">
+              <p className="text-[10px] text-orange-400/60">
+                Payload enviado ao BotConversa: <code className="font-mono bg-orange-500/10 px-1 rounded">{'{ trigger, nome, telefone, email, mensagem }'}</code>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── CampaignsTab ─────────────────────────────────────────────────────────────
 function CampaignsTab() {
   const { data: campaigns, isLoading } = useMarketingCampaigns();
@@ -852,6 +975,8 @@ function CampaignsTab() {
       <div className="flex justify-end">
         <button onClick={() => setShowNew(true)} className={btnGold}>+ Nova Campanha</button>
       </div>
+
+      <CampaignHowItWorks />
 
       {isLoading ? (
         <div className="text-center py-12 text-zinc-500 text-sm">Carregando campanhas...</div>
