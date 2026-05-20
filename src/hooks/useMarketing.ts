@@ -135,6 +135,10 @@ export function useCreateCampaign() {
       email_enabled: boolean;
       email_subject?: string;
       email_template?: { image_url?: string; title?: string; body?: string; cta_text?: string; cta_url?: string };
+      step2_enabled: boolean;
+      step2_message?: string;
+      step2_event_ids?: string[];
+      response_timeout_days: number;
     }) => {
       // Create campaign
       const { data: camp, error: campErr } = await (supabase as any)
@@ -149,6 +153,10 @@ export function useCreateCampaign() {
           email_enabled: campaign.email_enabled,
           email_subject: campaign.email_subject || null,
           email_template: campaign.email_template || null,
+          step2_enabled: campaign.step2_enabled,
+          step2_message: campaign.step2_message || null,
+          step2_event_ids: campaign.step2_event_ids || null,
+          response_timeout_days: campaign.response_timeout_days,
           status: 'draft',
           total_contacts: campaign.contact_ids.length,
         })

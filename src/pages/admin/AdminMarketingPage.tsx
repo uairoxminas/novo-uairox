@@ -449,7 +449,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const { data: contacts } = useMarketingContacts();
   const createCampaign = useCreateCampaign();
 
-  const [step, setStep] = useState<'config' | 'whatsapp' | 'email' | 'contacts'>('config');
+  const [step, setStep] = useState<'config' | 'whatsapp' | 'invite' | 'email' | 'contacts'>('config');
   const [name, setName] = useState('');
   const [triggerName, setTriggerName] = useState('marketing');
   const [baseMessage, setBaseMessage] = useState('');
@@ -457,6 +457,42 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [autoContinue, setAutoContinue] = useState(true);
   const [variants, setVariants] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+
+  // Step 2 — Convite state
+  const [step2Enabled, setStep2Enabled] = useState(false);
+  const [step2Message, setStep2Message] = useState('');
+  const [step2EventIds, setStep2EventIds] = useState<string[]>([]);
+  const [responseTimeoutDays, setResponseTimeoutDays] = useState(5);
+  const [generatingStep2, setGeneratingStep2] = useState(false);
+  const [availableEvents, setAvailableEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from('events' as any)
+      .select('id, title, date, location, status')
+      .in('status', ['open', 'planning'])
+      .order('date', { ascending: true })
+      .then(({ data }: any) => setAvailableEvents(data || []));
+  }, []);
+
+  const handleGenerateStep2 = async () => {
+    if (!step2EventIds.length) { toast.error('Selecione ao menos um evento'); return; }
+    setGeneratingStep2(true);
+    try {
+      const res = await fetch('/api/marketing-generate-step2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: step2EventIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro na API');
+      setStep2Message(data.message);
+      toast.success('Convite gerado!');
+    } catch (err: any) {
+      toast.error('Erro ao gerar convite: ' + err.message);
+    } finally {
+      setGeneratingStep2(false);
+    }
+  };
 
   // Email state
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -547,6 +583,10 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
         email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
+        step2_enabled: step2Enabled,
+        step2_message: step2Enabled ? step2Message : undefined,
+        step2_event_ids: step2Enabled ? step2EventIds : undefined,
+        response_timeout_days: responseTimeoutDays,
       });
       toast.success('Campanha criada! Ative-a para iniciar os envios.');
       onClose();
@@ -579,9 +619,10 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   const steps = [
     { id: 'config',   label: '1. Config' },
-    { id: 'whatsapp', label: '2. WhatsApp' },
-    { id: 'email',    label: '3. Email' },
-    { id: 'contacts', label: '4. Contatos' },
+    { id: 'whatsapp', label: '2. Saudação' },
+    { id: 'invite',   label: '3. Convite' },
+    { id: 'email',    label: '4. Email' },
+    { id: 'contacts', label: '5. Contatos' },
   ];
 
   return (
@@ -674,13 +715,108 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                       </div>
                     </div>
                   ))}
-                  <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Aprovado — Configurar Email →</button>
+                  <button onClick={() => setStep('invite')} className={`${btnGold} w-full`}>Aprovado — Configurar Convite →</button>
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 3: Email */}
+          {/* Step 3: Convite */}
+          {step === 'invite' && (
+            <div className="space-y-4">
+              {/* Toggle */}
+              <div className="flex items-center gap-3 p-4 rounded-xl border border-[#1a1a1a]">
+                <button onClick={() => setStep2Enabled(!step2Enabled)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${step2Enabled ? 'bg-[#EDAC02]' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${step2Enabled ? 'left-5' : 'left-0.5'}`} />
+                </button>
+                <div>
+                  <p className="text-xs font-bold text-white">Enviar convite quando o contato responder</p>
+                  <p className="text-[10px] text-zinc-500">Quem não responder entra em opt-out automaticamente após os dias configurados</p>
+                </div>
+              </div>
+
+              {!step2Enabled && (
+                <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Pular — Configurar Email →</button>
+              )}
+
+              {step2Enabled && (
+                <div className="space-y-4">
+                  {/* Timeout */}
+                  <div className="space-y-1">
+                    <p className={labelClass}>Dias sem resposta → opt-out automático</p>
+                    <input type="number" min={1} max={30} value={responseTimeoutDays} onChange={e => setResponseTimeoutDays(Number(e.target.value))} className={inputClass} />
+                    <p className="text-[10px] text-zinc-600">Contatos que não responderem em <strong className="text-zinc-400">{responseTimeoutDays} dias</strong> serão movidos para opt-out automaticamente pelo worker</p>
+                  </div>
+
+                  {/* Event selector */}
+                  <div className="space-y-2">
+                    <p className={labelClass}>Eventos a divulgar no convite</p>
+                    {availableEvents.length === 0 ? (
+                      <div className="p-4 text-center text-zinc-600 text-xs border border-[#1a1a1a] rounded-xl">Nenhum evento aberto ou em planejamento encontrado</div>
+                    ) : (
+                      <div className={`${cardClass} divide-y divide-[#0f0f0f] overflow-hidden`}>
+                        {availableEvents.map((ev: any) => (
+                          <label key={ev.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#0f0f0f] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={step2EventIds.includes(ev.id)}
+                              onChange={e => setStep2EventIds(prev => e.target.checked ? [...prev, ev.id] : prev.filter(id => id !== ev.id))}
+                              className="accent-[#EDAC02] flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-white truncate">{ev.title}</p>
+                              <p className="text-[10px] text-zinc-500">{new Date(ev.date).toLocaleDateString('pt-BR')} · {ev.location}</p>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${ev.status === 'open' ? 'bg-[#25D366]/10 text-[#25D366]' : 'bg-zinc-800 text-zinc-500'}`}>
+                              {ev.status === 'open' ? 'Aberto' : 'Planejamento'}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Generate button */}
+                  <button
+                    onClick={handleGenerateStep2}
+                    disabled={generatingStep2 || !step2EventIds.length}
+                    className={`${btnGold} w-full`}
+                  >
+                    {generatingStep2 ? '✨ Gerando convite...' : '✨ Gerar mensagem de convite com Gemini'}
+                  </button>
+
+                  {/* Message editor */}
+                  {step2Message && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className={labelClass}>Mensagem de convite — revise e edite</p>
+                        <button onClick={() => setStep2Message(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
+                      </div>
+                      <textarea
+                        value={step2Message}
+                        onChange={e => setStep2Message(e.target.value)}
+                        rows={6}
+                        className={`${inputClass} resize-none`}
+                      />
+                      <p className="text-[10px] text-zinc-600">
+                        Enviada via BotConversa com trigger <code className="font-mono text-[#EDAC02] bg-[#EDAC02]/10 px-1 rounded">{triggerName}_step2</code> quando o contato responder a saudação.
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setStep('email')}
+                    disabled={!step2Message.trim()}
+                    className={`${btnGold} w-full`}
+                  >
+                    Próximo — Configurar Email →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 4: Email */}
           {step === 'email' && (
             <div className="space-y-4">
               {/* Toggle */}

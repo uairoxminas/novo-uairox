@@ -275,7 +275,49 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, processed: results.length, results }), {
+    // ── Inactivity opt-out: step-1 contacts with no response after timeout ────
+    const { data: step2Campaigns } = await supabase
+      .from('marketing_campaigns')
+      .select('id, response_timeout_days')
+      .eq('status', 'active')
+      .eq('step2_enabled', true)
+      .gt('response_timeout_days', 0);
+
+    const inactivityOptOuts: any[] = [];
+
+    for (const camp of step2Campaigns || []) {
+      const cutoff = new Date(
+        Date.now() - camp.response_timeout_days * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      const { data: staleItems } = await supabase
+        .from('marketing_queue')
+        .select('id, contact_id, phone, name')
+        .eq('campaign_id', camp.id)
+        .eq('step', 1)
+        .eq('status', 'sent')
+        .is('responded_at', null)
+        .lt('sent_at', cutoff);
+
+      for (const item of staleItems || []) {
+        await supabase.from('marketing_queue')
+          .update({ status: 'skipped' })
+          .eq('id', item.id);
+        if (item.contact_id) {
+          await supabase.from('marketing_contacts')
+            .update({ opt_out: true })
+            .eq('id', item.contact_id);
+          inactivityOptOuts.push({ phone: item.phone, name: item.name });
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      processed: results.length,
+      results,
+      inactivity_opt_outs: inactivityOptOuts.length,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
