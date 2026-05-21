@@ -12,7 +12,7 @@ function getSupabase() {
 export default async function handler(req) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'content-type',
   };
 
@@ -23,6 +23,55 @@ export default async function handler(req) {
   const supabase = getSupabase();
 
   try {
+    // ── LIST campaigns ────────────────────────────────────────────────────────
+    if (req.method === 'GET' && action === 'list') {
+      const { data, error } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── QUEUE for campaign ────────────────────────────────────────────────────
+    if (req.method === 'GET' && action === 'queue') {
+      const campaignId = url.searchParams.get('campaign_id');
+      if (!campaignId) throw new Error('campaign_id obrigatório');
+      const { data, error } = await supabase
+        .from('marketing_queue')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── METRICS for campaign ──────────────────────────────────────────────────
+    if (req.method === 'GET' && action === 'metrics') {
+      const campaignId = url.searchParams.get('campaign_id');
+      if (!campaignId) throw new Error('campaign_id obrigatório');
+      const [queueRes, clicksRes] = await Promise.all([
+        supabase.from('marketing_queue')
+          .select('status, responded_at')
+          .eq('campaign_id', campaignId),
+        supabase.from('marketing_clicks')
+          .select('converted')
+          .eq('campaign_id', campaignId),
+      ]);
+      const queue = queueRes.data || [];
+      const clicks = clicksRes.data || [];
+      return new Response(JSON.stringify({
+        sent: queue.filter(q => q.status === 'sent' || q.status === 'skipped').length,
+        responded: queue.filter(q => q.responded_at).length,
+        clicks: clicks.length,
+        conversions: clicks.filter(c => c.converted).length,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // ── CREATE campaign ───────────────────────────────────────────────────────
     if (req.method === 'POST' && action === 'create') {
       const campaign = await req.json();

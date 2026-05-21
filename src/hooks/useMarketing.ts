@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 // ─── API helpers (use serverless API with service_role for marketing tables) ──
 
@@ -110,12 +109,7 @@ export function useMarketingCampaigns() {
   return useQuery({
     queryKey: ['marketing-campaigns'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('marketing_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data as any[];
+      return await apiFetch('/marketing-campaigns?action=list') as any[];
     },
     refetchInterval: 15000,
   });
@@ -178,13 +172,7 @@ export function useCampaignQueue(campaignId: string | null) {
     queryKey: ['marketing-queue', campaignId],
     queryFn: async () => {
       if (!campaignId) return [];
-      const { data, error } = await (supabase as any)
-        .from('marketing_queue')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data as any[];
+      return await apiFetch(`/marketing-campaigns?action=queue&campaign_id=${campaignId}`) as any[];
     },
     enabled: !!campaignId,
     refetchInterval: 10000,
@@ -198,26 +186,8 @@ export function useCampaignMetrics(campaignId: string | null) {
     queryKey: ['marketing-metrics', campaignId],
     queryFn: async () => {
       if (!campaignId) return null;
-
-      const [queueRes, clicksRes] = await Promise.all([
-        (supabase as any)
-          .from('marketing_queue')
-          .select('id, step, status, responded_at, step2_sent_at')
-          .eq('campaign_id', campaignId),
-        (supabase as any)
-          .from('marketing_clicks')
-          .select('id, converted')
-          .eq('campaign_id', campaignId),
-      ]);
-
-      const queue: any[] = queueRes.data || [];
-      const clicks: any[] = clicksRes.data || [];
-
-      return {
-        sent: queue.filter(q => q.status === 'sent' || q.status === 'skipped').length,
-        responded: queue.filter(q => q.responded_at).length,
-        clicks: clicks.length,
-        conversions: clicks.filter(c => c.converted).length,
+      return await apiFetch(`/marketing-campaigns?action=metrics&campaign_id=${campaignId}`) as {
+        sent: number; responded: number; clicks: number; conversions: number;
       };
     },
     enabled: !!campaignId,
