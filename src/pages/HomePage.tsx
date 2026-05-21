@@ -278,7 +278,8 @@ export default function HomePage() {
       </section>
 
       {/* COMBO JUNHO */}
-      <section className="py-14 md:py-20 bg-[#050505] px-4 border-t border-[#1a1a1a]">
+      <section className="py-14 md:py-20 bg-[#0d0d0d] px-4 border-y border-[#EDAC02]/20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(237,172,2,0.07)_0%,transparent_70%)] pointer-events-none" />
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-[10px] font-bold text-[#EDAC02]/60 uppercase tracking-[0.35em] mb-2">Junho 2026</p>
           <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter italic leading-none mb-2">
