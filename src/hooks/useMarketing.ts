@@ -140,58 +140,11 @@ export function useCreateCampaign() {
       step2_event_ids?: string[];
       response_timeout_days: number;
     }) => {
-      // Create campaign
-      const { data: camp, error: campErr } = await (supabase as any)
-        .from('marketing_campaigns')
-        .insert({
-          name: campaign.name,
-          trigger_name: campaign.trigger_name,
-          base_message: campaign.base_message,
-          variants: campaign.variants,
-          daily_limit: campaign.daily_limit,
-          auto_continue: campaign.auto_continue,
-          email_enabled: campaign.email_enabled,
-          email_subject: campaign.email_subject || null,
-          email_template: campaign.email_template || null,
-          step2_enabled: campaign.step2_enabled,
-          step2_message: campaign.step2_message || null,
-          step2_event_ids: campaign.step2_event_ids || null,
-          response_timeout_days: campaign.response_timeout_days,
-          status: 'draft',
-          total_contacts: campaign.contact_ids.length,
-        })
-        .select()
-        .single();
-      if (campErr) throw campErr;
-
-      // Load contacts via API (service_role)
-      const allContacts = await apiFetch('/marketing-contacts') as any[];
-      const contacts = allContacts.filter((c: any) =>
-        campaign.contact_ids.includes(c.id) && !c.opt_out
-      );
-
-      // Create queue entries with variant rotation + unique tracking code per contact
-      const variantCount = campaign.variants.length || 1;
-      const trackingEventId = campaign.step2_event_ids?.[0] || null;
-      const queueRows = contacts.map((c: any, i: number) => ({
-        campaign_id: camp.id,
-        contact_id: c.id,
-        phone: c.phone,
-        name: c.name,
-        email: c.email,
-        variant_index: i % variantCount,
-        status: 'pending',
-        send_after: new Date().toISOString(),
-        tracking_code: Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6),
-        tracking_event_id: trackingEventId,
-      }));
-
-      const { error: queueErr } = await (supabase as any)
-        .from('marketing_queue')
-        .insert(queueRows);
-      if (queueErr) throw queueErr;
-
-      return camp;
+      const result = await apiFetch('/marketing-campaigns?action=create', {
+        method: 'POST',
+        body: JSON.stringify(campaign),
+      });
+      return result.campaign;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-campaigns'] }),
   });
@@ -201,11 +154,10 @@ export function useUpdateCampaignStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'active' | 'paused' | 'draft' }) => {
-      const { error } = await (supabase as any)
-        .from('marketing_campaigns')
-        .update({ status })
-        .eq('id', id);
-      if (error) throw error;
+      await apiFetch('/marketing-campaigns?action=update-status', {
+        method: 'POST',
+        body: JSON.stringify({ id, status }),
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-campaigns'] }),
   });
@@ -215,11 +167,7 @@ export function useDeleteCampaign() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
-        .from('marketing_campaigns')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      await apiFetch(`/marketing-campaigns?id=${id}`, { method: 'DELETE' });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-campaigns'] }),
   });
