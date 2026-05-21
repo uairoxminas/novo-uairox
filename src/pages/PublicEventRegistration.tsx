@@ -1059,6 +1059,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [crossCouponCode, setCrossCouponCode] = useState<string | null>(null);
 
   const [categoryId, setCategoryId] = useState(initialCategoryId);
   
@@ -1466,6 +1467,17 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         }).catch(() => {});
       }
 
+      // Cross-coupon for selecao: generate 5% discount valid on 8experience and 8oficial
+      if (event?.slug === 'selecao') {
+        fetch('/api/combo-registration?action=cross-coupon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registration_id: data.id, athlete_name: a1.name.trim(), athlete_email: a1.email.trim() }),
+        }).then(r => r.json()).then(res => {
+          if (res.ok && res.code) setCrossCouponCode(res.code);
+        }).catch(() => {});
+      }
+
       setSuccess(true);
       sendConfirmationMessages(data.id);
     } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }
@@ -1691,6 +1703,21 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
               <span className="text-zinc-400 font-mono text-xs">{registrationId?.slice(0, 8)}</span>
             </div>
           </div>
+
+          {crossCouponCode && (
+            <div className="bg-[#0a0a0a] border border-[#EDAC02]/30 rounded-2xl p-4 mb-4 text-left">
+              <p className="text-[10px] font-bold text-[#EDAC02]/60 uppercase tracking-[0.3em] mb-1">Bônus Combo Junho 🎁</p>
+              <p className="text-white text-sm font-bold mb-2">5% OFF no UAIROX 8ª Edição</p>
+              <p className="text-zinc-400 text-xs mb-3">Use este cupom ao se inscrever no Experience ou Oficial e ganhe 5% de desconto.</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-[#111] px-3 py-2 rounded-lg text-sm text-[#EDAC02] font-mono border border-[#262626] select-all tracking-wider">{crossCouponCode}</code>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(crossCouponCode); }}
+                  className="px-3 py-2 bg-[#EDAC02] text-black font-black rounded-lg text-xs"
+                >Copiar</button>
+              </div>
+            </div>
+          )}
 
           {event?.whatsapp_group_link ? (
             <a

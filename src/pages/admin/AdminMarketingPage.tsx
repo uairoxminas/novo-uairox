@@ -1251,7 +1251,7 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <p className={labelClass}>Mensagem de saudação</p>
-                  <button onClick={() => setBaseMessage(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
+                  <button onClick={() => setBaseMessage((prev: string) => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
                 </div>
                 <textarea value={baseMessage} onChange={e => setBaseMessage(e.target.value)} rows={5} className={`${inputClass} resize-none`} />
               </div>
@@ -1259,11 +1259,11 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                 <p className={labelClass}>Variações ({variants.length})</p>
                 {variants.map((v, i) => (
                   <div key={i} className="flex gap-2">
-                    <textarea value={v} onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))} rows={3} className={`${inputClass} resize-none flex-1 text-xs`} />
-                    <button onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))} className="text-zinc-600 hover:text-red-400 text-lg self-start mt-1">✕</button>
+                    <textarea value={v} onChange={e => setVariants((prev: string[]) => prev.map((x, j) => j === i ? e.target.value : x))} rows={3} className={`${inputClass} resize-none flex-1 text-xs`} />
+                    <button onClick={() => setVariants((prev: string[]) => prev.filter((_, j) => j !== i))} className="text-zinc-600 hover:text-red-400 text-lg self-start mt-1">✕</button>
                   </div>
                 ))}
-                <button onClick={() => setVariants(prev => [...prev, baseMessage])} className="text-xs text-zinc-500 hover:text-[#EDAC02] transition-colors">+ Adicionar variação</button>
+                <button onClick={() => setVariants((prev: string[]) => [...prev, baseMessage])} className="text-xs text-zinc-500 hover:text-[#EDAC02] transition-colors">+ Adicionar variação</button>
               </div>
             </div>
           )}
@@ -1283,8 +1283,8 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                     <div className="flex items-center justify-between mb-1">
                       <p className={labelClass}>Mensagem de convite</p>
                       <div className="flex gap-1">
-                        <button onClick={() => setStep2Message(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
-                        <button onClick={() => setStep2Message(prev => prev + '{link}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-blue-400 text-[9px] font-mono">+ {'{link}'}</button>
+                        <button onClick={() => setStep2Message((prev: string) => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
+                        <button onClick={() => setStep2Message((prev: string) => prev + '{link}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-blue-400 text-[9px] font-mono">+ {'{link}'}</button>
                       </div>
                     </div>
                     <textarea value={step2Message} onChange={e => setStep2Message(e.target.value)} rows={6} className={`${inputClass} resize-none`} />

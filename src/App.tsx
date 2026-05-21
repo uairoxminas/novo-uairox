@@ -37,6 +37,7 @@ import AdminSquad from './pages/admin/AdminSquad';
 import AdminLocations from './pages/admin/AdminLocations';
 import AdminMarketingPage from './pages/admin/AdminMarketingPage';
 import PublicEventRegistration from './pages/PublicEventRegistration';
+import ComboJunhoPage from './pages/ComboJunhoPage';
 import PaymentPortal from './pages/PaymentPortal';
 import RaffleLivePage from './pages/RaffleLivePage';
 import SquadPortalPage from './pages/SquadPortalPage';
@@ -88,6 +89,9 @@ export default function App() {
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/store" element={<StorePage />} />
           </Route>
+
+          {/* Combo Junho */}
+          <Route path="/combo-junho" element={<ComboJunhoPage />} />
 
           {/* Inscrição Pública em Eventos */}
           <Route path="/evento/:id" element={<PublicEventRegistration />} />
