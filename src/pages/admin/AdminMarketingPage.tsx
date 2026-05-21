@@ -43,6 +43,7 @@ function ContactsTab() {
 
   const [search, setSearch] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookTestState, setWebhookTestState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [filterOptOut, setFilterOptOut] = useState<'all' | 'active' | 'optout'>('active');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +54,35 @@ function ContactsTab() {
   const [colEmail, setColEmail] = useState('');
 
   useEffect(() => { if (config?.webhook_url) setWebhookUrl(config.webhook_url); }, [config]);
+
+  const handleTestWebhook = async () => {
+    if (!webhookUrl.trim()) { toast.error('Cole a URL do webhook antes de testar'); return; }
+    setWebhookTestState('loading');
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trigger: 'marketing_test',
+          nome: 'Teste UAIROX',
+          telefone: '5531999999999',
+          mensagem: '✅ Webhook configurado com sucesso! Esta é uma mensagem de teste do sistema UAIROX Marketing.',
+        }),
+      });
+      if (res.ok) {
+        setWebhookTestState('ok');
+        toast.success('Webhook respondeu com sucesso!');
+      } else {
+        setWebhookTestState('error');
+        toast.error(`Webhook retornou erro: ${res.status} ${res.statusText}`);
+      }
+    } catch {
+      setWebhookTestState('error');
+      toast.error('Falha ao conectar. Verifique a URL e tente novamente.');
+    } finally {
+      setTimeout(() => setWebhookTestState('idle'), 5000);
+    }
+  };
 
   // Step 1: parse file and show mapping modal
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,10 +322,29 @@ function ContactsTab() {
       <div className={`${cardClass} p-4 space-y-3`}>
         <p className={labelClass}>🔗 Webhook BotConversa</p>
         <div className="flex gap-3">
-          <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} font-mono text-xs flex-1`} />
+          <input value={webhookUrl} onChange={e => { setWebhookUrl(e.target.value); setWebhookTestState('idle'); }} placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..." className={`${inputClass} font-mono text-xs flex-1`} />
+          <button
+            onClick={handleTestWebhook}
+            disabled={webhookTestState === 'loading' || !webhookUrl.trim()}
+            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              webhookTestState === 'ok'    ? 'bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366]' :
+              webhookTestState === 'error' ? 'bg-red-500/20 border border-red-500/40 text-red-400' :
+              'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'
+            }`}
+          >
+            {webhookTestState === 'loading' ? '...' :
+             webhookTestState === 'ok'      ? '✓ OK' :
+             webhookTestState === 'error'   ? '✕ Erro' : 'Testar'}
+          </button>
           <button onClick={async () => { await saveConfig.mutateAsync({ webhook_url: webhookUrl }); toast.success('Salvo'); }} disabled={saveConfig.isPending} className={`${btnGold} whitespace-nowrap`}>Salvar</button>
         </div>
         {!webhookUrl && <p className="text-[10px] text-yellow-500 font-bold">⚠ Configure o webhook para habilitar campanhas</p>}
+        {webhookTestState === 'ok' && (
+          <p className="text-[10px] text-[#25D366] font-bold">✓ BotConversa recebeu a requisição de teste. Verifique se a mensagem chegou no WhatsApp configurado.</p>
+        )}
+        {webhookTestState === 'error' && (
+          <p className="text-[10px] text-red-400 font-bold">✕ O webhook não respondeu. Verifique se a URL está correta e o BotConversa está ativo.</p>
+        )}
       </div>
 
       {/* Meta Ads instructions */}
