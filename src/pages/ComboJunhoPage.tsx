@@ -46,18 +46,33 @@ function fmt(val: number) {
 }
 
 // ─── Event Selector (inside card) ─────────────────────────────────────────────
+function inferBatch(catName: string, batches: Batch[]): Batch | null {
+  if (!batches.length) return null;
+  const upper = catName.toUpperCase();
+  const isDupla = upper.includes('DUPLA') || upper.includes('DUPLAS') || upper.includes('DUO') || upper.includes('EQUIPE');
+  const keyword = isDupla ? 'DUPLA' : 'INDIVIDUAL';
+  // dedupe by name first, keep first occurrence (lowest order_index)
+  const unique = batches.filter((b, i, arr) => arr.findIndex(x => x.name.toUpperCase() === b.name.toUpperCase()) === i);
+  return unique.find(b => b.name.toUpperCase().includes(keyword)) ?? unique[0];
+}
+
 function EventSelector({ ev, catId, batchId, onCatChange, onBatchChange }: {
   ev: EventData;
   catId: string; batchId: string;
   onCatChange: (v: string) => void;
   onBatchChange: (v: string) => void;
 }) {
-  // Auto-select batch when there's only one
+  // Infer batch automatically when category changes
   useEffect(() => {
-    if (ev.batches.length === 1 && !batchId) onBatchChange(ev.batches[0].id);
-  }, [ev.batches.length]);
+    if (!catId) { onBatchChange(''); return; }
+    const cat = ev.categories.find(c => c.id === catId);
+    if (!cat) return;
+    const match = inferBatch(cat.name, ev.batches);
+    onBatchChange(match?.id ?? '');
+  }, [catId]);
 
   const selectedBatch = ev.batches.find(b => b.id === batchId);
+  const minPrice = ev.batches.length ? Math.min(...ev.batches.map(b => b.price)) : 0;
   const inputClass = 'w-full bg-[#0d0d0d] border border-[#222] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#EDAC02]/50 transition-colors';
 
   return (
@@ -69,17 +84,19 @@ function EventSelector({ ev, catId, batchId, onCatChange, onBatchChange }: {
             {new Date(ev.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })} · {ev.location}
           </p>
         </div>
-        {selectedBatch ? (
-          <div className="text-right flex-shrink-0">
-            <p className="text-[10px] text-zinc-600 line-through">{fmt(selectedBatch.price)}</p>
-            <p className="text-sm font-black text-[#EDAC02]">{fmt(Math.round(selectedBatch.price * (1 - DISCOUNT / 100) * 100) / 100)}</p>
-          </div>
-        ) : (
-          <div className="text-right flex-shrink-0">
-            <p className="text-[10px] text-zinc-600">a partir de</p>
-            <p className="text-xs font-bold text-zinc-500">{ev.batches.length ? fmt(Math.min(...ev.batches.map(b => b.price))) : '—'}</p>
-          </div>
-        )}
+        <div className="text-right flex-shrink-0">
+          {selectedBatch ? (
+            <>
+              <p className="text-[10px] text-zinc-600 line-through">{fmt(selectedBatch.price)}</p>
+              <p className="text-sm font-black text-[#EDAC02]">{fmt(Math.round(selectedBatch.price * (1 - DISCOUNT / 100) * 100) / 100)}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] text-zinc-600">a partir de</p>
+              <p className="text-xs font-bold text-zinc-500">{minPrice ? fmt(minPrice) : '—'}</p>
+            </>
+          )}
+        </div>
       </div>
 
       <select value={catId} onChange={e => onCatChange(e.target.value)} className={inputClass}>
@@ -87,13 +104,12 @@ function EventSelector({ ev, catId, batchId, onCatChange, onBatchChange }: {
         {ev.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
 
-      {ev.batches.length > 1 && (
-        <select value={batchId} onChange={e => onBatchChange(e.target.value)} className={inputClass}>
-          <option value="">Selecione o lote / valor</option>
-          {ev.batches.map(b => (
-            <option key={b.id} value={b.id}>{b.name} — {fmt(b.price)}</option>
-          ))}
-        </select>
+      {/* Batch is auto-inferred — only show as read-only confirmation */}
+      {catId && selectedBatch && (
+        <p className="text-[10px] text-zinc-600 pl-1">
+          Valor: <span className="text-white font-bold">{fmt(selectedBatch.price)}</span>
+          {' '}→ combo: <span className="text-[#EDAC02] font-bold">{fmt(Math.round(selectedBatch.price * (1 - DISCOUNT / 100) * 100) / 100)}</span>
+        </p>
       )}
     </div>
   );
