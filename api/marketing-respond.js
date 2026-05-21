@@ -9,14 +9,24 @@ function getSupabase() {
   );
 }
 
-// Normalize phone: strip non-digits, try exact + with/without DDI 55
+// Normalize phone: try all common BR formats (BotConversa sends with DDI 55)
 async function findContact(supabase, phone) {
   const digits = String(phone).replace(/\D/g, '');
-  for (const candidate of [
+  const candidates = [...new Set([
     digits,
+    // BotConversa envia 5531XXXXXXXXX (13 digits) → tentar sem o 55
+    digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : null,
+    // 11 digits → add DDI
     digits.length === 11 ? '55' + digits : null,
+    // 10 digits (old format without leading 9) → add DDI
+    digits.length === 10 ? '55' + digits : null,
+    // >11 digits → strip to last 11 (DDD + 9 digits)
     digits.length > 11 ? digits.slice(-11) : null,
-  ].filter(Boolean)) {
+    // >10 digits → strip to last 10 (old 8-digit landline format)
+    digits.length > 10 ? digits.slice(-10) : null,
+  ].filter(Boolean))];
+
+  for (const candidate of candidates) {
     const { data } = await supabase
       .from('marketing_contacts')
       .select('id, phone, name, opt_out')
@@ -68,8 +78,8 @@ export default async function handler(req) {
     const contact = await findContact(supabase, rawPhone);
 
     if (!contact) {
-      // Return 200 so BotConversa doesn't retry
-      return new Response(JSON.stringify({ ok: true, message: 'Contato não encontrado na base' }), {
+      const digits = String(rawPhone).replace(/\D/g, '');
+      return new Response(JSON.stringify({ ok: true, message: 'Contato não encontrado na base', debug_phone_received: digits }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -81,16 +91,44 @@ export default async function handler(req) {
     }
 
     // Find step-1 queue items awaiting response
-    const { data: queueItems } = await supabase
-      .from('marketing_queue')
-      .select('id, campaign_id, name, tracking_code')
-      .eq('contact_id', contact.id)
-      .eq('step', 1)
-      .eq('status', 'sent')
-      .is('responded_at', null);
+    // Accept 'pending' or 'sent' — there's no background sender marking items as 'sent' yet
+    // tracking_code column may not exist if migration wasn't run, so try without it first
+    let queueItems = null;
+    {
+      const { data, error } = await supabase
+        .from('marketing_queue')
+        .select('id, campaign_id, name, tracking_code')
+        .eq('contact_id', contact.id)
+        .in('status', ['sent', 'pending'])
+        .is('responded_at', null);
+
+      if (error) {
+        // columns tracking_code/responded_at may not exist yet (migration not run)
+        const { data: data2, error: err2 } = await supabase
+          .from('marketing_queue')
+          .select('id, campaign_id, name')
+          .eq('contact_id', contact.id)
+          .in('status', ['sent', 'pending'])
+          .is('responded_at', null);
+
+        if (err2) {
+          // responded_at also missing — minimal query without extra filters
+          const { data: data3 } = await supabase
+            .from('marketing_queue')
+            .select('id, campaign_id, name')
+            .eq('contact_id', contact.id)
+            .in('status', ['sent', 'pending']);
+          queueItems = data3;
+        } else {
+          queueItems = data2;
+        }
+      } else {
+        queueItems = data;
+      }
+    }
 
     if (!queueItems?.length) {
-      return new Response(JSON.stringify({ ok: true, message: 'Nenhum item aguardando resposta' }), {
+      return new Response(JSON.stringify({ ok: true, message: 'Nenhum item aguardando resposta', contact_found: contact.phone }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -105,10 +143,10 @@ export default async function handler(req) {
       .maybeSingle();
 
     for (const item of queueItems) {
-      // Mark as responded
+      // Mark as responded (ignore error if column doesn't exist yet)
       await supabase.from('marketing_queue')
-        .update({ responded_at: now })
-        .eq('id', item.id);
+        .update({ responded_at: now, status: 'responded' })
+        .eq('id', item.id).catch(() => {});
 
       // Get campaign step2 config
       const { data: campaign } = await supabase
@@ -156,7 +194,7 @@ export default async function handler(req) {
       if (waOk) {
         await supabase.from('marketing_queue')
           .update({ step2_sent_at: new Date().toISOString() })
-          .eq('id', item.id);
+          .eq('id', item.id).catch(() => {});
       }
 
       step2Results.push({ campaign_id: item.campaign_id, step2: waOk ? 'sent' : 'failed' });
