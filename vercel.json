@@ -33,6 +33,7 @@
       ],
       "destination": "/api/parceiro/:token"
     },
+    { "source": "/t/:code", "destination": "/api/marketing-track?c=:code" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
 }

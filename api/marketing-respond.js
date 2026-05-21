@@ -83,7 +83,7 @@ export default async function handler(req) {
     // Find step-1 queue items awaiting response
     const { data: queueItems } = await supabase
       .from('marketing_queue')
-      .select('id, campaign_id, name')
+      .select('id, campaign_id, name, tracking_code')
       .eq('contact_id', contact.id)
       .eq('step', 1)
       .eq('status', 'sent')
@@ -127,7 +127,12 @@ export default async function handler(req) {
       }
 
       const contactName = contact.name || item.name || '';
-      const personalizedMessage = campaign.step2_message.replace(/\{nome\}/gi, contactName);
+      const trackingUrl = item.tracking_code
+        ? `https://uairox.com.br/t/${item.tracking_code}`
+        : 'https://uairox.com.br';
+      const personalizedMessage = campaign.step2_message
+        .replace(/\{nome\}/gi, contactName)
+        .replace(/\{link\}/gi, trackingUrl);
 
       // Send step 2 via BotConversa (trigger = original_trigger + '_step2')
       const payload = {

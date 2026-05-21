@@ -1456,6 +1456,16 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         }).catch(err => console.error('[Marketing Auto-Capture] Fetch error:', err.message));
       }
 
+      // Conversion tracking: mark marketing_clicks for this phone+event as converted
+      const athletePhone = a1.phone.trim().replace(/\D/g, '');
+      if (athletePhone.length >= 8 && eventId) {
+        fetch('/api/marketing-convert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: athletePhone, event_id: eventId, registration_id: data.id }),
+        }).catch(() => {});
+      }
+
       setSuccess(true);
       sendConfirmationMessages(data.id);
     } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }

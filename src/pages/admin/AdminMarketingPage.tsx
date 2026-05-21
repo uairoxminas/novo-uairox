@@ -14,6 +14,7 @@ import {
   useUpdateCampaignStatus,
   useDeleteCampaign,
   useCampaignQueue,
+  useCampaignMetrics,
   useSyncRegistrationsToMarketing,
 } from '@/hooks/useMarketing';
 
@@ -790,7 +791,10 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className={labelClass}>Mensagem de convite — revise e edite</p>
-                        <button onClick={() => setStep2Message(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
+                        <div className="flex gap-1">
+                          <button onClick={() => setStep2Message(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
+                          <button onClick={() => setStep2Message(prev => prev + '{link}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-blue-400 text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{link}'}</button>
+                        </div>
                       </div>
                       <textarea
                         value={step2Message}
@@ -1097,6 +1101,80 @@ function CampaignHowItWorks() {
   );
 }
 
+// ─── CampaignCard ─────────────────────────────────────────────────────────────
+function CampaignCard({
+  c,
+  onQueue,
+  onToggleStatus,
+  onDelete,
+}: {
+  c: any;
+  onQueue: () => void;
+  onToggleStatus: (status: 'active' | 'paused') => void;
+  onDelete: () => void;
+}) {
+  const { data: metrics } = useCampaignMetrics(c.id);
+  const progress = c.total_contacts > 0 ? Math.round((c.sent_total / c.total_contacts) * 100) : 0;
+  const st = STATUS_LABEL[c.status] || STATUS_LABEL.draft;
+
+  return (
+    <div className={`${cardClass} p-5`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-black text-white truncate">{c.name}</h3>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${st.color}`}>{st.label}</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500 text-[10px] font-mono border border-zinc-800">{c.trigger_name}</span>
+          </div>
+          <div className="flex items-center gap-4 mt-2 text-[10px] text-zinc-500 font-bold">
+            <span>📨 {c.sent_total} / {c.total_contacts} enviados</span>
+            <span>📅 Hoje: {c.sent_today} / {c.daily_limit}</span>
+            <span>🔁 {c.auto_continue ? 'Auto-continua' : 'Pausa ao fim do dia'}</span>
+          </div>
+
+          {/* Tracking metrics row */}
+          {c.step2_enabled && (
+            <div className="flex items-center gap-3 mt-2 text-[10px] font-bold flex-wrap">
+              <span className="text-zinc-500">💬 {metrics?.responded ?? '—'} responderam</span>
+              <span className="text-blue-400">🔗 {metrics?.clicks ?? '—'} cliques</span>
+              <span className="text-[#25D366]">✅ {metrics?.conversions ?? '—'} conversões</span>
+              {(metrics?.clicks ?? 0) > 0 && (
+                <span className="text-zinc-600">
+                  ({Math.round(((metrics?.conversions ?? 0) / (metrics?.clicks ?? 1)) * 100)}% conv.)
+                </span>
+              )}
+            </div>
+          )}
+
+          {c.total_contacts > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-[10px] text-zinc-600 mb-1">
+                <span>Progresso</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-full bg-[#EDAC02] rounded-full transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={onQueue} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 hover:text-white transition-colors">Fila</button>
+          {c.status === 'active' && (
+            <button onClick={() => onToggleStatus('paused')} className="px-3 py-1.5 rounded-lg border border-yellow-500/30 text-yellow-400 text-xs font-bold hover:bg-yellow-500/10 transition-colors">⏸ Pausar</button>
+          )}
+          {(c.status === 'draft' || c.status === 'paused') && (
+            <button onClick={() => onToggleStatus('active')} className="px-3 py-1.5 rounded-lg border border-[#25D366]/30 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/10 transition-colors">▶ Ativar</button>
+          )}
+          {c.status !== 'active' && (
+            <button onClick={onDelete} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-600 text-xs font-bold hover:border-red-500/30 hover:text-red-400 transition-colors">✕</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CampaignsTab ─────────────────────────────────────────────────────────────
 function CampaignsTab() {
   const { data: campaigns, isLoading } = useMarketingCampaigns();
@@ -1123,51 +1201,15 @@ function CampaignsTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {(campaigns as any[]).map((c: any) => {
-            const progress = c.total_contacts > 0 ? Math.round((c.sent_total / c.total_contacts) * 100) : 0;
-            const st = STATUS_LABEL[c.status] || STATUS_LABEL.draft;
-            return (
-              <div key={c.id} className={`${cardClass} p-5`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-black text-white truncate">{c.name}</h3>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${st.color}`}>{st.label}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500 text-[10px] font-mono border border-zinc-800">{c.trigger_name}</span>
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-[10px] text-zinc-500 font-bold">
-                      <span>📨 {c.sent_total} / {c.total_contacts} enviados</span>
-                      <span>📅 Hoje: {c.sent_today} / {c.daily_limit}</span>
-                      <span>🔁 {c.auto_continue ? 'Auto-continua' : 'Pausa ao fim do dia'}</span>
-                    </div>
-                    {c.total_contacts > 0 && (
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-[10px] text-zinc-600 mb-1">
-                          <span>Progresso</span>
-                          <span>{progress}%</span>
-                        </div>
-                        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#EDAC02] rounded-full transition-all" style={{ width: `${progress}%` }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => setQueueModal({ id: c.id, name: c.name })} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 hover:text-white transition-colors">Fila</button>
-                    {c.status === 'active' && (
-                      <button onClick={() => updateStatus.mutate({ id: c.id, status: 'paused' })} className="px-3 py-1.5 rounded-lg border border-yellow-500/30 text-yellow-400 text-xs font-bold hover:bg-yellow-500/10 transition-colors">⏸ Pausar</button>
-                    )}
-                    {(c.status === 'draft' || c.status === 'paused') && (
-                      <button onClick={() => updateStatus.mutate({ id: c.id, status: 'active' })} className="px-3 py-1.5 rounded-lg border border-[#25D366]/30 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/10 transition-colors">▶ Ativar</button>
-                    )}
-                    {c.status !== 'active' && (
-                      <button onClick={() => { if (confirm('Excluir campanha?')) deleteCampaign.mutate(c.id); }} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-600 text-xs font-bold hover:border-red-500/30 hover:text-red-400 transition-colors">✕</button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {(campaigns as any[]).map((c: any) => (
+            <CampaignCard
+              key={c.id}
+              c={c}
+              onQueue={() => setQueueModal({ id: c.id, name: c.name })}
+              onToggleStatus={(status) => updateStatus.mutate({ id: c.id, status })}
+              onDelete={() => { if (confirm('Excluir campanha?')) deleteCampaign.mutate(c.id); }}
+            />
+          ))}
         </div>
       )}
 

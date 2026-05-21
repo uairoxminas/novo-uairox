@@ -170,8 +170,9 @@ export function useCreateCampaign() {
         campaign.contact_ids.includes(c.id) && !c.opt_out
       );
 
-      // Create queue entries with variant rotation
+      // Create queue entries with variant rotation + unique tracking code per contact
       const variantCount = campaign.variants.length || 1;
+      const trackingEventId = campaign.step2_event_ids?.[0] || null;
       const queueRows = contacts.map((c: any, i: number) => ({
         campaign_id: camp.id,
         contact_id: c.id,
@@ -181,6 +182,8 @@ export function useCreateCampaign() {
         variant_index: i % variantCount,
         status: 'pending',
         send_after: new Date().toISOString(),
+        tracking_code: Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6),
+        tracking_event_id: trackingEventId,
       }));
 
       const { error: queueErr } = await (supabase as any)
@@ -237,6 +240,40 @@ export function useCampaignQueue(campaignId: string | null) {
     },
     enabled: !!campaignId,
     refetchInterval: 10000,
+  });
+}
+
+// ─── Campaign Metrics ─────────────────────────────────────────────────────────
+
+export function useCampaignMetrics(campaignId: string | null) {
+  return useQuery({
+    queryKey: ['marketing-metrics', campaignId],
+    queryFn: async () => {
+      if (!campaignId) return null;
+
+      const [queueRes, clicksRes] = await Promise.all([
+        (supabase as any)
+          .from('marketing_queue')
+          .select('id, step, status, responded_at, step2_sent_at')
+          .eq('campaign_id', campaignId),
+        (supabase as any)
+          .from('marketing_clicks')
+          .select('id, converted')
+          .eq('campaign_id', campaignId),
+      ]);
+
+      const queue: any[] = queueRes.data || [];
+      const clicks: any[] = clicksRes.data || [];
+
+      return {
+        sent: queue.filter(q => q.status === 'sent' || q.status === 'skipped').length,
+        responded: queue.filter(q => q.responded_at).length,
+        clicks: clicks.length,
+        conversions: clicks.filter(c => c.converted).length,
+      };
+    },
+    enabled: !!campaignId,
+    refetchInterval: 30000,
   });
 }
 
