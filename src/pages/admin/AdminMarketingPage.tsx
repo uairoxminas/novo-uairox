@@ -1150,6 +1150,114 @@ function CampaignHowItWorks() {
   );
 }
 
+// ─── TestCampaignModal ────────────────────────────────────────────────────────
+function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () => void }) {
+  const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [sentMessage, setSentMessage] = useState('');
+
+  const handleSend = async () => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10) { toast.error('Informe um número de WhatsApp válido'); return; }
+    setState('sending');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/marketing-test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: campaign.id, phone: digits, name: name || 'Teste' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao enviar');
+      setSentMessage(data.message || '');
+      setState('ok');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+      setState('error');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className={`${cardClass} w-full max-w-md p-6 space-y-5`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-black text-white">Testar Campanha</h2>
+            <p className="text-[10px] text-zinc-500 mt-0.5">{campaign.name}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white text-lg leading-none">✕</button>
+        </div>
+
+        {state !== 'ok' ? (
+          <>
+            <div className="space-y-3">
+              <div>
+                <p className={labelClass}>Número WhatsApp</p>
+                <input
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="31999999999 (com DDD)"
+                  className={`${inputClass} mt-1`}
+                />
+              </div>
+              <div>
+                <p className={labelClass}>Nome (substitui {'{nome}'} na mensagem)</p>
+                <input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Ex: Léo"
+                  className={`${inputClass} mt-1`}
+                />
+              </div>
+            </div>
+
+            {state === 'error' && (
+              <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                <p className="text-[10px] text-red-400 font-bold">✕ {errorMsg}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 transition-colors">Cancelar</button>
+              <button
+                onClick={handleSend}
+                disabled={state === 'sending' || !phone.trim()}
+                className={`flex-1 ${btnGold}`}
+              >
+                {state === 'sending' ? 'Enviando...' : 'Enviar teste →'}
+              </button>
+            </div>
+
+            <p className="text-[10px] text-zinc-600 leading-relaxed">
+              Envia o step 1 da campanha imediatamente para o número informado via BotConversa. Nenhum registro é criado na fila — é apenas um teste.
+            </p>
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="px-4 py-3 rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 space-y-2">
+              <p className="text-[10px] font-black text-[#25D366] uppercase tracking-widest">✓ Mensagem enviada!</p>
+              <p className="text-[10px] text-zinc-400">Verifique se chegou no WhatsApp <span className="text-white font-bold">{phone}</span>. Depois responda a mensagem para testar o fluxo completo do BotConversa.</p>
+            </div>
+
+            {sentMessage && (
+              <div className="space-y-1">
+                <p className={labelClass}>Mensagem enviada:</p>
+                <div className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
+                  <p className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{sentMessage}</p>
+                </div>
+              </div>
+            )}
+
+            <button onClick={onClose} className={`${btnGold} w-full`}>Fechar</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── CampaignCard ─────────────────────────────────────────────────────────────
 function CampaignCard({
   c,
@@ -1163,10 +1271,12 @@ function CampaignCard({
   onDelete: () => void;
 }) {
   const { data: metrics } = useCampaignMetrics(c.id);
+  const [showTest, setShowTest] = useState(false);
   const progress = c.total_contacts > 0 ? Math.round((c.sent_total / c.total_contacts) * 100) : 0;
   const st = STATUS_LABEL[c.status] || STATUS_LABEL.draft;
 
   return (
+    <>
     <div className={`${cardClass} p-5`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -1208,6 +1318,7 @@ function CampaignCard({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={() => setShowTest(true)} className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold hover:border-[#EDAC02]/40 hover:text-[#EDAC02] transition-colors">🧪 Testar</button>
           <button onClick={onQueue} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 hover:text-white transition-colors">Fila</button>
           {c.status === 'active' && (
             <button onClick={() => onToggleStatus('paused')} className="px-3 py-1.5 rounded-lg border border-yellow-500/30 text-yellow-400 text-xs font-bold hover:bg-yellow-500/10 transition-colors">⏸ Pausar</button>
@@ -1221,6 +1332,8 @@ function CampaignCard({
         </div>
       </div>
     </div>
+    {showTest && <TestCampaignModal campaign={c} onClose={() => setShowTest(false)} />}
+    </>
   );
 }
 
