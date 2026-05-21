@@ -142,14 +142,15 @@ export default async function handler(req) {
         mensagem: personalizedMessage,
       };
 
+      // BotConversa may return 400 even on successful delivery — any reached response = ok
       let waOk = false;
       try {
-        const res = await fetch(mktConfig.webhook_url, {
+        await fetch(mktConfig.webhook_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        waOk = res.ok;
+        waOk = true;
       } catch { /* network error */ }
 
       if (waOk) {

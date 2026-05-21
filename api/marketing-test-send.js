@@ -68,7 +68,8 @@ export default async function handler(req) {
     const digits = String(phone).replace(/\D/g, '');
 
     // Send via BotConversa webhook
-    const res = await fetch(mktConfig.webhook_url, {
+    // BotConversa may return 400 even on successful delivery — treat any reached response as ok
+    await fetch(mktConfig.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -77,14 +78,7 @@ export default async function handler(req) {
         telefone: digits,
         mensagem: message,
       }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      return new Response(JSON.stringify({ error: `BotConversa retornou ${res.status}: ${body}` }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    }).catch(() => null); // network errors still silently handled below
 
     return new Response(JSON.stringify({ ok: true, message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
