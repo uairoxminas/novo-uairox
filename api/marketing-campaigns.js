@@ -138,6 +138,23 @@ export default async function handler(req) {
       });
     }
 
+    // ── EDIT campaign fields ──────────────────────────────────────────────────
+    if (req.method === 'POST' && action === 'edit') {
+      const { id, ...fields } = await req.json();
+      if (!id) throw new Error('id obrigatório');
+      const allowed = [
+        'name','trigger_name','base_message','variants','daily_limit','auto_continue',
+        'email_enabled','email_subject','email_template',
+        'step2_enabled','step2_message','step2_event_ids','response_timeout_days',
+      ];
+      const patch = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)));
+      const { error } = await supabase.from('marketing_campaigns').update(patch).eq('id', id);
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ── UPDATE status ─────────────────────────────────────────────────────────
     if (req.method === 'POST' && action === 'update-status') {
       const { id, status } = await req.json();

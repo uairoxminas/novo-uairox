@@ -11,6 +11,7 @@ import {
   useSaveMarketingConfig,
   useMarketingCampaigns,
   useCreateCampaign,
+  useUpdateCampaign,
   useUpdateCampaignStatus,
   useDeleteCampaign,
   useCampaignQueue,
@@ -1150,6 +1151,187 @@ function CampaignHowItWorks() {
   );
 }
 
+// ─── EditCampaignModal ────────────────────────────────────────────────────────
+function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () => void }) {
+  const updateCampaign = useUpdateCampaign();
+
+  const [tab, setTab] = useState<'config' | 'whatsapp' | 'invite' | 'email'>('config');
+  const [name, setName] = useState(campaign.name || '');
+  const [triggerName, setTriggerName] = useState(campaign.trigger_name || 'marketing');
+  const [baseMessage, setBaseMessage] = useState(campaign.base_message || '');
+  const [dailyLimit, setDailyLimit] = useState(campaign.daily_limit ?? 30);
+  const [autoContinue, setAutoContinue] = useState(campaign.auto_continue ?? true);
+  const [variants, setVariants] = useState<string[]>(campaign.variants || []);
+
+  const [step2Enabled, setStep2Enabled] = useState(campaign.step2_enabled ?? false);
+  const [step2Message, setStep2Message] = useState(campaign.step2_message || '');
+  const [responseTimeoutDays, setResponseTimeoutDays] = useState(campaign.response_timeout_days ?? 5);
+
+  const [emailEnabled, setEmailEnabled] = useState(campaign.email_enabled ?? false);
+  const [emailSubject, setEmailSubject] = useState(campaign.email_template?.subject || campaign.email_subject || '');
+  const [emailImageUrl, setEmailImageUrl] = useState(campaign.email_template?.image_url || '');
+  const [emailTitle, setEmailTitle] = useState(campaign.email_template?.title || '');
+  const [emailBody, setEmailBody] = useState(campaign.email_template?.body || '');
+  const [emailCtaText, setEmailCtaText] = useState(campaign.email_template?.cta_text || '');
+  const [emailCtaUrl, setEmailCtaUrl] = useState(campaign.email_template?.cta_url || '');
+
+  const handleSave = async () => {
+    if (!name.trim()) { toast.error('Nome obrigatório'); return; }
+    try {
+      await updateCampaign.mutateAsync({
+        id: campaign.id,
+        name: name.trim(),
+        trigger_name: triggerName.trim(),
+        base_message: baseMessage,
+        variants,
+        daily_limit: dailyLimit,
+        auto_continue: autoContinue,
+        email_enabled: emailEnabled,
+        email_subject: emailEnabled ? emailSubject : undefined,
+        email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
+        step2_enabled: step2Enabled,
+        step2_message: step2Enabled ? step2Message : undefined,
+        response_timeout_days: responseTimeoutDays,
+      });
+      toast.success('Campanha atualizada');
+      onClose();
+    } catch (err: any) {
+      toast.error('Erro ao salvar: ' + err.message);
+    }
+  };
+
+  const tabs = [
+    { id: 'config' as const, label: '1. Config' },
+    { id: 'whatsapp' as const, label: '2. Saudação' },
+    { id: 'invite' as const, label: '3. Convite' },
+    { id: 'email' as const, label: '4. Email' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className={`${cardClass} w-full max-w-2xl max-h-[90vh] flex flex-col`}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[#1a1a1a]">
+          <div>
+            <h2 className="text-sm font-black text-white">Editar Campanha</h2>
+            <p className="text-[10px] text-zinc-500 mt-0.5">As alterações afetam envios futuros — contatos já na fila não são alterados</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white text-lg leading-none">✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-[#1a1a1a] px-6">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2.5 text-[10px] font-bold border-b-2 -mb-px transition-colors ${tab === t.id ? 'border-[#EDAC02] text-[#EDAC02]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {tab === 'config' && (
+            <div className="space-y-4">
+              <div><p className={labelClass}>Nome da campanha</p><input value={name} onChange={e => setName(e.target.value)} className={`${inputClass} mt-1`} /></div>
+              <div><p className={labelClass}>Trigger BotConversa</p><input value={triggerName} onChange={e => setTriggerName(e.target.value)} className={`${inputClass} mt-1 font-mono`} /></div>
+              <div className="flex gap-4">
+                <div className="flex-1"><p className={labelClass}>Limite diário</p><input type="number" min={1} max={500} value={dailyLimit} onChange={e => setDailyLimit(Number(e.target.value))} className={`${inputClass} mt-1`} /></div>
+                <div className="flex-1 flex items-end pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={autoContinue} onChange={e => setAutoContinue(e.target.checked)} className="w-4 h-4 rounded accent-[#EDAC02]" />
+                    <span className="text-xs text-zinc-300">Auto-continua no dia seguinte</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'whatsapp' && (
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className={labelClass}>Mensagem de saudação</p>
+                  <button onClick={() => setBaseMessage(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
+                </div>
+                <textarea value={baseMessage} onChange={e => setBaseMessage(e.target.value)} rows={5} className={`${inputClass} resize-none`} />
+              </div>
+              <div className="space-y-2">
+                <p className={labelClass}>Variações ({variants.length})</p>
+                {variants.map((v, i) => (
+                  <div key={i} className="flex gap-2">
+                    <textarea value={v} onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))} rows={3} className={`${inputClass} resize-none flex-1 text-xs`} />
+                    <button onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))} className="text-zinc-600 hover:text-red-400 text-lg self-start mt-1">✕</button>
+                  </div>
+                ))}
+                <button onClick={() => setVariants(prev => [...prev, baseMessage])} className="text-xs text-zinc-500 hover:text-[#EDAC02] transition-colors">+ Adicionar variação</button>
+              </div>
+            </div>
+          )}
+
+          {tab === 'invite' && (
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 p-4 rounded-xl border border-[#1a1a1a] cursor-pointer">
+                <input type="checkbox" checked={step2Enabled} onChange={e => setStep2Enabled(e.target.checked)} className="w-4 h-4 accent-[#EDAC02]" />
+                <div>
+                  <p className="text-xs font-bold text-white">Enviar convite quando contato responder</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Step 2 ativado via BotConversa ao detectar resposta</p>
+                </div>
+              </label>
+              {step2Enabled && (
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className={labelClass}>Mensagem de convite</p>
+                      <div className="flex gap-1">
+                        <button onClick={() => setStep2Message(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
+                        <button onClick={() => setStep2Message(prev => prev + '{link}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-blue-400 text-[9px] font-mono">+ {'{link}'}</button>
+                      </div>
+                    </div>
+                    <textarea value={step2Message} onChange={e => setStep2Message(e.target.value)} rows={6} className={`${inputClass} resize-none`} />
+                  </div>
+                  <div><p className={labelClass}>Opt-out por inatividade (dias sem resposta)</p><input type="number" min={1} max={30} value={responseTimeoutDays} onChange={e => setResponseTimeoutDays(Number(e.target.value))} className={`${inputClass} mt-1 w-24`} /></div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'email' && (
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 p-4 rounded-xl border border-[#1a1a1a] cursor-pointer">
+                <input type="checkbox" checked={emailEnabled} onChange={e => setEmailEnabled(e.target.checked)} className="w-4 h-4 accent-[#EDAC02]" />
+                <div>
+                  <p className="text-xs font-bold text-white">Enviar email junto com WhatsApp</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Requer Resend API Key configurada</p>
+                </div>
+              </label>
+              {emailEnabled && (
+                <div className="space-y-3">
+                  <div><p className={labelClass}>Assunto</p><input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className={`${inputClass} mt-1`} /></div>
+                  <div><p className={labelClass}>URL da imagem (banner)</p><input value={emailImageUrl} onChange={e => setEmailImageUrl(e.target.value)} className={`${inputClass} mt-1`} /></div>
+                  <div><p className={labelClass}>Título</p><input value={emailTitle} onChange={e => setEmailTitle(e.target.value)} className={`${inputClass} mt-1`} /></div>
+                  <div><p className={labelClass}>Corpo do email</p><textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={4} className={`${inputClass} mt-1 resize-none`} /></div>
+                  <div className="flex gap-3">
+                    <div className="flex-1"><p className={labelClass}>Texto do botão</p><input value={emailCtaText} onChange={e => setEmailCtaText(e.target.value)} className={`${inputClass} mt-1`} /></div>
+                    <div className="flex-1"><p className={labelClass}>URL do botão</p><input value={emailCtaUrl} onChange={e => setEmailCtaUrl(e.target.value)} className={`${inputClass} mt-1`} /></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 p-6 border-t border-[#1a1a1a]">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 transition-colors">Cancelar</button>
+          <button onClick={handleSave} disabled={updateCampaign.isPending} className={`flex-1 ${btnGold}`}>
+            {updateCampaign.isPending ? 'Salvando...' : 'Salvar alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── TestCampaignModal ────────────────────────────────────────────────────────
 function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () => void }) {
   const [phone, setPhone] = useState('');
@@ -1272,6 +1454,7 @@ function CampaignCard({
 }) {
   const { data: metrics } = useCampaignMetrics(c.id);
   const [showTest, setShowTest] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const progress = c.total_contacts > 0 ? Math.round((c.sent_total / c.total_contacts) * 100) : 0;
   const st = STATUS_LABEL[c.status] || STATUS_LABEL.draft;
 
@@ -1318,6 +1501,7 @@ function CampaignCard({
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={() => setShowEdit(true)} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 hover:text-white transition-colors">✏ Editar</button>
           <button onClick={() => setShowTest(true)} className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold hover:border-[#EDAC02]/40 hover:text-[#EDAC02] transition-colors">🧪 Testar</button>
           <button onClick={onQueue} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 hover:text-white transition-colors">Fila</button>
           {c.status === 'active' && (
@@ -1332,6 +1516,7 @@ function CampaignCard({
         </div>
       </div>
     </div>
+    {showEdit && <EditCampaignModal campaign={c} onClose={() => setShowEdit(false)} />}
     {showTest && <TestCampaignModal campaign={c} onClose={() => setShowTest(false)} />}
     </>
   );

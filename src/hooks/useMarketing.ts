@@ -144,6 +144,34 @@ export function useCreateCampaign() {
   });
 }
 
+export function useUpdateCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (fields: {
+      id: string;
+      name?: string;
+      trigger_name?: string;
+      base_message?: string;
+      variants?: string[];
+      daily_limit?: number;
+      auto_continue?: boolean;
+      email_enabled?: boolean;
+      email_subject?: string;
+      email_template?: any;
+      step2_enabled?: boolean;
+      step2_message?: string;
+      step2_event_ids?: string[];
+      response_timeout_days?: number;
+    }) => {
+      await apiFetch('/marketing-campaigns?action=edit', {
+        method: 'POST',
+        body: JSON.stringify(fields),
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-campaigns'] }),
+  });
+}
+
 export function useUpdateCampaignStatus() {
   const qc = useQueryClient();
   return useMutation({
