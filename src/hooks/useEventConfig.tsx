@@ -965,11 +965,11 @@ export function useSquadMembers() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("squad_members")
-        .select("id, full_name, coupon_code, role, avatar_url")
+        .select("id, full_name, coupon_code, role, avatar_url, phone")
         .eq("is_active", true)
         .order("full_name");
       if (error) throw error;
-      return (data ?? []) as { id: string; full_name: string; coupon_code: string | null; role: string; avatar_url: string | null }[];
+      return (data ?? []) as { id: string; full_name: string; coupon_code: string | null; role: string; avatar_url: string | null; phone: string | null }[];
     },
   });
 }

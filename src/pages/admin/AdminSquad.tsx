@@ -34,6 +34,7 @@ interface SquadMember {
   coupon_code: string | null;
   coupon_usage_count: number;
   portal_token: string | null;
+  phone: string | null;
 }
 
 // ── Promo Arts Tab ────────────────────────────────────────────
@@ -332,7 +333,8 @@ export default function AdminSquad() {
           avatar_url: finalAvatarUrl,
           coupon_code: editingMember.coupon_code,
           coupon_usage_count: editingMember.coupon_usage_count,
-          is_active: editingMember.is_active
+          is_active: editingMember.is_active,
+          phone: editingMember.phone || null
         })
         .eq('id', editingMember.id);
         
@@ -582,6 +584,10 @@ export default function AdminSquad() {
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Instagram</label>
                   <input type="text" value={editingMember.instagram_handle || ''} onChange={e => setEditingMember({...editingMember, instagram_handle: e.target.value})} className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">WhatsApp (com DDD)</label>
+                  <input type="text" value={editingMember.phone || ''} onChange={e => setEditingMember({...editingMember, phone: e.target.value})} placeholder="31999999999" className="w-full bg-[#111] border border-dark-border p-3 text-white text-sm focus:border-brand-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Role</label>

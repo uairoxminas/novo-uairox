@@ -1055,6 +1055,7 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const { data: batches } = usePriceBatches(eventId);
   const { data: allRules } = useCouponBatchRules(eventId);
   const { data: squadMembers } = useSquadMembers();
+  const { data: event } = useEvent(eventId);
   const { data: trainingLocations } = useTrainingLocations();
   const createCoupon = useCreateDiscountCoupon();
   const deleteCoupon = useDeleteDiscountCoupon();
@@ -1380,6 +1381,7 @@ function CuponsTab({ eventId }: { eventId: string }) {
       {showBulkSquad && (
         <BulkSquadCouponsModal
           eventId={eventId}
+          eventName={event?.title || ''}
           squadMembers={squadMembers || []}
           existingCoupons={coupons || []}
           onClose={() => setShowBulkSquad(false)}
@@ -1391,10 +1393,11 @@ function CuponsTab({ eventId }: { eventId: string }) {
 
 // ============ MODAL: CRIAR CUPONS EM LOTE PARA SQUADS ============
 function BulkSquadCouponsModal({
-  eventId, squadMembers, existingCoupons, onClose,
+  eventId, eventName, squadMembers, existingCoupons, onClose,
 }: {
   eventId: string;
-  squadMembers: { id: string; full_name: string; coupon_code: string | null }[];
+  eventName: string;
+  squadMembers: { id: string; full_name: string; coupon_code: string | null; phone?: string | null }[];
   existingCoupons: any[];
   onClose: () => void;
 }) {
@@ -1402,9 +1405,10 @@ function BulkSquadCouponsModal({
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState('');
   const [maxUses, setMaxUses] = useState('1');
+  const [rewardValue, setRewardValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
-  const [results, setResults] = useState<{ name: string; code: string; ok: boolean }[]>([]);
+  const [results, setResults] = useState<{ name: string; code: string; ok: boolean; notified?: boolean; reason?: string }[]>([]);
 
   const existingCodes = new Set((existingCoupons || []).map((c: any) => c.code.toUpperCase()));
 
@@ -1418,7 +1422,9 @@ function BulkSquadCouponsModal({
   const handleCreate = async () => {
     if (!discountValue) return;
     setSaving(true);
-    const res: { name: string; code: string; ok: boolean }[] = [];
+    const res: { name: string; code: string; ok: boolean; notified?: boolean; reason?: string }[] = [];
+    const created: typeof toCreate = [];
+
     for (const m of toCreate) {
       try {
         await supabase.from('discount_coupons').insert({
@@ -1430,10 +1436,36 @@ function BulkSquadCouponsModal({
           squad_member_id: m.id,
         } as any);
         res.push({ name: m.full_name, code: m.code, ok: true });
+        created.push(m);
       } catch {
         res.push({ name: m.full_name, code: m.code, ok: false });
       }
     }
+
+    // Enviar notificação WhatsApp para membros com telefone
+    if (created.length > 0) {
+      try {
+        const notifyRes = await fetch('/api/squad-coupon-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_name: eventName,
+            discount_type: discountType,
+            discount_value: parseFloat(discountValue),
+            reward_value: rewardValue.trim() || null,
+            members: created.map(m => ({ name: m.full_name, code: m.code, phone: m.phone })),
+          }),
+        });
+        const notifyData = await notifyRes.json();
+        if (notifyData.results) {
+          for (const nr of notifyData.results) {
+            const r = res.find(r => r.code === nr.code);
+            if (r) { r.notified = nr.ok; r.reason = nr.reason; }
+          }
+        }
+      } catch { /* notificação falhou, cupons já foram criados */ }
+    }
+
     qc.invalidateQueries({ queryKey: ['discount-coupons', eventId] });
     setResults(res);
     setDone(true);
@@ -1453,7 +1485,7 @@ function BulkSquadCouponsModal({
               </select>
             </div>
             <div>
-              <label className={labelClass}>Valor</label>
+              <label className={labelClass}>Valor do Desconto</label>
               <input
                 type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)}
                 placeholder={discountType === 'percentage' ? '10' : '50'}
@@ -1465,6 +1497,14 @@ function BulkSquadCouponsModal({
               <input
                 type="number" value={maxUses} onChange={e => setMaxUses(e.target.value)}
                 placeholder="Ilimitado"
+                className={`${inputClass} mt-1`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Recompensa por uso (ex: R$ 20)</label>
+              <input
+                type="text" value={rewardValue} onChange={e => setRewardValue(e.target.value)}
+                placeholder="Ex: R$ 20,00 por inscrição"
                 className={`${inputClass} mt-1`}
               />
             </div>
@@ -1513,7 +1553,12 @@ function BulkSquadCouponsModal({
                   <span className="text-xs text-zinc-300">{r.name}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-[#EDAC02]">{r.code}</span>
-                    <span className={`text-[10px] font-bold ${r.ok ? 'text-[#25D366]' : 'text-red-400'}`}>{r.ok ? '✓' : '✗'}</span>
+                    <span className={`text-[10px] font-bold ${r.ok ? 'text-[#25D366]' : 'text-red-400'}`}>{r.ok ? '✓ cupom' : '✗'}</span>
+                    {r.ok && (
+                      <span className={`text-[10px] font-bold ${r.notified ? 'text-blue-400' : 'text-zinc-600'}`} title={r.reason}>
+                        {r.notified ? '📱 notificado' : '📵 sem tel'}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
