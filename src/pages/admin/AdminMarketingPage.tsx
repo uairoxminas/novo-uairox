@@ -1507,7 +1507,7 @@ function CampaignCard({
           {c.status === 'active' && (
             <button onClick={() => onToggleStatus('paused')} className="px-3 py-1.5 rounded-lg border border-yellow-500/30 text-yellow-400 text-xs font-bold hover:bg-yellow-500/10 transition-colors">⏸ Pausar</button>
           )}
-          {(c.status === 'draft' || c.status === 'paused') && (
+          {(c.status === 'draft' || c.status === 'paused' || c.status === 'completed') && (
             <button onClick={() => onToggleStatus('active')} className="px-3 py-1.5 rounded-lg border border-[#25D366]/30 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/10 transition-colors">▶ Ativar</button>
           )}
           {c.status !== 'active' && (

@@ -75,7 +75,6 @@ export default async function handler(req) {
     .maybeSingle();
 
   if (!campaign || campaign.status !== 'active') {
-    await supabase.from('marketing_queue').update({ status: 'skipped' }).eq('id', item.id);
     return new Response(JSON.stringify({ ok: true, skipped: 'campanha não está ativa' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -350,7 +350,7 @@ function WorkoutModal({
                       {milestone === 30
                         ? 'Você garantiu sua vaga no sorteio! 🎯'
                         : milestone === 20
-                        ? `Mais ${GOAL - milestone} para o sorteio! ⚡`
+                        ? `Mais ${DEFAULT_GOAL - milestone} para o sorteio! ⚡`
                         : 'Continue assim! Você está arrasando! 💪'}
                     </motion.p>
                     <motion.p
