@@ -117,6 +117,39 @@ export default async function handler(req) {
       return Response.json(data, { headers: corsHeaders });
     }
 
+    // POST: sync squad members → marketing_contacts with source='squad'
+    if (req.method === 'POST' && action === 'sync-squad') {
+      const { data: squadMembers } = await supabase
+        .from('squad_members')
+        .select('id, full_name, phone, coupon_code')
+        .eq('is_active', true)
+        .not('phone', 'is', null);
+
+      const members = (squadMembers || []).filter(m => m.phone?.trim());
+      let synced = 0;
+
+      for (const m of members) {
+        const phone = String(m.phone).replace(/\D/g, '');
+        if (!phone) continue;
+        const { data: existing } = await supabase
+          .from('marketing_contacts')
+          .select('id')
+          .eq('phone', phone)
+          .maybeSingle();
+        if (existing) {
+          await supabase.from('marketing_contacts')
+            .update({ name: m.full_name, source: 'squad', opt_out: false })
+            .eq('id', existing.id);
+        } else {
+          await supabase.from('marketing_contacts')
+            .insert({ phone, name: m.full_name, source: 'squad', opt_out: false });
+        }
+        synced++;
+      }
+
+      return Response.json({ ok: true, synced }, { headers: corsHeaders });
+    }
+
     return Response.json({ error: 'Unknown action' }, { status: 400, headers: corsHeaders });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500, headers: corsHeaders });

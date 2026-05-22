@@ -223,8 +223,20 @@ export function useSyncRegistrationsToMarketing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      // Use the serverless API endpoint which uses service_role
       const result = await apiFetch('/marketing-sync', { method: 'POST' });
+      return result.synced as number;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),
+  });
+}
+
+// ─── Sync Squad → Marketing ───────────────────────────────────────────────────
+
+export function useSyncSquadToMarketing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const result = await apiFetch('/marketing-contacts?action=sync-squad', { method: 'POST' });
       return result.synced as number;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing-contacts'] }),

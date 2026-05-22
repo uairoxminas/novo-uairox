@@ -17,6 +17,7 @@ import {
   useCampaignQueue,
   useCampaignMetrics,
   useSyncRegistrationsToMarketing,
+  useSyncSquadToMarketing,
 } from '@/hooks/useMarketing';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ function ContactsTab() {
   const deleteContact = useDeleteMarketingContact();
   const saveConfig = useSaveMarketingConfig();
   const syncRegistrations = useSyncRegistrationsToMarketing();
+  const syncSquad = useSyncSquadToMarketing();
 
   const [search, setSearch] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
@@ -203,6 +205,20 @@ function ContactsTab() {
           className="px-3 py-2 rounded-lg border border-[#25D366]/40 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/10 hover:border-[#25D366]/60 transition-colors disabled:opacity-40"
         >
           {syncRegistrations.isPending ? '⏳ Sincronizando...' : '🔄 Sincronizar Inscritos'}
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              const count = await syncSquad.mutateAsync();
+              toast.success(`${count} membro(s) do Squad sincronizados`);
+            } catch (err: any) {
+              toast.error('Erro ao sincronizar squad: ' + err.message);
+            }
+          }}
+          disabled={syncSquad.isPending}
+          className="px-3 py-2 rounded-lg border border-[#EDAC02]/40 text-[#EDAC02] text-xs font-bold hover:bg-[#EDAC02]/10 hover:border-[#EDAC02]/60 transition-colors disabled:opacity-40"
+        >
+          {syncSquad.isPending ? '⏳ Sincronizando...' : '👑 Sincronizar Squad'}
         </button>
         <button onClick={handleExport} disabled={!contacts?.length} className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-400 text-xs font-bold hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-40">↓ Exportar XLSX</button>
         <button onClick={handleExportMetaAds} disabled={!activeCount} className="px-3 py-2 rounded-lg border border-blue-500/40 text-blue-400 text-xs font-bold hover:bg-blue-500/10 hover:border-blue-500/60 transition-colors disabled:opacity-40">
@@ -590,10 +606,15 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'squad' | 'athletes'>('all');
 
-  const filteredContacts = (contacts || []).filter((c: any) =>
-    !c.opt_out && (!contactSearch || [c.name, c.phone, c.email].some((v: any) => v?.toLowerCase().includes(contactSearch.toLowerCase())))
-  );
+  const filteredContacts = (contacts || []).filter((c: any) => {
+    if (c.opt_out) return false;
+    if (sourceFilter === 'squad' && c.source !== 'squad') return false;
+    if (sourceFilter === 'athletes' && c.source === 'squad') return false;
+    if (contactSearch && ![c.name, c.phone, c.email].some((v: any) => v?.toLowerCase().includes(contactSearch.toLowerCase()))) return false;
+    return true;
+  });
 
   const handleSelectAll = () => {
     if (selectedContacts.size === filteredContacts.length) {
@@ -832,6 +853,14 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                     {selectedContacts.size === filteredContacts.length ? 'Desmarcar todos' : 'Selecionar todos'}
                   </button>
                 </div>
+              </div>
+              <div className="flex gap-2">
+                {(['all', 'squad', 'athletes'] as const).map(f => (
+                  <button key={f} onClick={() => { setSourceFilter(f); setSelectedContacts(new Set()); }}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${sourceFilter === f ? 'bg-[#EDAC02] text-black' : 'border border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
+                    {f === 'all' ? `Todos (${(contacts || []).filter((c:any) => !c.opt_out).length})` : f === 'squad' ? `👑 Squad (${(contacts || []).filter((c:any) => !c.opt_out && c.source === 'squad').length})` : `🏃 Atletas (${(contacts || []).filter((c:any) => !c.opt_out && c.source !== 'squad').length})`}
+                  </button>
+                ))}
               </div>
               <input value={contactSearch} onChange={e => setContactSearch(e.target.value)} placeholder="Buscar contato..." className={inputClass} />
               <div className={`${cardClass} overflow-hidden max-h-64 overflow-y-auto`}>
