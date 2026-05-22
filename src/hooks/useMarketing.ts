@@ -128,6 +128,7 @@ export function useCreateCampaign() {
       email_subject?: string;
       email_template?: { image_url?: string; title?: string; body?: string; cta_text?: string; cta_url?: string };
       use_squad_webhook?: boolean;
+      base_message?: string;
     }) => {
       const result = await apiFetch('/marketing-campaigns?action=create', {
         method: 'POST',

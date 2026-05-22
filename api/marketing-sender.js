@@ -70,7 +70,7 @@ export default async function handler(req) {
   // ── 2. Carrega campanha ───────────────────────────────────────────────────
   const { data: campaign } = await supabase
     .from('marketing_campaigns')
-    .select('trigger_name, daily_limit, status, auto_continue, use_squad_webhook')
+    .select('trigger_name, daily_limit, status, auto_continue, use_squad_webhook, base_message')
     .eq('id', item.campaign_id)
     .maybeSingle();
 
@@ -121,14 +121,18 @@ export default async function handler(req) {
   // ── 5. Envia trigger ao BotConversa (BotConversa cuida da mensagem) ──────
   let sent = false;
   try {
+    const payload = {
+      trigger:  campaign.trigger_name,
+      nome:     item.name || '',
+      telefone: item.phone,
+    };
+    if (campaign.use_squad_webhook && campaign.base_message) {
+      payload.mensagem = campaign.base_message.replace(/\{nome\}/gi, item.name || '');
+    }
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        trigger:  campaign.trigger_name,
-        nome:     item.name || '',
-        telefone: item.phone,
-      }),
+      body: JSON.stringify(payload),
     });
     sent = true;
   } catch { /* erro de rede — marca como failed */ }

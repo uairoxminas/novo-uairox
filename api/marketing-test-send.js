@@ -37,7 +37,7 @@ export default async function handler(req) {
     // Load campaign
     const { data: campaign, error: campErr } = await supabase
       .from('marketing_campaigns')
-      .select('name, trigger_name, use_squad_webhook')
+      .select('name, trigger_name, use_squad_webhook, base_message')
       .eq('id', campaign_id)
       .maybeSingle();
 
@@ -67,14 +67,18 @@ export default async function handler(req) {
     const digits = String(phone).replace(/\D/g, '');
 
     // Dispara trigger ao BotConversa — BotConversa cuida da mensagem pelo seu fluxo
+    const payload = {
+      trigger:  campaign.trigger_name,
+      nome:     contactName,
+      telefone: digits,
+    };
+    if (campaign.use_squad_webhook && campaign.base_message) {
+      payload.mensagem = campaign.base_message.replace(/\{nome\}/gi, contactName);
+    }
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        trigger:  campaign.trigger_name,
-        nome:     contactName,
-        telefone: digits,
-      }),
+      body: JSON.stringify(payload),
     }).catch(() => null);
 
     return new Response(JSON.stringify({ ok: true }), {

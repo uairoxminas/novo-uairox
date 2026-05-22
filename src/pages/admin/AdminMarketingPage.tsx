@@ -568,6 +568,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [dailyLimit, setDailyLimit] = useState(30);
   const [autoContinue, setAutoContinue] = useState(true);
   const [useSquadWebhook, setUseSquadWebhook] = useState(false);
+  const [baseMessage, setBaseMessage] = useState('');
 
   // Email state
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -637,6 +638,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
         use_squad_webhook: useSquadWebhook,
+        base_message: baseMessage || undefined,
         contact_ids: Array.from(selectedContacts),
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
@@ -733,6 +735,19 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   <p className="text-[10px] text-zinc-500">Envia pelo webhook dedicado ao Squad ao invés do webhook padrão de marketing</p>
                 </div>
               </div>
+              {useSquadWebhook && (
+                <div className="space-y-1">
+                  <p className={labelClass}>Mensagem <span className="text-purple-400">(campo {'{mensagem}'} enviado ao webhook)</span></p>
+                  <textarea
+                    value={baseMessage}
+                    onChange={e => setBaseMessage(e.target.value)}
+                    rows={6}
+                    placeholder={'🎉 Olá {nome}! Você foi selecionado...\n\nUse {nome} para personalizar.'}
+                    className={`${inputClass} resize-none font-mono text-xs leading-relaxed`}
+                  />
+                  <p className="text-[10px] text-zinc-600">Use <code className="font-mono">{'{nome}'}</code> para inserir o nome do contato</p>
+                </div>
+              )}
               <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Próximo →</button>
             </div>
           )}
@@ -1036,6 +1051,7 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
   const [dailyLimit, setDailyLimit] = useState(campaign.daily_limit ?? 30);
   const [autoContinue, setAutoContinue] = useState(campaign.auto_continue ?? true);
   const [useSquadWebhook, setUseSquadWebhook] = useState(campaign.use_squad_webhook ?? false);
+  const [baseMessage, setBaseMessage] = useState(campaign.base_message || '');
 
   const [emailEnabled, setEmailEnabled] = useState(campaign.email_enabled ?? false);
   const [emailSubject, setEmailSubject] = useState(campaign.email_template?.subject || campaign.email_subject || '');
@@ -1055,6 +1071,7 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
         use_squad_webhook: useSquadWebhook,
+        base_message: baseMessage || undefined,
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
         email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
@@ -1116,6 +1133,19 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                   <p className="text-[10px] text-zinc-500">Envia pelo webhook dedicado ao Squad ao invés do webhook padrão de marketing</p>
                 </div>
               </div>
+              {useSquadWebhook && (
+                <div className="space-y-1">
+                  <p className={labelClass}>Mensagem <span className="text-purple-400">(campo {'{mensagem}'} enviado ao webhook)</span></p>
+                  <textarea
+                    value={baseMessage}
+                    onChange={e => setBaseMessage(e.target.value)}
+                    rows={6}
+                    placeholder={'🎉 Olá {nome}! Você foi selecionado...\n\nUse {nome} para personalizar.'}
+                    className={`${inputClass} resize-none font-mono text-xs leading-relaxed`}
+                  />
+                  <p className="text-[10px] text-zinc-600">Use <code className="font-mono">{'{nome}'}</code> para inserir o nome do contato</p>
+                </div>
+              )}
             </div>
           )}
 
