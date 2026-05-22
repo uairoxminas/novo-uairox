@@ -127,7 +127,22 @@ export default async function handler(req) {
       telefone: item.phone,
     };
     if (campaign.use_squad_webhook && campaign.base_message) {
-      payload.mensagem = campaign.base_message.replace(/\{nome\}/gi, item.name || '');
+      // Busca cupom do membro pelo telefone
+      const phoneDigits = String(item.phone).replace(/\D/g, '');
+      const phoneCandidates = [...new Set([
+        phoneDigits,
+        phoneDigits.startsWith('55') ? phoneDigits.slice(2) : '55' + phoneDigits,
+      ])];
+      let couponCode = '';
+      for (const p of phoneCandidates) {
+        const { data: sm } = await supabase.from('squad_members').select('coupon_code').eq('phone', p).maybeSingle();
+        if (sm?.coupon_code) { couponCode = sm.coupon_code; break; }
+      }
+      const link = couponCode ? `https://uairox.com.br/squad/${couponCode}` : '';
+      payload.mensagem = campaign.base_message
+        .replace(/\{nome\}/gi, item.name || '')
+        .replace(/\{cupom\}/gi, couponCode)
+        .replace(/\{link\}/gi, link);
     }
     await fetch(webhookUrl, {
       method: 'POST',

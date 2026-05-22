@@ -741,11 +741,19 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   <textarea
                     value={baseMessage}
                     onChange={e => setBaseMessage(e.target.value)}
-                    rows={6}
-                    placeholder={'🎉 Olá {nome}! Você foi selecionado...\n\nUse {nome} para personalizar.'}
+                    rows={8}
+                    placeholder={'🎟 Seu cupom foi criado!\n\n📅 Evento: UAIROX JUNHO\n🏷 Cupom: *{cupom}*\n💸 Desconto: 10% de desconto\n🎁 Recompensa: R$ 20,00 por inscrição\n\n📊 Acompanhe seus resultados:\n{link}\n\nCompartilhe com sua galera! 💪'}
                     className={`${inputClass} resize-none font-mono text-xs leading-relaxed`}
                   />
-                  <p className="text-[10px] text-zinc-600">Use <code className="font-mono">{'{nome}'}</code> para inserir o nome do contato</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {['{nome}', '{cupom}', '{link}'].map(v => (
+                      <button key={v} type="button" onClick={() => setBaseMessage((m: string) => m + v)}
+                        className="px-2 py-0.5 rounded bg-purple-900/40 border border-purple-700/40 text-purple-300 text-[10px] font-mono hover:bg-purple-800/50 transition-colors">
+                        {v}
+                      </button>
+                    ))}
+                    <span className="text-[10px] text-zinc-600 self-center">→ clique para inserir • {'{evento}'} {'{desconto}'} {'{recompensa}'} escreva fixo no texto</span>
+                  </div>
                 </div>
               )}
               <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Próximo →</button>
@@ -1139,11 +1147,19 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                   <textarea
                     value={baseMessage}
                     onChange={e => setBaseMessage(e.target.value)}
-                    rows={6}
-                    placeholder={'🎉 Olá {nome}! Você foi selecionado...\n\nUse {nome} para personalizar.'}
+                    rows={8}
+                    placeholder={'🎟 Seu cupom foi criado!\n\n📅 Evento: UAIROX JUNHO\n🏷 Cupom: *{cupom}*\n💸 Desconto: 10% de desconto\n🎁 Recompensa: R$ 20,00 por inscrição\n\n📊 Acompanhe seus resultados:\n{link}\n\nCompartilhe com sua galera! 💪'}
                     className={`${inputClass} resize-none font-mono text-xs leading-relaxed`}
                   />
-                  <p className="text-[10px] text-zinc-600">Use <code className="font-mono">{'{nome}'}</code> para inserir o nome do contato</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {['{nome}', '{cupom}', '{link}'].map(v => (
+                      <button key={v} type="button" onClick={() => setBaseMessage((m: string) => m + v)}
+                        className="px-2 py-0.5 rounded bg-purple-900/40 border border-purple-700/40 text-purple-300 text-[10px] font-mono hover:bg-purple-800/50 transition-colors">
+                        {v}
+                      </button>
+                    ))}
+                    <span className="text-[10px] text-zinc-600 self-center">→ clique para inserir • {'{evento}'} {'{desconto}'} {'{recompensa}'} escreva fixo no texto</span>
+                  </div>
                 </div>
               )}
             </div>
