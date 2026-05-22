@@ -44,7 +44,9 @@ function ContactsTab() {
 
   const [search, setSearch] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [squadWebhookUrl, setSquadWebhookUrl] = useState('');
   const [webhookTestState, setWebhookTestState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [squadWebhookTestState, setSquadWebhookTestState] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [filterOptOut, setFilterOptOut] = useState<'all' | 'active' | 'optout'>('active');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -54,7 +56,10 @@ function ContactsTab() {
   const [colPhone, setColPhone] = useState('');
   const [colEmail, setColEmail] = useState('');
 
-  useEffect(() => { if (config?.webhook_url) setWebhookUrl(config.webhook_url); }, [config]);
+  useEffect(() => {
+    if (config?.webhook_url) setWebhookUrl(config.webhook_url);
+    if (config?.squad_webhook_url) setSquadWebhookUrl(config.squad_webhook_url);
+  }, [config]);
 
   const handleTestWebhook = async () => {
     if (!webhookUrl.trim()) { toast.error('Cole a URL do webhook antes de testar'); return; }
@@ -346,6 +351,47 @@ function ContactsTab() {
         {webhookTestState === 'error' && (
           <p className="text-[10px] text-red-400 font-bold">✕ O webhook não respondeu. Verifique se a URL está correta e o BotConversa está ativo.</p>
         )}
+      </div>
+
+      {/* Webhook Squad */}
+      <div className={`${cardClass} p-4 space-y-3`}>
+        <p className={labelClass}>👥 Webhook Squad / Parceiros</p>
+        <p className="text-[10px] text-zinc-500">Usado para notificações de cupom criado (trigger: <span className="font-mono text-zinc-300">squad_cupom</span>). Se vazio, usa o webhook de marketing.</p>
+        <div className="flex gap-3">
+          <input
+            value={squadWebhookUrl}
+            onChange={e => { setSquadWebhookUrl(e.target.value); setSquadWebhookTestState('idle'); }}
+            placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..."
+            className={`${inputClass} font-mono text-xs flex-1`}
+          />
+          <button
+            onClick={async () => {
+              if (!squadWebhookUrl.trim()) { toast.error('Cole a URL do webhook squad'); return; }
+              setSquadWebhookTestState('loading');
+              try {
+                await fetch(squadWebhookUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ trigger: 'squad_cupom', nome: 'Teste Squad', telefone: '5531999999999', mensagem: '🎟 Teste de notificação de cupom Squad UAIROX!' }),
+                });
+                setSquadWebhookTestState('ok');
+                toast.success('Webhook Squad respondeu!');
+              } catch {
+                setSquadWebhookTestState('error');
+                toast.error('Falha ao conectar.');
+              } finally { setTimeout(() => setSquadWebhookTestState('idle'), 5000); }
+            }}
+            disabled={squadWebhookTestState === 'loading' || !squadWebhookUrl.trim()}
+            className="px-3 py-2 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold hover:border-[#EDAC02]/40 hover:text-[#EDAC02] transition-colors whitespace-nowrap disabled:opacity-40"
+          >
+            {squadWebhookTestState === 'loading' ? '...' : squadWebhookTestState === 'ok' ? '✓ OK' : squadWebhookTestState === 'error' ? '✕ Erro' : 'Testar'}
+          </button>
+          <button
+            onClick={async () => { await saveConfig.mutateAsync({ squad_webhook_url: squadWebhookUrl }); toast.success('Webhook Squad salvo!'); }}
+            disabled={saveConfig.isPending}
+            className={`${btnGold} whitespace-nowrap`}
+          >Salvar</button>
+        </div>
       </div>
 
       {/* Meta Ads instructions */}

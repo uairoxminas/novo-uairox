@@ -35,11 +35,12 @@ export default async function handler(req) {
     const supabase = getSupabase();
     const { data: mktConfig } = await supabase
       .from('marketing_config')
-      .select('webhook_url')
+      .select('webhook_url, squad_webhook_url')
       .maybeSingle();
 
-    if (!mktConfig?.webhook_url) {
-      return new Response(JSON.stringify({ error: 'Webhook BotConversa não configurado em Marketing > Contatos' }), {
+    const webhookUrl = mktConfig?.squad_webhook_url || mktConfig?.webhook_url;
+    if (!webhookUrl) {
+      return new Response(JSON.stringify({ error: 'Webhook Squad não configurado. Configure em Marketing > Contatos > Webhook Squad.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -72,7 +73,7 @@ export default async function handler(req) {
       const mensagem = lines.join('\n');
 
       try {
-        await fetch(mktConfig.webhook_url, {
+        await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

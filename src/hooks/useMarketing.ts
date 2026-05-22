@@ -85,7 +85,7 @@ export function useMarketingConfig() {
   return useQuery({
     queryKey: ['marketing-config'],
     queryFn: async () => {
-      return await apiFetch('/marketing-contacts?action=config') as { id?: string; webhook_url?: string } | null;
+      return await apiFetch('/marketing-contacts?action=config') as { id?: string; webhook_url?: string; squad_webhook_url?: string } | null;
     },
   });
 }
@@ -93,7 +93,7 @@ export function useMarketingConfig() {
 export function useSaveMarketingConfig() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (cfg: { webhook_url?: string; email_from?: string; resend_api_key?: string }) => {
+    mutationFn: async (cfg: { webhook_url?: string; squad_webhook_url?: string; email_from?: string; resend_api_key?: string }) => {
       await apiFetch('/marketing-contacts?action=save-config', {
         method: 'POST',
         body: JSON.stringify(cfg),
