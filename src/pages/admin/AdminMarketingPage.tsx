@@ -1505,7 +1505,7 @@ function CampaignCard({
           <button onClick={() => setShowTest(true)} className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold hover:border-[#EDAC02]/40 hover:text-[#EDAC02] transition-colors">🧪 Testar</button>
           <button onClick={onQueue} className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 text-xs font-bold hover:border-zinc-600 hover:text-white transition-colors">Fila</button>
           {c.status === 'active' && (
-            <button onClick={() => onToggleStatus('paused')} className="px-3 py-1.5 rounded-lg border border-yellow-500/30 text-yellow-400 text-xs font-bold hover:bg-yellow-500/10 transition-colors">⏸ Pausar</button>
+            <button onClick={() => onToggleStatus('paused')} className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/40 text-red-400 text-xs font-black uppercase tracking-widest hover:bg-red-500/20 hover:border-red-500/70 transition-colors">⏹ PARAR</button>
           )}
           {(c.status === 'draft' || c.status === 'paused' || c.status === 'completed') && (
             <button onClick={() => onToggleStatus('active')} className="px-3 py-1.5 rounded-lg border border-[#25D366]/30 text-[#25D366] text-xs font-bold hover:bg-[#25D366]/10 transition-colors">▶ Ativar</button>
