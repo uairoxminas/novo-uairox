@@ -135,10 +135,12 @@ export default async function handler(req) {
       .maybeSingle();
 
     for (const item of queueItems) {
-      // Mark as responded (ignore error if column doesn't exist yet)
-      await supabase.from('marketing_queue')
-        .update({ responded_at: now, status: 'responded' })
-        .eq('id', item.id).catch(() => {});
+      // Mark as responded
+      try {
+        await supabase.from('marketing_queue')
+          .update({ responded_at: now, status: 'responded' })
+          .eq('id', item.id);
+      } catch {}
 
       // Get campaign step2 config
       const { data: campaign } = await supabase
@@ -184,9 +186,11 @@ export default async function handler(req) {
       } catch { /* network error */ }
 
       if (waOk) {
-        await supabase.from('marketing_queue')
-          .update({ step2_sent_at: new Date().toISOString() })
-          .eq('id', item.id).catch(() => {});
+        try {
+          await supabase.from('marketing_queue')
+            .update({ step2_sent_at: new Date().toISOString() })
+            .eq('id', item.id);
+        } catch {}
       }
 
       step2Results.push({ campaign_id: item.campaign_id, step2: waOk ? 'sent' : 'failed' });
