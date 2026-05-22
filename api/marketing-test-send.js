@@ -37,7 +37,7 @@ export default async function handler(req) {
     // Load campaign
     const { data: campaign, error: campErr } = await supabase
       .from('marketing_campaigns')
-      .select('name, trigger_name, base_message, variants')
+      .select('name, trigger_name')
       .eq('id', campaign_id)
       .maybeSingle();
 
@@ -59,28 +59,21 @@ export default async function handler(req) {
       });
     }
 
-    // Pick message: use first variant if available, else base_message
-    const variants = campaign.variants?.length ? campaign.variants : [campaign.base_message];
-    const rawMessage = variants[0] || campaign.base_message || '';
     const contactName = name?.trim() || 'Teste';
-    const message = rawMessage.replace(/\{nome\}/gi, contactName);
-
     const digits = String(phone).replace(/\D/g, '');
 
-    // Send via BotConversa webhook
-    // BotConversa may return 400 even on successful delivery — treat any reached response as ok
+    // Dispara trigger ao BotConversa — BotConversa cuida da mensagem pelo seu fluxo
     await fetch(mktConfig.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        trigger: campaign.trigger_name,
-        nome: contactName,
+        trigger:  campaign.trigger_name,
+        nome:     contactName,
         telefone: digits,
-        mensagem: message,
       }),
-    }).catch(() => null); // network errors still silently handled below
+    }).catch(() => null);
 
-    return new Response(JSON.stringify({ ok: true, message }), {
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

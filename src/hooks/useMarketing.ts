@@ -121,18 +121,12 @@ export function useCreateCampaign() {
     mutationFn: async (campaign: {
       name: string;
       trigger_name: string;
-      base_message: string;
-      variants: string[];
       daily_limit: number;
       auto_continue: boolean;
       contact_ids: string[];
       email_enabled: boolean;
       email_subject?: string;
       email_template?: { image_url?: string; title?: string; body?: string; cta_text?: string; cta_url?: string };
-      step2_enabled: boolean;
-      step2_message?: string;
-      step2_event_ids?: string[];
-      response_timeout_days: number;
     }) => {
       const result = await apiFetch('/marketing-campaigns?action=create', {
         method: 'POST',

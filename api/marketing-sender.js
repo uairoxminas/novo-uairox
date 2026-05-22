@@ -70,7 +70,7 @@ export default async function handler(req) {
   // ── 2. Carrega campanha ───────────────────────────────────────────────────
   const { data: campaign } = await supabase
     .from('marketing_campaigns')
-    .select('trigger_name, base_message, variants, daily_limit, status')
+    .select('trigger_name, daily_limit, status, auto_continue')
     .eq('id', item.campaign_id)
     .maybeSingle();
 
@@ -92,19 +92,17 @@ export default async function handler(req) {
     .gte('sent_at', todayStart.toISOString());
 
   if (!countErr && sentToday >= (campaign.daily_limit || 50)) {
+    // Se auto_continue = false, pausa a campanha ao atingir o limite do dia
+    if (!campaign.auto_continue) {
+      await supabase.from('marketing_campaigns').update({ status: 'paused' }).eq('id', item.campaign_id);
+    }
     return new Response(JSON.stringify({
       ok: true,
       skipped: `limite diário atingido: ${sentToday}/${campaign.daily_limit}`,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  // ── 4. Monta mensagem personalizada com variante do contato ──────────────
-  const variants   = campaign.variants?.length ? campaign.variants : [campaign.base_message];
-  const variantIdx = (item.variant_index || 0) % variants.length;
-  const rawMessage = variants[variantIdx] || campaign.base_message || '';
-  const message    = rawMessage.replace(/\{nome\}/gi, item.name || '');
-
-  // ── 5. Carrega webhook BotConversa ───────────────────────────────────────
+  // ── 4. Carrega webhook BotConversa ───────────────────────────────────────
   const { data: mktConfig } = await supabase
     .from('marketing_config')
     .select('webhook_url')
@@ -116,17 +114,16 @@ export default async function handler(req) {
     });
   }
 
-  // ── 6. Envia via BotConversa (ignora HTTP status — BC retorna 400 mesmo com sucesso) ─
+  // ── 5. Envia trigger ao BotConversa (BotConversa cuida da mensagem) ──────
   let sent = false;
   try {
     await fetch(mktConfig.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        trigger:   campaign.trigger_name,
-        nome:      item.name || '',
-        telefone:  item.phone,
-        mensagem:  message,
+        trigger:  campaign.trigger_name,
+        nome:     item.name || '',
+        telefone: item.phone,
       }),
     });
     sent = true;
@@ -160,12 +157,11 @@ export default async function handler(req) {
   }
 
   return new Response(JSON.stringify({
-    ok:                  true,
+    ok:                   true,
     sent,
-    phone:               item.phone,
-    variant_used:        variantIdx,
-    daily_sent:          (sentToday || 0) + 1,
-    daily_limit:         campaign.daily_limit,
+    phone:                item.phone,
+    daily_sent:           (sentToday || 0) + 1,
+    daily_limit:          campaign.daily_limit,
     next_send_in_minutes: nextDelayMin,
   }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }

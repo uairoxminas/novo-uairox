@@ -500,50 +500,11 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const { data: contacts } = useMarketingContacts();
   const createCampaign = useCreateCampaign();
 
-  const [step, setStep] = useState<'config' | 'whatsapp' | 'invite' | 'email' | 'contacts'>('config');
+  const [step, setStep] = useState<'config' | 'email' | 'contacts'>('config');
   const [name, setName] = useState('');
   const [triggerName, setTriggerName] = useState('marketing');
-  const [baseMessage, setBaseMessage] = useState('');
   const [dailyLimit, setDailyLimit] = useState(30);
   const [autoContinue, setAutoContinue] = useState(true);
-  const [variants, setVariants] = useState<string[]>([]);
-  const [generating, setGenerating] = useState(false);
-
-  // Step 2 — Convite state
-  const [step2Enabled, setStep2Enabled] = useState(false);
-  const [step2Message, setStep2Message] = useState('');
-  const [step2EventIds, setStep2EventIds] = useState<string[]>([]);
-  const [responseTimeoutDays, setResponseTimeoutDays] = useState(5);
-  const [generatingStep2, setGeneratingStep2] = useState(false);
-  const [availableEvents, setAvailableEvents] = useState<any[]>([]);
-
-  useEffect(() => {
-    supabase.from('events' as any)
-      .select('id, title, date, location, status')
-      .in('status', ['open', 'planning'])
-      .order('date', { ascending: true })
-      .then(({ data }: any) => setAvailableEvents(data || []));
-  }, []);
-
-  const handleGenerateStep2 = async () => {
-    if (!step2EventIds.length) { toast.error('Selecione ao menos um evento'); return; }
-    setGeneratingStep2(true);
-    try {
-      const res = await fetch('/api/marketing-generate-step2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_ids: step2EventIds }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro na API');
-      setStep2Message(data.message);
-      toast.success('Convite gerado!');
-    } catch (err: any) {
-      toast.error('Erro ao gerar convite: ' + err.message);
-    } finally {
-      setGeneratingStep2(false);
-    }
-  };
 
   // Email state
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -588,27 +549,6 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
     !c.opt_out && (!contactSearch || [c.name, c.phone, c.email].some((v: any) => v?.toLowerCase().includes(contactSearch.toLowerCase())))
   );
 
-  const handleGenerateVariants = async () => {
-    if (!baseMessage.trim()) { toast.error('Escreva a mensagem base primeiro'); return; }
-    setGenerating(true);
-    try {
-      const res = await fetch('/api/marketing-generate-variants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base_message: baseMessage, context: 'Evento de CrossFit/Fitness UAIROX' })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro na API');
-      if (!data?.variants?.length) throw new Error('Nenhuma variação gerada');
-      setVariants(data.variants);
-      toast.success(`${data.variants.length} variações geradas!`);
-    } catch (err: any) {
-      toast.error('Erro ao gerar variações: ' + err.message);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   const handleSelectAll = () => {
     if (selectedContacts.size === filteredContacts.length) {
       setSelectedContacts(new Set());
@@ -619,25 +559,19 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   const handleCreate = async () => {
     if (!name.trim()) { toast.error('Nome da campanha obrigatório'); return; }
-    if (variants.length === 0) { toast.error('Gere as variações de WhatsApp primeiro'); return; }
+    if (!triggerName.trim()) { toast.error('Trigger BotConversa obrigatório'); return; }
     if (emailEnabled && !emailSubject.trim()) { toast.error('Assunto do email é obrigatório quando email está ativo'); return; }
     if (selectedContacts.size === 0) { toast.error('Selecione ao menos um contato'); return; }
     try {
       await createCampaign.mutateAsync({
         name,
         trigger_name: triggerName,
-        base_message: baseMessage,
-        variants,
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
         contact_ids: Array.from(selectedContacts),
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
         email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
-        step2_enabled: step2Enabled,
-        step2_message: step2Enabled ? step2Message : undefined,
-        step2_event_ids: step2Enabled ? step2EventIds : undefined,
-        response_timeout_days: responseTimeoutDays,
       });
       toast.success('Campanha criada! Ative-a para iniciar os envios.');
       onClose();
@@ -670,10 +604,8 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
 
   const steps = [
     { id: 'config',   label: '1. Config' },
-    { id: 'whatsapp', label: '2. Saudação' },
-    { id: 'invite',   label: '3. Convite' },
-    { id: 'email',    label: '4. Email' },
-    { id: 'contacts', label: '5. Contatos' },
+    { id: 'email',    label: '2. Email' },
+    { id: 'contacts', label: '3. Contatos' },
   ];
 
   return (
@@ -723,154 +655,11 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                   <p className="text-[10px] text-zinc-500">Se desativado, a campanha pausa ao fim de cada janela e precisa ser reativada manualmente</p>
                 </div>
               </div>
-              <button onClick={() => setStep('whatsapp')} className={`${btnGold} w-full`}>Próximo →</button>
+              <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Próximo →</button>
             </div>
           )}
 
-          {/* Step 2: WhatsApp */}
-          {step === 'whatsapp' && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className={labelClass}>Mensagem base</p>
-                  <button onClick={() => setBaseMessage(prev => prev + '{nome}')} className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[10px] font-mono font-bold hover:bg-zinc-700 transition-colors">
-                    + inserir {'{nome}'}
-                  </button>
-                </div>
-                <textarea value={baseMessage} onChange={e => setBaseMessage(e.target.value)} placeholder="Ex: Olá {nome}, temos novidades sobre a próxima edição da UAIROX..." rows={4} className={`${inputClass} resize-none`} />
-                <p className="text-[10px] text-zinc-600">Use <code className="font-mono text-[#EDAC02]">{'{nome}'}</code> para personalizar. O Gemini vai manter o marcador nas variações.</p>
-              </div>
-              <button onClick={handleGenerateVariants} disabled={generating || !baseMessage.trim()} className={`${btnGold} w-full`}>
-                {generating ? '✨ Gerando variações...' : '✨ Gerar 10 variações com Gemini'}
-              </button>
-              {variants.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className={labelClass}>{variants.length} variações — revise e edite</p>
-                    <span className="text-[10px] text-zinc-600"><code className="font-mono text-[#EDAC02]">{'{nome}'}</code> substituído no envio</span>
-                  </div>
-                  {variants.map((v, i) => (
-                    <div key={i} className={`${cardClass} p-3 space-y-2`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">#{i + 1}</span>
-                          {v.includes('{nome}') && <span className="px-1.5 py-0.5 rounded bg-[#EDAC02]/10 text-[#EDAC02] text-[9px] font-mono border border-[#EDAC02]/20">personalizada</span>}
-                        </div>
-                        <button onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))} className="text-zinc-700 hover:text-red-400 text-xs font-bold transition-colors">✕</button>
-                      </div>
-                      <div className="relative">
-                        <textarea value={v} onChange={e => setVariants(prev => prev.map((x, j) => j === i ? e.target.value : x))} rows={3} className={`${inputClass} resize-none text-xs text-zinc-300`} />
-                        <button onClick={() => setVariants(prev => prev.map((x, j) => j === i ? x + '{nome}' : x))} className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">
-                          + {'{nome}'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  <button onClick={() => setStep('invite')} className={`${btnGold} w-full`}>Aprovado — Configurar Convite →</button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Convite */}
-          {step === 'invite' && (
-            <div className="space-y-4">
-              {/* Toggle */}
-              <div className="flex items-center gap-3 p-4 rounded-xl border border-[#1a1a1a]">
-                <button onClick={() => setStep2Enabled(!step2Enabled)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${step2Enabled ? 'bg-[#EDAC02]' : 'bg-zinc-700'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${step2Enabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-                <div>
-                  <p className="text-xs font-bold text-white">Enviar convite quando o contato responder</p>
-                  <p className="text-[10px] text-zinc-500">Quem não responder entra em opt-out automaticamente após os dias configurados</p>
-                </div>
-              </div>
-
-              {!step2Enabled && (
-                <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Pular — Configurar Email →</button>
-              )}
-
-              {step2Enabled && (
-                <div className="space-y-4">
-                  {/* Timeout */}
-                  <div className="space-y-1">
-                    <p className={labelClass}>Dias sem resposta → opt-out automático</p>
-                    <input type="number" min={1} max={30} value={responseTimeoutDays} onChange={e => setResponseTimeoutDays(Number(e.target.value))} className={inputClass} />
-                    <p className="text-[10px] text-zinc-600">Contatos que não responderem em <strong className="text-zinc-400">{responseTimeoutDays} dias</strong> serão movidos para opt-out automaticamente pelo worker</p>
-                  </div>
-
-                  {/* Event selector */}
-                  <div className="space-y-2">
-                    <p className={labelClass}>Eventos a divulgar no convite</p>
-                    {availableEvents.length === 0 ? (
-                      <div className="p-4 text-center text-zinc-600 text-xs border border-[#1a1a1a] rounded-xl">Nenhum evento aberto ou em planejamento encontrado</div>
-                    ) : (
-                      <div className={`${cardClass} divide-y divide-[#0f0f0f] overflow-hidden`}>
-                        {availableEvents.map((ev: any) => (
-                          <label key={ev.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#0f0f0f] cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={step2EventIds.includes(ev.id)}
-                              onChange={e => setStep2EventIds(prev => e.target.checked ? [...prev, ev.id] : prev.filter(id => id !== ev.id))}
-                              className="accent-[#EDAC02] flex-shrink-0"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-white truncate">{ev.title}</p>
-                              <p className="text-[10px] text-zinc-500">{new Date(ev.date).toLocaleDateString('pt-BR')} · {ev.location}</p>
-                            </div>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${ev.status === 'open' ? 'bg-[#25D366]/10 text-[#25D366]' : 'bg-zinc-800 text-zinc-500'}`}>
-                              {ev.status === 'open' ? 'Aberto' : 'Planejamento'}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Generate button */}
-                  <button
-                    onClick={handleGenerateStep2}
-                    disabled={generatingStep2 || !step2EventIds.length}
-                    className={`${btnGold} w-full`}
-                  >
-                    {generatingStep2 ? '✨ Gerando convite...' : '✨ Gerar mensagem de convite com Gemini'}
-                  </button>
-
-                  {/* Message editor */}
-                  {step2Message && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className={labelClass}>Mensagem de convite — revise e edite</p>
-                        <div className="flex gap-1">
-                          <button onClick={() => setStep2Message(prev => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{nome}'}</button>
-                          <button onClick={() => setStep2Message(prev => prev + '{link}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-blue-400 text-[9px] font-mono hover:bg-zinc-700 transition-colors">+ {'{link}'}</button>
-                        </div>
-                      </div>
-                      <textarea
-                        value={step2Message}
-                        onChange={e => setStep2Message(e.target.value)}
-                        rows={6}
-                        className={`${inputClass} resize-none`}
-                      />
-                      <p className="text-[10px] text-zinc-600">
-                        Enviada via BotConversa com trigger <code className="font-mono text-[#EDAC02] bg-[#EDAC02]/10 px-1 rounded">{triggerName}_step2</code> quando o contato responder a saudação.
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => setStep('email')}
-                    disabled={!step2Message.trim()}
-                    className={`${btnGold} w-full`}
-                  >
-                    Próximo — Configurar Email →
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 4: Email */}
+          {/* Step 2: Email */}
           {step === 'email' && (
             <div className="space-y-4">
               {/* Toggle */}
@@ -1155,17 +944,11 @@ function CampaignHowItWorks() {
 function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () => void }) {
   const updateCampaign = useUpdateCampaign();
 
-  const [tab, setTab] = useState<'config' | 'whatsapp' | 'invite' | 'email'>('config');
+  const [tab, setTab] = useState<'config' | 'email'>('config');
   const [name, setName] = useState(campaign.name || '');
   const [triggerName, setTriggerName] = useState(campaign.trigger_name || 'marketing');
-  const [baseMessage, setBaseMessage] = useState(campaign.base_message || '');
   const [dailyLimit, setDailyLimit] = useState(campaign.daily_limit ?? 30);
   const [autoContinue, setAutoContinue] = useState(campaign.auto_continue ?? true);
-  const [variants, setVariants] = useState<string[]>(campaign.variants || []);
-
-  const [step2Enabled, setStep2Enabled] = useState(campaign.step2_enabled ?? false);
-  const [step2Message, setStep2Message] = useState(campaign.step2_message || '');
-  const [responseTimeoutDays, setResponseTimeoutDays] = useState(campaign.response_timeout_days ?? 5);
 
   const [emailEnabled, setEmailEnabled] = useState(campaign.email_enabled ?? false);
   const [emailSubject, setEmailSubject] = useState(campaign.email_template?.subject || campaign.email_subject || '');
@@ -1182,16 +965,11 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
         id: campaign.id,
         name: name.trim(),
         trigger_name: triggerName.trim(),
-        base_message: baseMessage,
-        variants,
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
         email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
-        step2_enabled: step2Enabled,
-        step2_message: step2Enabled ? step2Message : undefined,
-        response_timeout_days: responseTimeoutDays,
       });
       toast.success('Campanha atualizada');
       onClose();
@@ -1202,9 +980,7 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
 
   const tabs = [
     { id: 'config' as const, label: '1. Config' },
-    { id: 'whatsapp' as const, label: '2. Saudação' },
-    { id: 'invite' as const, label: '3. Convite' },
-    { id: 'email' as const, label: '4. Email' },
+    { id: 'email' as const, label: '2. Email' },
   ];
 
   return (
@@ -1243,55 +1019,6 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                   </label>
                 </div>
               </div>
-            </div>
-          )}
-
-          {tab === 'whatsapp' && (
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <p className={labelClass}>Mensagem de saudação</p>
-                  <button onClick={() => setBaseMessage((prev: string) => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
-                </div>
-                <textarea value={baseMessage} onChange={e => setBaseMessage(e.target.value)} rows={5} className={`${inputClass} resize-none`} />
-              </div>
-              <div className="space-y-2">
-                <p className={labelClass}>Variações ({variants.length})</p>
-                {variants.map((v, i) => (
-                  <div key={i} className="flex gap-2">
-                    <textarea value={v} onChange={e => setVariants((prev: string[]) => prev.map((x, j) => j === i ? e.target.value : x))} rows={3} className={`${inputClass} resize-none flex-1 text-xs`} />
-                    <button onClick={() => setVariants((prev: string[]) => prev.filter((_, j) => j !== i))} className="text-zinc-600 hover:text-red-400 text-lg self-start mt-1">✕</button>
-                  </div>
-                ))}
-                <button onClick={() => setVariants((prev: string[]) => [...prev, baseMessage])} className="text-xs text-zinc-500 hover:text-[#EDAC02] transition-colors">+ Adicionar variação</button>
-              </div>
-            </div>
-          )}
-
-          {tab === 'invite' && (
-            <div className="space-y-4">
-              <label className="flex items-center gap-3 p-4 rounded-xl border border-[#1a1a1a] cursor-pointer">
-                <input type="checkbox" checked={step2Enabled} onChange={e => setStep2Enabled(e.target.checked)} className="w-4 h-4 accent-[#EDAC02]" />
-                <div>
-                  <p className="text-xs font-bold text-white">Enviar convite quando contato responder</p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Step 2 ativado via BotConversa ao detectar resposta</p>
-                </div>
-              </label>
-              {step2Enabled && (
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className={labelClass}>Mensagem de convite</p>
-                      <div className="flex gap-1">
-                        <button onClick={() => setStep2Message((prev: string) => prev + '{nome}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[#EDAC02] text-[9px] font-mono">+ {'{nome}'}</button>
-                        <button onClick={() => setStep2Message((prev: string) => prev + '{link}')} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-blue-400 text-[9px] font-mono">+ {'{link}'}</button>
-                      </div>
-                    </div>
-                    <textarea value={step2Message} onChange={e => setStep2Message(e.target.value)} rows={6} className={`${inputClass} resize-none`} />
-                  </div>
-                  <div><p className={labelClass}>Opt-out por inatividade (dias sem resposta)</p><input type="number" min={1} max={30} value={responseTimeoutDays} onChange={e => setResponseTimeoutDays(Number(e.target.value))} className={`${inputClass} mt-1 w-24`} /></div>
-                </div>
-              )}
             </div>
           )}
 
