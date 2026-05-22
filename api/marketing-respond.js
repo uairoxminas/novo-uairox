@@ -67,10 +67,13 @@ export default async function handler(req) {
     }
 
     const supabase = getSupabase();
+    const digits = String(rawPhone).replace(/\D/g, '');
+    console.log('[marketing-respond] phone_received:', digits);
+
     const contact = await findContact(supabase, rawPhone);
+    console.log('[marketing-respond] contact_found:', contact ? contact.phone : 'null');
 
     if (!contact) {
-      const digits = String(rawPhone).replace(/\D/g, '');
       return new Response(JSON.stringify({ ok: true, message: 'Contato não encontrado na base', debug_phone_received: digits }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -119,6 +122,7 @@ export default async function handler(req) {
       }
     }
 
+    console.log('[marketing-respond] queue_items_found:', queueItems?.length ?? 0);
     if (!queueItems?.length) {
       return new Response(JSON.stringify({ ok: true, message: 'Nenhum item aguardando resposta', contact_found: contact.phone }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
