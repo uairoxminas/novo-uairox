@@ -70,7 +70,7 @@ export default async function handler(req) {
   // ── 2. Carrega campanha ───────────────────────────────────────────────────
   const { data: campaign } = await supabase
     .from('marketing_campaigns')
-    .select('trigger_name, daily_limit, status, auto_continue')
+    .select('trigger_name, daily_limit, status, auto_continue, use_squad_webhook')
     .eq('id', item.campaign_id)
     .maybeSingle();
 
@@ -105,10 +105,14 @@ export default async function handler(req) {
   // ── 4. Carrega webhook BotConversa ───────────────────────────────────────
   const { data: mktConfig } = await supabase
     .from('marketing_config')
-    .select('webhook_url')
+    .select('webhook_url, squad_webhook_url')
     .maybeSingle();
 
-  if (!mktConfig?.webhook_url) {
+  const webhookUrl = campaign.use_squad_webhook
+    ? (mktConfig?.squad_webhook_url || mktConfig?.webhook_url)
+    : mktConfig?.webhook_url;
+
+  if (!webhookUrl) {
     return new Response(JSON.stringify({ ok: false, error: 'Webhook BotConversa não configurado' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -117,7 +121,7 @@ export default async function handler(req) {
   // ── 5. Envia trigger ao BotConversa (BotConversa cuida da mensagem) ──────
   let sent = false;
   try {
-    await fetch(mktConfig.webhook_url, {
+    await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

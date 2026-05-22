@@ -127,6 +127,7 @@ export function useCreateCampaign() {
       email_enabled: boolean;
       email_subject?: string;
       email_template?: { image_url?: string; title?: string; body?: string; cta_text?: string; cta_url?: string };
+      use_squad_webhook?: boolean;
     }) => {
       const result = await apiFetch('/marketing-campaigns?action=create', {
         method: 'POST',
@@ -156,6 +157,7 @@ export function useUpdateCampaign() {
       step2_message?: string;
       step2_event_ids?: string[];
       response_timeout_days?: number;
+      use_squad_webhook?: boolean;
     }) => {
       await apiFetch('/marketing-campaigns?action=edit', {
         method: 'POST',

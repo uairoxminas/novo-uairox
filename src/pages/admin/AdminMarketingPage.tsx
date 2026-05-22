@@ -567,6 +567,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
   const [triggerName, setTriggerName] = useState('marketing');
   const [dailyLimit, setDailyLimit] = useState(30);
   const [autoContinue, setAutoContinue] = useState(true);
+  const [useSquadWebhook, setUseSquadWebhook] = useState(false);
 
   // Email state
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -635,6 +636,7 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
         trigger_name: triggerName,
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
+        use_squad_webhook: useSquadWebhook,
         contact_ids: Array.from(selectedContacts),
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
@@ -720,6 +722,15 @@ function NewCampaignModal({ onClose }: { onClose: () => void }) {
                 <div>
                   <p className="text-xs font-bold text-white">Continuar automaticamente no próximo dia</p>
                   <p className="text-[10px] text-zinc-500">Se desativado, a campanha pausa ao fim de cada janela e precisa ser reativada manualmente</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-[#1a1a1a]">
+                <button onClick={() => setUseSquadWebhook(!useSquadWebhook)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${useSquadWebhook ? 'bg-purple-500' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${useSquadWebhook ? 'left-5' : 'left-0.5'}`} />
+                </button>
+                <div>
+                  <p className="text-xs font-bold text-white">👑 Usar Webhook do Squad</p>
+                  <p className="text-[10px] text-zinc-500">Envia pelo webhook dedicado ao Squad ao invés do webhook padrão de marketing</p>
                 </div>
               </div>
               <button onClick={() => setStep('email')} className={`${btnGold} w-full`}>Próximo →</button>
@@ -1024,6 +1035,7 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
   const [triggerName, setTriggerName] = useState(campaign.trigger_name || 'marketing');
   const [dailyLimit, setDailyLimit] = useState(campaign.daily_limit ?? 30);
   const [autoContinue, setAutoContinue] = useState(campaign.auto_continue ?? true);
+  const [useSquadWebhook, setUseSquadWebhook] = useState(campaign.use_squad_webhook ?? false);
 
   const [emailEnabled, setEmailEnabled] = useState(campaign.email_enabled ?? false);
   const [emailSubject, setEmailSubject] = useState(campaign.email_template?.subject || campaign.email_subject || '');
@@ -1042,6 +1054,7 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
         trigger_name: triggerName.trim(),
         daily_limit: dailyLimit,
         auto_continue: autoContinue,
+        use_squad_webhook: useSquadWebhook,
         email_enabled: emailEnabled,
         email_subject: emailEnabled ? emailSubject : undefined,
         email_template: emailEnabled ? { image_url: emailImageUrl, title: emailTitle, body: emailBody, cta_text: emailCtaText, cta_url: emailCtaUrl } : undefined,
@@ -1092,6 +1105,15 @@ function EditCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                     <input type="checkbox" checked={autoContinue} onChange={e => setAutoContinue(e.target.checked)} className="w-4 h-4 rounded accent-[#EDAC02]" />
                     <span className="text-xs text-zinc-300">Auto-continua no dia seguinte</span>
                   </label>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-[#1a1a1a]">
+                <button onClick={() => setUseSquadWebhook(!useSquadWebhook)} className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${useSquadWebhook ? 'bg-purple-500' : 'bg-zinc-700'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${useSquadWebhook ? 'left-5' : 'left-0.5'}`} />
+                </button>
+                <div>
+                  <p className="text-xs font-bold text-white">👑 Usar Webhook do Squad</p>
+                  <p className="text-[10px] text-zinc-500">Envia pelo webhook dedicado ao Squad ao invés do webhook padrão de marketing</p>
                 </div>
               </div>
             </div>

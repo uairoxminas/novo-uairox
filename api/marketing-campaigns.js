@@ -94,6 +94,7 @@ export default async function handler(req) {
           step2_message: campaign.step2_message || null,
           step2_event_ids: campaign.step2_event_ids || null,
           response_timeout_days: campaign.response_timeout_days,
+          use_squad_webhook: campaign.use_squad_webhook ?? false,
           status: 'draft',
           total_contacts: campaign.contact_ids?.length || 0,
         })
@@ -147,6 +148,7 @@ export default async function handler(req) {
         'name','trigger_name','base_message','variants','daily_limit','auto_continue',
         'email_enabled','email_subject','email_template',
         'step2_enabled','step2_message','step2_event_ids','response_timeout_days',
+        'use_squad_webhook',
       ];
       const patch = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)));
       const { error } = await supabase.from('marketing_campaigns').update(patch).eq('id', id);
