@@ -52,14 +52,6 @@ export default async function handler(req) {
   }
 
   try {
-    // Optional secret validation
-    const secret = process.env.MARKETING_OPTOUT_SECRET;
-    if (secret && req.headers.get('x-webhook-secret') !== secret) {
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const body = await req.json();
 
     // Accept multiple BotConversa payload formats

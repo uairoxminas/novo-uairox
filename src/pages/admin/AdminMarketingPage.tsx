@@ -1098,12 +1098,24 @@ function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
         body: JSON.stringify({ phone: digits }),
       });
       const data = await res.json();
-      if (!res.ok && !data.ok) throw new Error(data.error || 'Erro');
-      setSimState(s => ({ ...s, [action]: 'ok' }));
-      toast.success(action === 'respond' ? 'Aceite registrado! Veja as métricas.' : 'Opt-out registrado! Fila cancelada.');
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      // Check if something was actually recorded
+      const msg = data.message || '';
+      const notFound = msg.toLowerCase().includes('não encontrado');
+      const noItems = msg.toLowerCase().includes('nenhum item') || msg.toLowerCase().includes('nenhum item');
+      if (notFound || noItems) {
+        setSimState(s => ({ ...s, [action]: 'error' }));
+        toast.warning(`API retornou: ${msg}. Verifique se o telefone está na fila da campanha.`);
+      } else {
+        setSimState(s => ({ ...s, [action]: 'ok' }));
+        const detail = action === 'respond'
+          ? `Aceite registrado (${data.responded ?? 1} item). Métricas atualizarão em ~30s.`
+          : `Opt-out registrado: ${data.contact || digits}. Fila cancelada.`;
+        toast.success(detail);
+      }
     } catch (err: any) {
       setSimState(s => ({ ...s, [action]: 'error' }));
-      toast.error(err.message);
+      toast.error(`Erro: ${err.message}`);
     }
   };
 
@@ -1187,7 +1199,7 @@ function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
                   {simState['optout'] === 'loading' ? '...' : simState['optout'] === 'ok' ? '✓ Opt-out registrado' : '🚫 Não quero receber'}
                 </button>
               </div>
-              <p className="text-[10px] text-zinc-600">Esses botões chamam diretamente os endpoints que o BotConversa chamaria — úttil para testar sem precisar responder no WhatsApp.</p>
+              <p className="text-[10px] text-zinc-600">O telefone deve estar na fila desta campanha (aba Fila) para o registro funcionar. Os botões chamam exatamente o mesmo endpoint que o BotConversa chama.</p>
             </div>
 
             <button onClick={onClose} className={`${btnGold} w-full`}>Fechar</button>
