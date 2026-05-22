@@ -65,8 +65,9 @@ export default async function handler(req) {
       const queue = queueRes.data || [];
       const clicks = clicksRes.data || [];
       return new Response(JSON.stringify({
-        sent: queue.filter(q => q.status === 'sent' || q.status === 'skipped').length,
+        sent: queue.filter(q => q.status === 'sent').length,
         responded: queue.filter(q => q.responded_at).length,
+        opted_out: queue.filter(q => q.status === 'optout').length,
         clicks: clicks.length,
         conversions: clicks.filter(c => c.converted).length,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

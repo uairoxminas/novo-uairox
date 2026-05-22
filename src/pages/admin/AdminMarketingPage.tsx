@@ -1202,15 +1202,15 @@ function CampaignCard({
           </div>
 
           {/* Tracking metrics row */}
-          {c.step2_enabled && (
+          {metrics && (
             <div className="flex items-center gap-3 mt-2 text-[10px] font-bold flex-wrap">
-              <span className="text-zinc-500">💬 {metrics?.responded ?? '—'} responderam</span>
-              <span className="text-blue-400">🔗 {metrics?.clicks ?? '—'} cliques</span>
-              <span className="text-[#25D366]">✅ {metrics?.conversions ?? '—'} conversões</span>
-              {(metrics?.clicks ?? 0) > 0 && (
-                <span className="text-zinc-600">
-                  ({Math.round(((metrics?.conversions ?? 0) / (metrics?.clicks ?? 1)) * 100)}% conv.)
-                </span>
+              <span className="text-[#25D366]">✅ {metrics.responded} aceitaram</span>
+              <span className="text-red-400">🚫 {metrics.opted_out} opt-out</span>
+              {metrics.clicks > 0 && (
+                <>
+                  <span className="text-blue-400">🔗 {metrics.clicks} cliques</span>
+                  <span className="text-[#EDAC02]">🎯 {metrics.conversions} conversões</span>
+                </>
               )}
             </div>
           )}

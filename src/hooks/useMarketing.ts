@@ -209,7 +209,7 @@ export function useCampaignMetrics(campaignId: string | null) {
     queryFn: async () => {
       if (!campaignId) return null;
       return await apiFetch(`/marketing-campaigns?action=metrics&campaign_id=${campaignId}`) as {
-        sent: number; responded: number; clicks: number; conversions: number;
+        sent: number; responded: number; opted_out: number; clicks: number; conversions: number;
       };
     },
     enabled: !!campaignId,
