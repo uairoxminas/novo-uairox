@@ -1065,7 +1065,7 @@ function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
   const [name, setName] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
-  const [sentMessage, setSentMessage] = useState('');
+  const [simState, setSimState] = useState<Record<string, string>>({});
 
   const handleSend = async () => {
     const digits = phone.replace(/\D/g, '');
@@ -1080,11 +1080,30 @@ function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao enviar');
-      setSentMessage(data.message || '');
       setState('ok');
     } catch (err: any) {
       setErrorMsg(err.message);
       setState('error');
+    }
+  };
+
+  const handleSimulate = async (action: 'respond' | 'optout') => {
+    const digits = phone.replace(/\D/g, '');
+    setSimState(s => ({ ...s, [action]: 'loading' }));
+    try {
+      const endpoint = action === 'respond' ? '/api/marketing-respond' : '/api/marketing-optout';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: digits }),
+      });
+      const data = await res.json();
+      if (!res.ok && !data.ok) throw new Error(data.error || 'Erro');
+      setSimState(s => ({ ...s, [action]: 'ok' }));
+      toast.success(action === 'respond' ? 'Aceite registrado! Veja as métricas.' : 'Opt-out registrado! Fila cancelada.');
+    } catch (err: any) {
+      setSimState(s => ({ ...s, [action]: 'error' }));
+      toast.error(err.message);
     }
   };
 
@@ -1146,18 +1165,30 @@ function TestCampaignModal({ campaign, onClose }: { campaign: any; onClose: () =
         ) : (
           <div className="space-y-4">
             <div className="px-4 py-3 rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 space-y-2">
-              <p className="text-[10px] font-black text-[#25D366] uppercase tracking-widest">✓ Mensagem enviada!</p>
-              <p className="text-[10px] text-zinc-400">Verifique se chegou no WhatsApp <span className="text-white font-bold">{phone}</span>. Depois responda a mensagem para testar o fluxo completo do BotConversa.</p>
+              <p className="text-[10px] font-black text-[#25D366] uppercase tracking-widest">✓ Trigger disparado!</p>
+              <p className="text-[10px] text-zinc-400">Verifique se chegou no WhatsApp <span className="text-white font-bold">{phone}</span>. Use os botões abaixo para simular a resposta do usuário e verificar se as métricas atualizam.</p>
             </div>
 
-            {sentMessage && (
-              <div className="space-y-1">
-                <p className={labelClass}>Mensagem enviada:</p>
-                <div className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
-                  <p className="text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">{sentMessage}</p>
-                </div>
+            <div className="space-y-2">
+              <p className={labelClass}>Simular resposta do BotConversa</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleSimulate('respond')}
+                  disabled={simState['respond'] === 'loading' || simState['respond'] === 'ok'}
+                  className="px-3 py-2 rounded-lg border border-[#25D366]/40 text-[#25D366] text-[10px] font-black uppercase tracking-wider hover:bg-[#25D366]/10 disabled:opacity-50 transition-colors"
+                >
+                  {simState['respond'] === 'loading' ? '...' : simState['respond'] === 'ok' ? '✓ Aceite registrado' : '✅ Aceitar receber'}
+                </button>
+                <button
+                  onClick={() => handleSimulate('optout')}
+                  disabled={simState['optout'] === 'loading' || simState['optout'] === 'ok'}
+                  className="px-3 py-2 rounded-lg border border-red-500/40 text-red-400 text-[10px] font-black uppercase tracking-wider hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                >
+                  {simState['optout'] === 'loading' ? '...' : simState['optout'] === 'ok' ? '✓ Opt-out registrado' : '🚫 Não quero receber'}
+                </button>
               </div>
-            )}
+              <p className="text-[10px] text-zinc-600">Esses botões chamam diretamente os endpoints que o BotConversa chamaria — úttil para testar sem precisar responder no WhatsApp.</p>
+            </div>
 
             <button onClick={onClose} className={`${btnGold} w-full`}>Fechar</button>
           </div>
