@@ -12,18 +12,23 @@ function getSupabase() {
 // Normalize phone: try all common BR formats (BotConversa sends with DDI 55)
 async function findContact(supabase, phone) {
   const digits = String(phone).replace(/\D/g, '');
+  const stripped = digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : null;
   const candidates = [...new Set([
     digits,
-    // BotConversa envia 5531XXXXXXXXX (13 digits) → tentar sem o 55
-    digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : null,
+    // Remove DDI 55
+    stripped,
     // 11 digits → add DDI
     digits.length === 11 ? '55' + digits : null,
-    // 10 digits (old format without leading 9) → add DDI
+    // 10 digits → add DDI
     digits.length === 10 ? '55' + digits : null,
-    // >11 digits → strip to last 11 (DDD + 9 digits)
+    // >11 → last 11
     digits.length > 11 ? digits.slice(-11) : null,
-    // >10 digits → strip to last 10 (old 8-digit landline format)
+    // >10 → last 10
     digits.length > 10 ? digits.slice(-10) : null,
+    // 10-digit BR: insert 9 after DDD (4896459791 → 48996459791)
+    digits.length === 10 ? digits.slice(0,2) + '9' + digits.slice(2) : null,
+    // 12-digit com DDI sem 9: insert 9 after DDI+DDD (554896459791 → 55489 wait → stripped=4896459791 → 48996459791)
+    stripped && stripped.length === 10 ? stripped.slice(0,2) + '9' + stripped.slice(2) : null,
   ].filter(Boolean))];
 
   for (const candidate of candidates) {

@@ -12,13 +12,17 @@ function getSupabase() {
 // Mesmos 6 candidatos do marketing-respond para máxima compatibilidade com BotConversa
 async function findContact(supabase, phone) {
   const digits = String(phone).replace(/\D/g, '');
+  const stripped = digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : null;
   const candidates = [...new Set([
     digits,
-    digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : null,
+    stripped,
     digits.length === 11 ? '55' + digits : null,
     digits.length === 10 ? '55' + digits : null,
     digits.length > 11 ? digits.slice(-11) : null,
     digits.length > 10 ? digits.slice(-10) : null,
+    // 10-digit BR sem 9: insert 9 após DDD
+    digits.length === 10 ? digits.slice(0,2) + '9' + digits.slice(2) : null,
+    stripped && stripped.length === 10 ? stripped.slice(0,2) + '9' + stripped.slice(2) : null,
   ].filter(Boolean))];
 
   for (const candidate of candidates) {
