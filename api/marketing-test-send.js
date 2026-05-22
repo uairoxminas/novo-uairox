@@ -37,7 +37,7 @@ export default async function handler(req) {
     // Load campaign
     const { data: campaign, error: campErr } = await supabase
       .from('marketing_campaigns')
-      .select('name, trigger_name')
+      .select('name, trigger_name, use_squad_webhook')
       .eq('id', campaign_id)
       .maybeSingle();
 
@@ -50,10 +50,14 @@ export default async function handler(req) {
     // Load webhook URL
     const { data: mktConfig } = await supabase
       .from('marketing_config')
-      .select('webhook_url')
+      .select('webhook_url, squad_webhook_url')
       .maybeSingle();
 
-    if (!mktConfig?.webhook_url) {
+    const webhookUrl = campaign.use_squad_webhook
+      ? (mktConfig?.squad_webhook_url || mktConfig?.webhook_url)
+      : mktConfig?.webhook_url;
+
+    if (!webhookUrl) {
       return new Response(JSON.stringify({ error: 'Webhook do BotConversa não configurado' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -63,7 +67,7 @@ export default async function handler(req) {
     const digits = String(phone).replace(/\D/g, '');
 
     // Dispara trigger ao BotConversa — BotConversa cuida da mensagem pelo seu fluxo
-    await fetch(mktConfig.webhook_url, {
+    await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
