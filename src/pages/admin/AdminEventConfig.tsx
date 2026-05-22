@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_MESSAGES, interpolate } from '@/lib/botconversaMessages';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEvent, useUpdateEvent, EVENT_STATUS_MAP, type EventStatus } from '@/hooks/useEvents';
@@ -1061,6 +1062,7 @@ function CuponsTab({ eventId }: { eventId: string }) {
   const deleteRule = useDeleteCouponBatchRule();
 
   const [showForm, setShowForm] = useState(false);
+  const [showBulkSquad, setShowBulkSquad] = useState(false);
   const [code, setCode] = useState('');
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState('');
@@ -1149,7 +1151,10 @@ function CuponsTab({ eventId }: { eventId: string }) {
           <h3 className="text-sm font-bold text-white">Cupons de Desconto</h3>
           <p className="text-xs text-zinc-500 mt-0.5">Crie cupons promocionais para inscrições</p>
         </div>
-        <button onClick={() => setShowForm(true)} className={btnGold}>+ Novo Cupom</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowBulkSquad(true)} className="px-3 py-2 rounded-lg border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-bold hover:bg-[#EDAC02]/10 transition-colors">👥 Criar para Squads</button>
+          <button onClick={() => setShowForm(true)} className={btnGold}>+ Novo Cupom</button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -1371,7 +1376,153 @@ function CuponsTab({ eventId }: { eventId: string }) {
           </div>
         </div>
       </Modal>
+
+      {showBulkSquad && (
+        <BulkSquadCouponsModal
+          eventId={eventId}
+          squadMembers={squadMembers || []}
+          existingCoupons={coupons || []}
+          onClose={() => setShowBulkSquad(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// ============ MODAL: CRIAR CUPONS EM LOTE PARA SQUADS ============
+function BulkSquadCouponsModal({
+  eventId, squadMembers, existingCoupons, onClose,
+}: {
+  eventId: string;
+  squadMembers: { id: string; full_name: string; coupon_code: string | null }[];
+  existingCoupons: any[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [discountType, setDiscountType] = useState('percentage');
+  const [discountValue, setDiscountValue] = useState('');
+  const [maxUses, setMaxUses] = useState('1');
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [results, setResults] = useState<{ name: string; code: string; ok: boolean }[]>([]);
+
+  const existingCodes = new Set((existingCoupons || []).map((c: any) => c.code.toUpperCase()));
+
+  const toCode = (m: { full_name: string; coupon_code: string | null }) =>
+    (m.coupon_code || m.full_name.split(' ')[0]).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14);
+
+  const members = squadMembers.map(m => ({ ...m, code: toCode(m) }));
+  const toCreate = members.filter(m => !existingCodes.has(m.code));
+  const skipped  = members.filter(m =>  existingCodes.has(m.code));
+
+  const handleCreate = async () => {
+    if (!discountValue) return;
+    setSaving(true);
+    const res: { name: string; code: string; ok: boolean }[] = [];
+    for (const m of toCreate) {
+      try {
+        await supabase.from('discount_coupons').insert({
+          event_id: eventId,
+          code: m.code,
+          discount_type: discountType,
+          discount_value: parseFloat(discountValue),
+          max_uses: maxUses ? parseInt(maxUses) : null,
+          squad_member_id: m.id,
+        } as any);
+        res.push({ name: m.full_name, code: m.code, ok: true });
+      } catch {
+        res.push({ name: m.full_name, code: m.code, ok: false });
+      }
+    }
+    qc.invalidateQueries({ queryKey: ['discount-coupons', eventId] });
+    setResults(res);
+    setDone(true);
+    setSaving(false);
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Criar Cupons para todos os Squads" subtitle="Um cupom por squad, usando o código cadastrado (ou primeiro nome).">
+      {!done ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className={labelClass}>Tipo de Desconto</label>
+              <select value={discountType} onChange={e => setDiscountType(e.target.value)} className={`${inputClass} mt-1`}>
+                <option value="percentage">Porcentagem (%)</option>
+                <option value="fixed">Valor Fixo (R$)</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Valor</label>
+              <input
+                type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)}
+                placeholder={discountType === 'percentage' ? '10' : '50'}
+                className={`${inputClass} mt-1`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Máx. usos por cupom</label>
+              <input
+                type="number" value={maxUses} onChange={e => setMaxUses(e.target.value)}
+                placeholder="Ilimitado"
+                className={`${inputClass} mt-1`}
+              />
+            </div>
+          </div>
+
+          <div className="bg-[#050505] rounded-lg border border-[#1a1a1a] overflow-hidden mb-4">
+            <div className="px-3 py-2 border-b border-[#1a1a1a] flex justify-between">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Serão criados ({toCreate.length})</span>
+              {skipped.length > 0 && <span className="text-[10px] text-zinc-600">{skipped.length} já existem — ignorados</span>}
+            </div>
+            <div className="max-h-48 overflow-y-auto divide-y divide-[#0f0f0f]">
+              {toCreate.length === 0 && (
+                <p className="text-xs text-zinc-600 text-center py-4">Todos os squads já têm cupom neste evento.</p>
+              )}
+              {toCreate.map(m => (
+                <div key={m.id} className="flex items-center justify-between px-3 py-2">
+                  <span className="text-xs text-zinc-300">{m.full_name}</span>
+                  <span className="text-xs font-mono text-[#EDAC02] bg-[#EDAC02]/10 px-2 py-0.5 rounded">{m.code}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={onClose} className={`flex-1 ${btnOutline}`}>Cancelar</button>
+            <button
+              onClick={handleCreate}
+              disabled={saving || toCreate.length === 0 || !discountValue}
+              className={`flex-1 ${btnGold} disabled:opacity-40`}
+            >
+              {saving ? 'Criando...' : `Criar ${toCreate.length} Cupons`}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="bg-[#050505] rounded-lg border border-[#1a1a1a] overflow-hidden mb-4">
+            <div className="px-3 py-2 border-b border-[#1a1a1a]">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                Resultado — {results.filter(r => r.ok).length} criados / {results.filter(r => !r.ok).length} falhas
+              </span>
+            </div>
+            <div className="max-h-64 overflow-y-auto divide-y divide-[#0f0f0f]">
+              {results.map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2">
+                  <span className="text-xs text-zinc-300">{r.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-[#EDAC02]">{r.code}</span>
+                    <span className={`text-[10px] font-bold ${r.ok ? 'text-[#25D366]' : 'text-red-400'}`}>{r.ok ? '✓' : '✗'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button onClick={onClose} className={`w-full ${btnGold}`}>Fechar</button>
+        </>
+      )}
+    </Modal>
   );
 }
 
