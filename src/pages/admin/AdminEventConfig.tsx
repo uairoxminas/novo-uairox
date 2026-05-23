@@ -4026,6 +4026,66 @@ function CronogramaTab({ eventId }: { eventId: string }) {
     completed: 'Finalizada',
   };
 
+  const handleExportExcel = async () => {
+    try {
+      toast.loading('Gerando planilha...', { id: 'export-excel' });
+      const { supabase } = await import('@/integrations/supabase/client');
+      const XLSX = await import('xlsx');
+      const supabaseAny = supabase as any;
+
+      const [{ data: event }, { data: fullHeats, error }] = await Promise.all([
+        supabaseAny.from('events').select('title').eq('id', eventId).maybeSingle(),
+        supabaseAny
+          .from('heats')
+          .select('*, categories(name), heat_lane_assignments(lane_number, registrations(bib_number, athlete_name, team_name))')
+          .eq('event_id', eventId)
+          .order('start_time'),
+      ]);
+      if (error) throw error;
+
+      const titleRow = [event?.title?.toUpperCase() || 'CRONOGRAMA', '', '', '', '', '', ''];
+      const headerRow = ['HORÁRIO', 'Nº', 'Equipe', 'Categoria', 'CHEGADA', 'TEMPO', 'CLASS'];
+      const dataRows: (string | number)[][] = [];
+      const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // title merge
+      ];
+
+      let rowIdx = 2; // after title + header
+      for (const heat of fullHeats || []) {
+        const assigned = (heat.heat_lane_assignments || [])
+          .filter((a: any) => a.registrations)
+          .sort((a: any, b: any) => a.lane_number - b.lane_number);
+        if (!assigned.length) continue;
+        assigned.forEach((a: any, i: number) => {
+          const r = a.registrations;
+          dataRows.push([
+            i === 0 ? heat.start_time : '',
+            r.bib_number ?? '',
+            r.team_name || r.athlete_name || '',
+            (heat.categories as any)?.name || '',
+            '', '', '',
+          ]);
+        });
+        if (assigned.length > 1) {
+          merges.push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx + assigned.length - 1, c: 0 } });
+        }
+        rowIdx += assigned.length;
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet([titleRow, headerRow, ...dataRows]);
+      ws['!cols'] = [{ wch: 10 }, { wch: 5 }, { wch: 35 }, { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 8 }];
+      ws['!merges'] = merges;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
+      const fileName = `cronograma-${(event?.title || 'evento').toLowerCase().replace(/\s+/g, '-')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success('Planilha exportada!', { id: 'export-excel' });
+    } catch (e: any) {
+      toast.error('Erro ao exportar: ' + e.message, { id: 'export-excel' });
+    }
+  };
+
   const handlePrint = async () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
@@ -4154,6 +4214,9 @@ function CronogramaTab({ eventId }: { eventId: string }) {
             toast.success("Link do cronograma público copiado!");
           }} className="px-4 py-2 border border-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-wider rounded flex items-center gap-2 hover:bg-[#111] transition-colors">
             🔗 Copiar Link Público
+          </button>
+          <button onClick={handleExportExcel} className="px-4 py-2 border border-green-600 text-green-400 font-bold text-xs uppercase tracking-wider rounded flex items-center gap-2 hover:bg-green-600/10 transition-colors">
+            📊 Exportar Excel
           </button>
           <button onClick={handlePrint} className="px-4 py-2 border border-[#EDAC02] text-[#EDAC02] font-bold text-xs uppercase tracking-wider rounded flex items-center gap-2 hover:bg-[#EDAC02]/10 transition-colors">
             🖨️ Imprimir
