@@ -32,6 +32,26 @@ export default function PublicEventSchedule() {
   const { data: heats, isLoading: heatsLoading } = useHeats(resolvedId || undefined);
   const { data: stages } = useEventStages(resolvedId || undefined);
 
+  const [catStats, setCatStats] = useState<{ name: string; count: number }[]>([]);
+
+  useEffect(() => {
+    if (!resolvedId) return;
+    async function fetchCatStats() {
+      const { data } = await (supabase as any)
+        .from('heats')
+        .select('categories(name), heat_lane_assignments(registration_id)')
+        .eq('event_id', resolvedId);
+      const acc: Record<string, number> = {};
+      for (const h of data || []) {
+        const cat = (h.categories as any)?.name || 'Sem categoria';
+        const count = (h.heat_lane_assignments || []).filter((a: any) => a.registration_id).length;
+        acc[cat] = (acc[cat] || 0) + count;
+      }
+      setCatStats(Object.entries(acc).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count));
+    }
+    fetchCatStats();
+  }, [resolvedId]);
+
   if (loading || (resolvedId && heatsLoading)) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
@@ -84,7 +104,20 @@ export default function PublicEventSchedule() {
           <h1 className="text-3xl md:text-5xl font-black text-white uppercase italic tracking-tighter mb-2">
             Cronograma de <span className="text-[#EDAC02]">Provas</span>
           </h1>
-          <p className="text-zinc-400 text-lg">{event.title}</p>
+          <p className="text-zinc-400 text-lg mb-4">{event.title}</p>
+          {catStats.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {catStats.map(s => (
+                <span key={s.name} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#111] border border-[#2a2a2a] text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                  <span className="text-[#EDAC02] font-black text-sm">{s.count}</span>
+                  {s.name}
+                </span>
+              ))}
+              <span className="text-xs text-zinc-600 font-bold uppercase tracking-wider pl-1">
+                · Total: {catStats.reduce((s, c) => s + c.count, 0)} inscritos
+              </span>
+            </div>
+          )}
         </div>
       </header>
 
