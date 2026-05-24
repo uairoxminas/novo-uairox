@@ -696,7 +696,7 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     const isClosed = ev.status === 'closed' || isFull;
     const isOpen = ev.status === 'open' && !isFull;
     const isPlanning = ev.status === 'planning' && !isFull;
-    const batchName = ev._active_batch?.name;
+    const batchName = ev._active_batch?.name?.split(' - ')[0]?.trim();
 
     let planningBadge = 'Em Breve';
     if (isPlanning && ev._next_batch?.start_date) {
