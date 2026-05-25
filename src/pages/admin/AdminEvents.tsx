@@ -11,16 +11,17 @@ import {
   useDeleteEvent,
   useUpdateEventStatus,
   useDuplicateEvent,
-  EVENT_STATUS_MAP,
+  EVENT_DISPLAY_STATUSES,
+  getDisplayStatus,
   type EventWithStats,
   type EventStatus,
   type EventType,
 } from '@/hooks/useEvents';
 
 // ============ STATUS BADGE ============
-function StatusBadge({ status }: { status: string | null }) {
-  const s = (status || 'planning') as EventStatus;
-  const info = EVENT_STATUS_MAP[s] || EVENT_STATUS_MAP.planning;
+function StatusBadge({ status, visivel }: { status: string | null; visivel?: boolean }) {
+  const ds = getDisplayStatus((status || 'planning') as EventStatus, visivel ?? true);
+  const info = EVENT_DISPLAY_STATUSES.find(s => s.key === ds) || EVENT_DISPLAY_STATUSES[1];
   return (
     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${info.color}`}>
       {info.label}
@@ -56,6 +57,7 @@ function EventFormDialog({
   const [location, setLocation] = useState(event?.location || '');
   const [description, setDescription] = useState(event?.description || '');
   const [status, setStatus] = useState<EventStatus>((event?.status as EventStatus) || 'planning');
+  const [visivelNoSite, setVisivelNoSite] = useState<boolean>((event as any)?.visivel_no_site ?? false);
   const [imageUrl, setImageUrl] = useState(event?.image_url || '');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(event?.image_url || null);
@@ -104,6 +106,7 @@ function EventFormDialog({
       location: location.trim(),
       description: description.trim() || null,
       status,
+      visivel_no_site: visivelNoSite,
       event_type: eventType,
       image_url: finalImageUrl.trim() || null,
       whatsapp_group_link: whatsappLink.trim() || null,
@@ -198,19 +201,19 @@ function EventFormDialog({
           {/* Status */}
           <div>
             <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Status</label>
-            <div className="grid grid-cols-4 gap-2">
-              {(Object.entries(EVENT_STATUS_MAP) as [EventStatus, { label: string; color: string }][]).map(([key, val]) => (
+            <div className="grid grid-cols-5 gap-2">
+              {EVENT_DISPLAY_STATUSES.map(opt => (
                 <button
-                  key={key}
+                  key={opt.key}
                   type="button"
-                  onClick={() => setStatus(key)}
+                  onClick={() => { setStatus(opt.status); setVisivelNoSite(opt.visivel); }}
                   className={`p-2.5 rounded-lg border text-xs font-bold transition-all ${
-                    status === key
+                    getDisplayStatus(status, visivelNoSite) === opt.key
                       ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
                       : 'border-[#262626] bg-[#050505] text-zinc-500 hover:border-zinc-600'
                   }`}
                 >
-                  {val.label}
+                  {opt.label}
                 </button>
               ))}
             </div>
@@ -463,7 +466,7 @@ function EventCard({
   onEditDetails: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
-  onStatusChange: (status: EventStatus) => void;
+  onStatusChange: (status: EventStatus, visivel: boolean) => void;
 }) {
   const eventDate = new Date(event.date);
   const daysUntil = differenceInDays(eventDate, new Date());
@@ -491,7 +494,7 @@ function EventCard({
 
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
-          <StatusBadge status={event.status} />
+          <StatusBadge status={event.status} visivel={(event as any).visivel_no_site ?? true} />
         </div>
 
         {/* Days counter & Link */}
@@ -617,20 +620,23 @@ function EventCard({
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowStatusMenu(false)} />
                 <div className="absolute right-0 bottom-full mb-1 z-50 bg-[#0a0a0a] border border-[#262626] rounded-lg py-1 min-w-[180px] shadow-xl">
-                  {(Object.entries(EVENT_STATUS_MAP) as [EventStatus, { label: string }][]).map(([key, val]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        onStatusChange(key);
-                        setShowStatusMenu(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-[#111] transition-colors ${
-                        event.status === key ? 'text-[#EDAC02] font-bold' : 'text-zinc-400'
-                      }`}
-                    >
-                      {event.status === key ? '✓ ' : '  '}{val.label}
-                    </button>
-                  ))}
+                  {EVENT_DISPLAY_STATUSES.map(opt => {
+                    const current = getDisplayStatus(event.status as EventStatus, (event as any).visivel_no_site ?? true);
+                    return (
+                      <button
+                        key={opt.key}
+                        onClick={() => {
+                          onStatusChange(opt.status, opt.visivel);
+                          setShowStatusMenu(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-[#111] transition-colors ${
+                          current === opt.key ? 'text-[#EDAC02] font-bold' : 'text-zinc-400'
+                        }`}
+                      >
+                        {current === opt.key ? '✓ ' : '  '}{opt.label}
+                      </button>
+                    );
+                  })}
                   <div className="border-t border-[#262626] my-1" />
                   <button
                     onClick={() => {
@@ -670,11 +676,11 @@ export default function AdminEvents() {
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithStats | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<EventWithStats | null>(null);
-  const [filterStatus, setFilterStatus] = useState<EventStatus | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
   const filteredEvents = filterStatus === 'all'
     ? events
-    : events?.filter(e => e.status === filterStatus);
+    : events?.filter(e => getDisplayStatus(e.status as EventStatus, (e as any).visivel_no_site ?? true) === filterStatus);
 
   // Stats
   const totalEvents = events?.length || 0;
@@ -725,10 +731,10 @@ export default function AdminEvents() {
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
-        {([['all', 'Todos'], ...Object.entries(EVENT_STATUS_MAP).map(([k, v]) => [k, v.label])] as [string, string][]).map(([key, label]) => (
+        {([{ key: 'all', label: 'Todos' }, ...EVENT_DISPLAY_STATUSES.map(s => ({ key: s.key, label: s.label }))]).map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setFilterStatus(key as any)}
+            onClick={() => setFilterStatus(key)}
             className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
               filterStatus === key
                 ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
@@ -738,7 +744,7 @@ export default function AdminEvents() {
             {label}
             {key !== 'all' && (
               <span className="ml-1.5 text-zinc-600">
-                ({events?.filter(e => e.status === key).length || 0})
+                ({events?.filter(e => getDisplayStatus(e.status as EventStatus, (e as any).visivel_no_site ?? true) === key).length || 0})
               </span>
             )}
           </button>
@@ -764,7 +770,7 @@ export default function AdminEvents() {
                   duplicateEvent.mutate(event);
                 }
               }}
-              onStatusChange={(status) => updateStatus.mutate({ id: event.id, status })}
+              onStatusChange={(status, visivel) => updateStatus.mutate({ id: event.id, status, visivel_no_site: visivel } as any)}
             />
           ))}
         </div>

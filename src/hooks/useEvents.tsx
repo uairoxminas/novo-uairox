@@ -34,11 +34,28 @@ export interface EventWithStats extends EventRow {
 export type EventStatus = 'planning' | 'open' | 'closed' | 'completed';
 
 export const EVENT_STATUS_MAP: Record<EventStatus, { label: string; color: string }> = {
-  planning: { label: 'Planejamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  planning: { label: 'Em Breve', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
   open: { label: 'Inscrições Abertas', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  closed: { label: 'Inscrições Fechadas', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  closed: { label: 'Inscrições Encerradas', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
   completed: { label: 'Realizado', color: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
 };
+
+export type DisplayStatus = 'pre_venda' | 'em_breve' | 'open' | 'closed' | 'completed';
+
+export const EVENT_DISPLAY_STATUSES: { key: DisplayStatus; label: string; status: EventStatus; visivel: boolean; color: string }[] = [
+  { key: 'pre_venda',  label: 'Pré-Venda',            status: 'planning',  visivel: false, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  { key: 'em_breve',  label: 'Em Breve',              status: 'planning',  visivel: true,  color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  { key: 'open',      label: 'Inscrições Abertas',    status: 'open',      visivel: true,  color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  { key: 'closed',    label: 'Inscrições Encerradas', status: 'closed',    visivel: true,  color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  { key: 'completed', label: 'Realizado',             status: 'completed', visivel: false, color: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
+];
+
+export function getDisplayStatus(status: EventStatus, visivel: boolean): DisplayStatus {
+  if (status === 'planning') return visivel ? 'em_breve' : 'pre_venda';
+  if (status === 'open') return 'open';
+  if (status === 'closed') return 'closed';
+  return 'completed';
+}
 
 // ============ LIST EVENTS WITH STATS ============
 export function useEvents() {
@@ -261,6 +278,7 @@ export function usePublicEvents() {
         .from("events")
         .select("*")
         .neq("status", "completed")
+        .neq("visivel_no_site" as any, false)
         .order("date", { ascending: true });
 
       if (error) throw error;

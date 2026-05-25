@@ -695,15 +695,13 @@ function UpcomingEventsSection({ events: eventsConfig }: { events: any }) {
     const isFull = ev.max_capacity ? (ev._registrations_count || 0) >= ev.max_capacity : false;
     const isClosed = ev.status === 'closed' || isFull;
     const isOpen = ev.status === 'open' && !isFull;
-    const isPlanning = ev.status === 'planning' && !isFull;
+    const isPlanning = ev.status === 'planning';
     const batchName = ev._active_batch?.name?.split(' - ')[0]?.trim();
 
     let planningBadge = 'Em Breve';
     if (isPlanning && ev._next_batch?.start_date) {
       const startDate = new Date(ev._next_batch.start_date);
       if (!isNaN(startDate.getTime())) {
-        planningBadge = `A partir de ${startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`; // Usually start_date comes in UTC format like 2026-05-01T00:00:00Z
-        // wait actually if they put the date in their local timezone, we just format it simply
         planningBadge = `A partir de ${startDate.toLocaleDateString('pt-BR')}`;
       }
     }
