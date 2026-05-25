@@ -2051,7 +2051,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     );
   }
 
-  if (!isInviteMode && event.status !== 'open') return null;
+  const eventCanRegister = event.status === 'open' || event.status === 'planning';
+  if (!isInviteMode && !eventCanRegister) return null;
 
   const steps = [
     { title: 'Categoria', subtitle: 'Escolha sua modalidade' },
