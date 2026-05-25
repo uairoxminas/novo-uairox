@@ -291,6 +291,8 @@ export default function PublicEventRegistration() {
   const maxCapacity = event?.max_capacity as number | null;
   const isEventFull = inviteValid ? false : (maxCapacity != null && registrationCount >= maxCapacity);
   const spotsRemaining = maxCapacity != null ? Math.max(0, maxCapacity - registrationCount) : null;
+  // planning = Pré-Venda ou Em Breve — ambos permitem inscrição via link direto
+  const canRegister = event?.status === 'open' || event?.status === 'planning';
 
   const scrollToRegistration = () => {
     setShowRegistration(true);
@@ -351,19 +353,19 @@ export default function PublicEventRegistration() {
                 🎟️ CONVITE ESPECIAL — INSCRIÇÃO GARANTIDA
               </span>
             )}
-            {!inviteValid && event.status === 'open' && !globalIsSoldOut && !isEventFull && (
+            {!inviteValid && canRegister && !globalIsSoldOut && !isEventFull && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#EDAC02] text-black font-black uppercase tracking-widest text-xs mb-6">
                 <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse"></span>
-                Inscrições Abertas
+                {event.status === 'planning' ? 'Pré-Venda' : 'Inscrições Abertas'}
               </span>
             )}
-            {!inviteValid && event.status === 'open' && isEventFull && (
+            {!inviteValid && canRegister && isEventFull && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white font-black uppercase tracking-widest text-xs mb-6 border border-red-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-white opacity-50"></span>
                 EVENTO LOTADO — LISTA DE ESPERA ABERTA
               </span>
             )}
-            {!inviteValid && event.status === 'open' && globalIsSoldOut && !isEventFull && (
+            {!inviteValid && canRegister && globalIsSoldOut && !isEventFull && (
               <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white font-black uppercase tracking-widest text-xs mb-6 border border-red-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-white opacity-50"></span>
                 INSCRIÇÕES ESGOTADAS
@@ -381,7 +383,7 @@ export default function PublicEventRegistration() {
             </div>
 
             {/* Spots remaining indicator */}
-            {spotsRemaining != null && event.status === 'open' && (
+            {spotsRemaining != null && canRegister && (
               <div className={`inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-lg border ${
                 isEventFull 
                   ? 'bg-red-500/10 border-red-500/30 text-red-400' 
@@ -500,7 +502,7 @@ export default function PublicEventRegistration() {
                   <p className="text-zinc-500 text-lg mt-2">Corrida + Funcional · 8 UaiZones</p>
                 )}
               </div>
-              {event.status === 'open' && (
+              {canRegister && (
                 <button onClick={scrollToRegistration} className="px-8 py-4 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest skew-x-[-10deg] hover:bg-white transition-colors flex-shrink-0">
                   <span className="inline-block skew-x-[10deg]">Inscrever →</span>
                 </button>
@@ -936,17 +938,17 @@ export default function PublicEventRegistration() {
                           })()}
                           {localActiveBatch && <p className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1">{localActiveBatch.name}</p>}
                         </div>
-                        {(inviteValid || (event.status === 'open' && !localIsSoldOut && !isEventFull)) && (
+                        {(inviteValid || (canRegister && !localIsSoldOut && !isEventFull)) && (
                           <button onClick={() => { setCategoryId(cat.id); scrollToRegistration(); }} className="px-6 py-3 bg-white text-black font-black uppercase tracking-widest text-xs skew-x-[-10deg] hover:bg-[#EDAC02] transition-colors">
                             <span className="inline-block skew-x-[10deg]">Inscrever</span>
                           </button>
                         )}
-                        {!inviteValid && event.status === 'open' && isEventFull && !localIsSoldOut && (
+                        {!inviteValid && canRegister && isEventFull && !localIsSoldOut && (
                           <button onClick={() => { setCategoryId(cat.id); scrollToRegistration(); }} className="px-6 py-3 bg-amber-500/10 text-amber-400 border border-amber-500/30 font-black uppercase tracking-widest text-xs skew-x-[-10deg] hover:bg-amber-500/20 transition-colors">
                             <span className="inline-block skew-x-[10deg]">📋 Lista de Espera</span>
                           </button>
                         )}
-                        {!inviteValid && event.status === 'open' && localIsSoldOut && (
+                        {!inviteValid && canRegister && localIsSoldOut && (
                           <div className="px-6 py-3 border border-red-500/30 text-red-500 bg-[#111] font-black uppercase tracking-widest text-xs skew-x-[-10deg]">
                             <span className="inline-block skew-x-[10deg]">Esgotado</span>
                           </div>
@@ -962,7 +964,7 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ CTA REGISTRATION ============ */}
-      {(inviteValid || (event.status === 'open' && !isEventFull)) && !showRegistration && (
+      {(inviteValid || (canRegister && !isEventFull)) && !showRegistration && (
         <section className={`py-20 text-center ${inviteValid ? 'bg-emerald-600' : 'bg-[#EDAC02]'}`}>
           <div className="max-w-3xl mx-auto px-4">
             <h2 className="text-4xl md:text-6xl font-black text-black uppercase tracking-tighter italic mb-4">
@@ -982,7 +984,7 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ CTA WAITLIST (when event is full) ============ */}
-      {!inviteValid && event.status === 'open' && !showRegistration && isEventFull && (
+      {!inviteValid && canRegister && !showRegistration && isEventFull && (
         <section className="py-20 bg-gradient-to-b from-red-600/20 to-[#050505] text-center border-y border-red-500/20">
           <div className="max-w-3xl mx-auto px-4">
             <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6">
@@ -1005,7 +1007,7 @@ export default function PublicEventRegistration() {
       )}
 
       {/* ============ REGISTRATION FORM ============ */}
-      {(showRegistration || inviteValid || event.status !== 'open') && (
+      {(showRegistration || inviteValid || !canRegister) && (
         <div ref={registrationRef}>
           <RegistrationForm
             eventId={resolvedId!}
