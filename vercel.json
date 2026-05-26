@@ -33,6 +33,17 @@
       ],
       "destination": "/api/parceiro/:token"
     },
+    {
+      "source": "/regulamento",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|twitterbot|whatsapp|linkedinbot|slackbot|telegrambot|discordbot|googlebot|bingbot|applebot|bot|crawler|spider|preview).*"
+        }
+      ],
+      "destination": "/api/regulamento"
+    },
     { "source": "/t/:code", "destination": "/api/marketing-track?c=:code" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
