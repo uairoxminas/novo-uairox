@@ -18,6 +18,7 @@ import ExperiencePage from './pages/ExperiencePage';
 import GalleryPage from './pages/GalleryPage';
 import LocationsPage from './pages/LocationsPage';
 import StorePage from './pages/StorePage';
+import RegulamentoPage from './pages/RegulamentoPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Páginas Admin
@@ -88,6 +89,7 @@ export default function App() {
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/store" element={<StorePage />} />
+            <Route path="/regulamento" element={<RegulamentoPage />} />
           </Route>
 
           {/* Combo Junho */}

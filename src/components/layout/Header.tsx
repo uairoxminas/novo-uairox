@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { to: '/gallery', label: 'Fotos' },
   { to: '/squad', label: 'Squad' },
   { to: '/locations', label: 'Onde Treinar' },
+  { to: '/regulamento', label: 'Regulamento' },
 ];
 
 export default function Header() {
