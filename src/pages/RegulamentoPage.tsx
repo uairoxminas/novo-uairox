@@ -420,7 +420,7 @@ const SECTIONS: Section[] = [
             name: 'UAIZONE 5 — Rowerg',
             rules: [
               'O monitor do remo deve ser (re)definido por um árbitro antes de iniciar.',
-              'A carga deve ser definida em 7 e não pode ser alterada pelo atleta.',
+              'A carga deve ser definida pelo atleta antes de iniciar (1 a 10) e não pode ser alterada pelo atleta.',
               'Os pés devem estar nos suportes antes de segurar a alça e permanecer durante todo o exercício.',
               'Em duplas: a troca não pode ter ajuda do parceiro. O atleta que sai deixa a manopla no suporte, retira os pés, e o parceiro inicia sem auxílio. Não é permitido entregar a manopla nas mãos do parceiro.',
               'Após completar a distância, levantar o braço para confirmar com o árbitro.',
