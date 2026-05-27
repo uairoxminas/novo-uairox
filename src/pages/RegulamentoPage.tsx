@@ -370,7 +370,7 @@ const SECTIONS: Section[] = [
             name: 'UAIZONE 1 — SkiErg',
             rules: [
               'O monitor deve ser (re)definido por um árbitro antes de iniciar.',
-              'A carga deve ser definida em 7 e não pode ser alterada pelo atleta.',
+              'A carga deve ser definida pelo atleta antes de iniciar (1 a 10) e não pode ser alterada pelo atleta.',
               'Os pés devem permanecer na plataforma durante todo o exercício. Levantá-los é permitido.',
               'Em duplas: colocar as manoplas no local de saída, sair da plataforma, e o parceiro inicia pegando as manoplas no próprio skierg.',
               'Soltar as manoplas de forma agressiva ou descuidada acarreta penalidade.',
