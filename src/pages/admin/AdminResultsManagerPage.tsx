@@ -536,7 +536,7 @@ export default function AdminResultsManagerPage() {
                     <tbody className="divide-y divide-[#1a1a1a]">
                        {groupedByCategory[catName].map((r: any, idx: number) => {
                           const isEdit = editingId === r.id;
-                          const name = r.registrations?.athlete_name || r.registrations?.team_name || 'Desconhecido';
+                          const name = r.registrations?.team_name || r.registrations?.athlete_name || 'Desconhecido';
                           const isPodium = r.status === 'validated' && idx < 3;
                           
                           return (
