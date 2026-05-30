@@ -19,6 +19,7 @@ import GalleryPage from './pages/GalleryPage';
 import LocationsPage from './pages/LocationsPage';
 import StorePage from './pages/StorePage';
 import RegulamentoPage from './pages/RegulamentoPage';
+import LinkPage from './pages/LinkPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Páginas Admin
@@ -91,6 +92,9 @@ export default function App() {
             <Route path="/store" element={<StorePage />} />
             <Route path="/regulamento" element={<RegulamentoPage />} />
           </Route>
+
+          {/* Link da Bio do Instagram */}
+          <Route path="/link" element={<LinkPage />} />
 
           {/* Combo Junho */}
           <Route path="/combo-junho" element={<ComboJunhoPage />} />
