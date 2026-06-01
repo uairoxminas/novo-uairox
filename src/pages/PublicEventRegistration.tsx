@@ -1865,15 +1865,21 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
     }
 
     // Normal success screen
+    const resolvedMethod = selectedPaymentMethod || (effectivePixKey && !formActiveBatch?.payment_link ? 'pix' : !effectivePixKey && formActiveBatch?.payment_link ? 'card' : null);
+    const isPendingReceipt = totalPrice > 0 && resolvedMethod === 'pix' && !receiptUrl;
     return (
       <section className="py-20 bg-[#050505]">
         <div className="max-w-xl mx-auto px-4">
-          <div className="bg-[#0a0a0a] border border-green-500/30 rounded-2xl p-8 text-center">
-            <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+          <div className={`bg-[#0a0a0a] border ${isPendingReceipt ? 'border-amber-500/30' : 'border-green-500/30'} rounded-2xl p-8 text-center`}>
+            <div className={`w-20 h-20 rounded-full ${isPendingReceipt ? 'bg-amber-500/10' : 'bg-green-500/10'} flex items-center justify-center mx-auto mb-4`}>
+              {isPendingReceipt ? (
+                <svg className="w-10 h-10 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              ) : (
+                <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+              )}
             </div>
-            <h2 className="text-2xl font-black text-white mb-2">Inscrição Realizada! 🎉</h2>
-            <p className="text-sm text-zinc-400 mb-6">Sua inscrição em <span className="text-white font-bold">{event.title}</span> foi registrada.</p>
+            <h2 className="text-2xl font-black text-white mb-2">{isPendingReceipt ? 'Vaga Reservada ⏳' : 'Inscrição Confirmada! 🎉'}</h2>
+            <p className="text-sm text-zinc-400 mb-6">{isPendingReceipt ? <span>Envie o comprovante PIX abaixo para <span className="text-amber-400 font-bold">confirmar sua inscrição</span>.</span> : <span>Sua inscrição em <span className="text-white font-bold">{event.title}</span> foi confirmada.</span>}</p>
             {totalPrice > 0 && (
               <div className="bg-[#050505] rounded-xl p-5 mb-6 border border-[#1a1a1a] text-left">
                 <p className="text-xs font-bold text-[#EDAC02] uppercase tracking-wider mb-3">💰 Pagamento</p>
@@ -1930,9 +1936,12 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
                           </div>
 
                           {/* Área de Upload do Comprovante */}
-                          <div className="bg-[#111] border border-[#262626] rounded-xl p-4 shadow-inner mt-6">
-                            <p className="text-sm text-white font-bold mb-1">Anexar Comprovante</p>
-                            <p className="text-xs text-zinc-500 mb-4">Acelere a aprovação da sua inscrição enviando o comprovante agora.</p>
+                          <div className={`bg-[#111] border ${!receiptUrl ? 'border-amber-500/40' : 'border-green-500/30'} rounded-xl p-4 shadow-inner mt-6`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm text-white font-bold">📎 Comprovante PIX</p>
+                              {!receiptUrl && <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">Obrigatório</span>}
+                            </div>
+                            <p className="text-xs text-zinc-500 mb-4">{!receiptUrl ? 'Sua vaga só será confirmada após o envio do comprovante.' : 'Comprovante recebido com sucesso!'}</p>
                             
                             {receiptUrl ? (
                               <div className="flex flex-col gap-3 mt-1">
