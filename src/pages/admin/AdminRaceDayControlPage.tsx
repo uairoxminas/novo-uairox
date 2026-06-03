@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, PlayCircle, Loader2, Save, Plus, Trash2, StopCircle } from 'lucide-react';
-import { useEventTimingConfig, useUpdateEventTiming, useRaceCheckpoints, useCreateRaceCheckpoint, useToggleFinishLine, useDeleteRaceCheckpoint, useStartHeat, useFinishHeat } from '@/hooks/useRaceDayConfig';
+import { useEventTimingConfig, useUpdateEventTiming, useRaceCheckpoints, useCreateRaceCheckpoint, useToggleFinishLine, useDeleteRaceCheckpoint, useStartHeat } from '@/hooks/useRaceDayConfig';
 import { toast } from 'sonner';
 import RFIDWristbandsPanel from '@/components/raceday/RFIDWristbandsPanel';
+import RFIDBridgePanel from '@/components/raceday/RFIDBridgePanel';
 
 export default function AdminRaceDayControlPage() {
   const { id } = useParams<{ id: string }>();
@@ -222,6 +223,9 @@ export default function AdminRaceDayControlPage() {
         </div>
 
       </div>
+
+      {/* BRIDGE M-ID40 */}
+      <RFIDBridgePanel eventId={id!} />
 
       {/* PAINEL RFID */}
       <RFIDWristbandsPanel eventId={id!} checkpoints={(checkpoints ?? []) as unknown as { id: string; name: string; is_finish_line: boolean }[]} />

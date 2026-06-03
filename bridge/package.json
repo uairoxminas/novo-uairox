@@ -1,0 +1,12 @@
+{
+  "name": "uairox-rfid-bridge",
+  "version": "1.0.0",
+  "description": "RFID bridge for M-ID40 LIGHT → Supabase rfid-gateway",
+  "main": "rfid-bridge.js",
+  "scripts": {
+    "start": "node rfid-bridge.js"
+  },
+  "dependencies": {
+    "serialport": "^12.0.0"
+  }
+}
