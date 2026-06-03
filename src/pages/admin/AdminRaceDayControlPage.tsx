@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, PlayCircle, Loader2, Save, Plus, Trash2, StopCircle } from 'lucide-react';
 import { useEventTimingConfig, useUpdateEventTiming, useRaceCheckpoints, useCreateRaceCheckpoint, useToggleFinishLine, useDeleteRaceCheckpoint, useStartHeat, useFinishHeat } from '@/hooks/useRaceDayConfig';
 import { toast } from 'sonner';
+import RFIDWristbandsPanel from '@/components/raceday/RFIDWristbandsPanel';
 
 export default function AdminRaceDayControlPage() {
   const { id } = useParams<{ id: string }>();
@@ -221,6 +222,9 @@ export default function AdminRaceDayControlPage() {
         </div>
 
       </div>
+
+      {/* PAINEL RFID */}
+      <RFIDWristbandsPanel eventId={id!} checkpoints={(checkpoints ?? []) as unknown as { id: string; name: string; is_finish_line: boolean }[]} />
 
       {/* PAINEL DE BATERIAS */}
       <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">

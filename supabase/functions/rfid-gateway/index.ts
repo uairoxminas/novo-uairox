@@ -1,0 +1,184 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-rfid-api-key',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  // API key auth — no JWT needed, called by the hardware bridge app
+  const apiKey = req.headers.get('x-rfid-api-key');
+  const expectedKey = Deno.env.get('RFID_GATEWAY_KEY');
+  if (!expectedKey || apiKey !== expectedKey) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  try {
+    const body = await req.json();
+    const { reader_id, antenna_index, tag_epc, rssi, read_at } = body;
+
+    if (!reader_id || antenna_index == null || !tag_epc) {
+      return new Response(JSON.stringify({ error: 'Missing: reader_id, antenna_index, tag_epc' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    const readAt = read_at ? new Date(read_at).toISOString() : new Date().toISOString();
+
+    // Helper: log read and return early
+    const logAndReturn = async (
+      skip_reason: string,
+      extra: Record<string, unknown> = {},
+    ) => {
+      await supabase.from('rfid_reads').insert({
+        reader_id, antenna_index, tag_epc, rssi,
+        read_at: readAt,
+        processed: false,
+        skip_reason,
+        ...extra,
+      });
+      return new Response(JSON.stringify({ status: skip_reason }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    };
+
+    // 1. Find active wristband assignment
+    const { data: assignment } = await supabase
+      .from('rfid_tag_assignments')
+      .select('registration_id, event_id')
+      .eq('tag_epc', tag_epc)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!assignment) {
+      return logAndReturn('unknown_tag');
+    }
+
+    const { registration_id, event_id } = assignment;
+
+    // 2. Find antenna config for this reader/port/event
+    const { data: antenna } = await supabase
+      .from('rfid_antennas')
+      .select('checkpoint_id, entry_type, debounce_ms, label')
+      .eq('event_id', event_id)
+      .eq('reader_id', reader_id)
+      .eq('antenna_index', antenna_index)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!antenna) {
+      return logAndReturn('no_antenna_config', { event_id, registration_id });
+    }
+
+    // 3. Debounce — ignore re-read of same tag on same antenna within debounce_ms
+    const debounceFrom = new Date(
+      new Date(readAt).getTime() - antenna.debounce_ms,
+    ).toISOString();
+
+    const { data: recentRead } = await supabase
+      .from('rfid_reads')
+      .select('id')
+      .eq('tag_epc', tag_epc)
+      .eq('antenna_index', antenna_index)
+      .eq('processed', true)
+      .gte('read_at', debounceFrom)
+      .limit(1)
+      .maybeSingle();
+
+    if (recentRead) {
+      return logAndReturn('debounce', { event_id, registration_id });
+    }
+
+    // 4. Get bib_number from registrations
+    const { data: registration } = await supabase
+      .from('registrations')
+      .select('bib_number')
+      .eq('id', registration_id)
+      .maybeSingle();
+
+    const bibNumber = registration?.bib_number ? String(registration.bib_number) : '';
+
+    // 5. Find a running heat for this registration + event (two-step to avoid FK name issues)
+    const { data: laneRows } = await supabase
+      .from('heat_lane_assignments')
+      .select('heat_id')
+      .eq('registration_id', registration_id);
+
+    const heatIds = (laneRows ?? []).map((r: { heat_id: string }) => r.heat_id);
+
+    if (!heatIds.length) {
+      return logAndReturn('no_heat_assignment', { event_id, registration_id });
+    }
+
+    const { data: runningHeat } = await supabase
+      .from('heats')
+      .select('id')
+      .eq('event_id', event_id)
+      .eq('status', 'running')
+      .in('id', heatIds)
+      .maybeSingle();
+
+    if (!runningHeat) {
+      return logAndReturn('no_running_heat', { event_id, registration_id });
+    }
+
+    const heat_id = runningHeat.id;
+
+    // 6. Insert into race_splits — same shape the judge panel uses
+    const { error: splitError } = await supabase
+      .from('race_splits')
+      .insert({
+        event_id,
+        heat_id,
+        registration_id,
+        bib_number: bibNumber,
+        checkpoint_id: antenna.checkpoint_id,
+        split_timestamp: readAt,
+      });
+
+    if (splitError) throw splitError;
+
+    // 7. Log successful read
+    await supabase.from('rfid_reads').insert({
+      reader_id, antenna_index, tag_epc, rssi,
+      read_at: readAt,
+      event_id,
+      registration_id,
+      processed: true,
+    });
+
+    return new Response(
+      JSON.stringify({
+        status: 'ok',
+        event_id,
+        heat_id,
+        registration_id,
+        bib_number: bibNumber,
+        checkpoint_id: antenna.checkpoint_id,
+        antenna_label: antenna.label,
+        entry_type: antenna.entry_type,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  } catch (err) {
+    console.error('rfid-gateway error:', err);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
