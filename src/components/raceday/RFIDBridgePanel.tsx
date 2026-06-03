@@ -66,19 +66,21 @@ function CodeBlock({ children }: { children: string }) {
 }
 
 export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
-  const [mode, setMode]         = useState<Mode>('usb');
+  const [mode, setMode]           = useState<Mode>('usb');
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [apiKey, setApiKey]     = useState(() => localStorage.getItem('rfid_api_key')    || '');
-  const [readerId, setReaderId] = useState(() => localStorage.getItem('rfid_reader_id')  || 'reader-1');
-  const [rfidIp, setRfidIp]     = useState(() => localStorage.getItem('rfid_ip')         || '192.168.1.50');
+  const [apiKey, setApiKey]       = useState(() => localStorage.getItem('rfid_api_key')   || '');
+  const [readerId, setReaderId]   = useState(() => localStorage.getItem('rfid_reader_id') || 'reader-1');
+  const [rfidIp, setRfidIp]       = useState(() => localStorage.getItem('rfid_ip')        || '192.168.1.50');
+  const [showHelpUsb, setShowHelpUsb]       = useState(false);
+  const [showHelpTcp, setShowHelpTcp]       = useState(false);
+  const [showHelpDirect, setShowHelpDirect] = useState(false);
   const [rfidPort, setRfidPort] = useState(() => localStorage.getItem('rfid_port')       || '5000');
   const [baudRate, setBaudRate] = useState<number>(9600);
   const [logs, setLogs]         = useState<ReadLog[]>([]);
   const [rawLog, setRawLog]     = useState<string[]>([]);
-  const [showRaw, setShowRaw]   = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
+  const [showRaw, setShowRaw]         = useState(false);
+  const [showConfig, setShowConfig]   = useState(false);
 
   const logIdRef   = useRef(0);
   const portRef    = useRef<any>(null);
@@ -179,12 +181,8 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
       <div className="p-5 border-b border-[#1a1a1a] flex items-center justify-between">
         <h2 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
           <Radio className="w-5 h-5 text-[#EDAC02]" /> Bridge M-ID40
+          <span className="text-xs font-normal text-zinc-500 normal-case ml-1">Conexão com o leitor RFID</span>
         </h2>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowHelp(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors">
-            <HelpCircle className="w-3.5 h-3.5" /> Ajuda {showHelp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-        </div>
       </div>
 
       {/* Mode tabs */}
@@ -207,24 +205,60 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
       {mode === 'usb' && (
         <>
           {/* Help USB */}
-          {showHelp && (
-            <div className="p-5 border-b border-[#1a1a1a] bg-[#050505] space-y-3">
-              <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Como conectar via USB</p>
-              <ol className="space-y-2.5 text-sm text-zinc-300">
-                {[
-                  'Conecte o M-ID40 ao notebook via cabo USB. O Windows reconhecerá como porta COM (ex: COM3).',
-                  'Clique em Config, informe a API Key e o ID do Leitor (deve ser igual ao configurado nas antenas).',
-                  'Selecione o Baud Rate conforme o manual Via Onda (normalmente 9600).',
-                  'Clique Conectar Leitor USB, selecione a porta COM e aguarde o indicador verde.',
-                  'Passe uma pulseira pela antena — a leitura aparecerá no feed abaixo.',
-                ].map((s, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="w-5 h-5 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-[10px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
-                    <span>{s}</span>
-                  </li>
-                ))}
+          <div className="px-5 py-3 border-b border-[#1a1a1a] bg-[#050505] flex justify-end">
+            <button onClick={() => setShowHelpUsb(v => !v)} className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors">
+              <HelpCircle className="w-3.5 h-3.5" /> Como conectar via USB {showHelpUsb ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+          {showHelpUsb && (
+            <div className="p-5 border-b border-[#1a1a1a] bg-[#050505] space-y-4">
+              <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Guia — Conexão USB Serial</p>
+
+              <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-500 space-y-1">
+                <p className="font-bold text-zinc-400">Requisitos:</p>
+                <p>• Navegador <strong className="text-white">Chrome ou Edge versão 89+</strong> (Web Serial API não funciona em Firefox ou Safari)</p>
+                <p>• Cabo USB conectado ao M-ID40</p>
+                <p>• Driver USB do M-ID40 instalado no Windows (disponível no site <strong className="text-white">viaondarfid.com.br</strong> ou no CD do equipamento)</p>
+              </div>
+
+              <ol className="space-y-3 text-sm text-zinc-300">
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+                  <span><strong className="text-white">Instale o driver USB</strong> do M-ID40 no notebook. Após instalar, conecte o cabo USB. No Gerenciador de Dispositivos do Windows, confirme que aparece uma porta <strong className="text-white">COM</strong> (ex: COM3, COM4) em "Portas (COM e LPT)".</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+                  <span>Clique em <strong className="text-white">Config</strong> (abaixo) e preencha os três campos: <strong className="text-white">API Key</strong> (valor de <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">RFID_GATEWAY_KEY</code> configurado no Supabase), <strong className="text-white">ID do Leitor</strong> (ex: reader-1 — deve ser idêntico ao valor configurado no painel de Antenas RFID) e <strong className="text-white">Baud Rate</strong> conforme o manual do M-ID40 (normalmente <strong className="text-white">9600</strong>).</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
+                  <span>Clique em <strong className="text-white">Conectar Leitor USB</strong>. O Chrome abrirá uma janela nativa para selecionar a porta serial — escolha a porta COM do M-ID40 (ex: COM3) e confirme.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">4</span>
+                  <span>O indicador na barra de status ficará <strong className="text-green-400">verde — ONLINE</strong>. O sistema está lendo a porta serial em tempo real.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">5</span>
+                  <span>Passe uma pulseira pela antena. A leitura deve aparecer no feed abaixo com status <strong className="text-green-400">REGISTRADO</strong>. Se aparecer <strong className="text-yellow-400">TAG DESCONHECIDA</strong>, a pulseira precisa ser cadastrada e atribuída no painel Pulseiras RFID.</span>
+                </li>
               </ol>
-              <p className="text-xs text-zinc-600">Alternativa sem browser: rode o script Node.js com <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">CONNECTION_MODE=serial</code> — veja a aba USB na seção de comandos abaixo.</p>
+
+              <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-500 space-y-1.5">
+                <p className="font-bold text-zinc-400">Diagnóstico de status:</p>
+                <p><span className="text-green-400 font-bold">REGISTRADO</span> — passagem gravada no sistema com sucesso.</p>
+                <p><span className="text-zinc-500 font-bold">DEBOUNCE</span> — mesma pulseira lida na mesma antena em menos de 5 segundos (ignorada).</p>
+                <p><span className="text-yellow-400 font-bold">TAG DESCONHECIDA</span> — pulseira não atribuída a nenhum atleta.</p>
+                <p><span className="text-orange-400 font-bold">SEM BATERIA ATIVA</span> — atleta não tem bateria com status "running".</p>
+                <p><span className="text-red-400 font-bold">ANTENA NÃO CONFIG.</span> — a entrada RFID não foi mapeada para nenhum tapete.</p>
+                <p className="pt-1">Use <strong className="text-zinc-300">Dados brutos</strong> (no final) para ver exatamente o que o M-ID40 está enviando e ajustar o parser se o formato for diferente.</p>
+              </div>
+
+              <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-500">
+                <p className="font-bold text-zinc-400 mb-1.5">Alternativa — rodar sem browser (Node.js):</p>
+                <CodeBlock>{`CONNECTION_MODE=serial SERIAL_PORT=COM3 READER_ID=reader-1 RFID_GATEWAY_KEY=sua-key node rfid-bridge.js`}</CodeBlock>
+                <p className="mt-2">Útil para rodar em background sem manter o navegador aberto.</p>
+              </div>
             </div>
           )}
 
@@ -310,12 +344,77 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
 
       {/* ── ABA TCP / REDE ─────────────────────────────────────────────── */}
       {mode === 'tcp' && (
-        <div className="p-6 space-y-6">
-          {showHelp && (
-            <div className="p-4 bg-[#050505] rounded-xl border border-[#1a1a1a] text-sm text-zinc-400 space-y-2">
-              <p className="font-black text-white text-xs uppercase tracking-widest text-[#EDAC02]">Quando usar rede / TCP?</p>
-              <p>Ideal quando o M-ID40 está <strong className="text-white">longe do notebook</strong> (cabos USB têm limite de ~5m). O leitor fica conectado ao Wi-Fi da arena e se comunica via TCP/IP.</p>
-              <p>Use <strong className="text-white">Modo TCP Client</strong> se o notebook conecta ao M-ID40 (você sabe o IP do leitor). Use <strong className="text-white">Modo TCP Server</strong> se o M-ID40 se conecta ao notebook (configure o IP do notebook no leitor).</p>
+        <div className="p-6 space-y-5">
+
+          {/* Help TCP */}
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Configuração do bridge Node.js</p>
+            <button onClick={() => setShowHelpTcp(v => !v)} className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors">
+              <HelpCircle className="w-3.5 h-3.5" /> Como conectar via rede {showHelpTcp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+          {showHelpTcp && (
+            <div className="space-y-4 p-5 bg-[#050505] rounded-xl border border-[#1a1a1a]">
+              <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Guia — Conexão TCP / Rede</p>
+
+              <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-500 space-y-1">
+                <p className="font-bold text-zinc-400">Quando usar este modo:</p>
+                <p>• Cabo USB tem limite de ~5m. Para distâncias maiores, use a rede.</p>
+                <p>• O M-ID40 deve estar conectado à rede local (cabo Ethernet ou Wi-Fi) e o notebook na mesma rede.</p>
+                <p>• Requisito: <strong className="text-white">Node.js instalado</strong> no notebook (download em nodejs.org).</p>
+              </div>
+
+              <div className="space-y-3 text-sm text-zinc-300">
+                <p className="text-xs font-black text-white uppercase tracking-widest">Preparação (faça uma vez)</p>
+                <ol className="space-y-3">
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+                    <span>Descubra o <strong className="text-white">IP do M-ID40</strong> acessando a interface web do leitor pelo navegador (ex: http://192.168.1.50 — verifique o IP no roteador ou no display do leitor). Informe esse IP no campo abaixo.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+                    <span>Abra um terminal na pasta <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">bridge/</code> do projeto e rode: <CodeBlock>{'npm install'}</CodeBlock></span>
+                  </li>
+                </ol>
+              </div>
+
+              <div className="space-y-3 text-sm text-zinc-300">
+                <p className="text-xs font-black text-white uppercase tracking-widest">Modo TCP Client — notebook conecta ao M-ID40</p>
+                <p className="text-xs text-zinc-500">Use quando o M-ID40 está configurado como servidor TCP (você sabe o IP do leitor). O notebook inicia a conexão.</p>
+                <ol className="space-y-3">
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+                    <span>Na interface web do M-ID40, configure-o para atuar como <strong className="text-white">servidor TCP</strong> na porta informada abaixo (padrão: 5000).</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+                    <span>Preencha o IP e porta abaixo, copie o comando gerado e execute no terminal. Substitua <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">&lt;sua-key&gt;</code> pelo valor de <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">RFID_GATEWAY_KEY</code>.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
+                    <span>Deixe o terminal aberto durante toda a prova. Se a conexão cair, o script reconecta automaticamente em 5 segundos.</span>
+                  </li>
+                </ol>
+              </div>
+
+              <div className="space-y-3 text-sm text-zinc-300">
+                <p className="text-xs font-black text-white uppercase tracking-widest">Modo TCP Server — M-ID40 conecta ao notebook</p>
+                <p className="text-xs text-zinc-500">Use quando você quer configurar o M-ID40 para se conectar ao notebook (útil se o IP do leitor muda). O notebook abre a porta e aguarda.</p>
+                <ol className="space-y-3">
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+                    <span>Execute o comando gerado abaixo com <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">CONNECTION_MODE=server</code>. O terminal exibirá "Aguardando M-ID40 na porta X".</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+                    <span>Na interface web do M-ID40, configure-o para conectar ao <strong className="text-white">IP deste notebook</strong> na porta configurada (padrão: 5000). Descubra o IP do notebook com <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">ipconfig</code> no terminal.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
+                    <span>Salve e reinicie o leitor. O terminal do bridge exibirá "M-ID40 conectado de X.X.X.X" quando a conexão for estabelecida.</span>
+                  </li>
+                </ol>
+              </div>
             </div>
           )}
 
@@ -358,12 +457,80 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
 
       {/* ── ABA DIRETO ─────────────────────────────────────────────────── */}
       {mode === 'direct' && (
-        <div className="p-6 space-y-6">
-          {showHelp && (
-            <div className="p-4 bg-[#050505] rounded-xl border border-[#1a1a1a] text-sm text-zinc-400 space-y-2">
-              <p className="font-black text-white text-xs uppercase tracking-widest text-[#EDAC02]">Modo Direto — sem bridge</p>
-              <p>O M-ID40 é configurado para fazer HTTP POST <strong className="text-white">diretamente ao Supabase</strong>, sem nenhum software intermediário no notebook. O leitor precisa ter acesso à internet.</p>
-              <p>Verifique se o firmware do seu M-ID40 suporta <strong className="text-white">HTTP POST com HTTPS</strong> e headers customizados. Consulte o manual Via Onda ou acesse a interface web do leitor via IP.</p>
+        <div className="p-6 space-y-5">
+
+          {/* Help Direto */}
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Configuração do M-ID40</p>
+            <button onClick={() => setShowHelpDirect(v => !v)} className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors">
+              <HelpCircle className="w-3.5 h-3.5" /> Como configurar modo direto {showHelpDirect ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+          {showHelpDirect && (
+            <div className="space-y-4 p-5 bg-[#050505] rounded-xl border border-[#1a1a1a]">
+              <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Guia — M-ID40 postando direto ao Supabase</p>
+
+              <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-500 space-y-1">
+                <p className="font-bold text-zinc-400">Quando usar este modo:</p>
+                <p>• Sem notebook na pista — o leitor opera de forma totalmente autônoma.</p>
+                <p>• O M-ID40 precisa de <strong className="text-white">acesso à internet</strong> (conectado ao roteador com saída para internet).</p>
+                <p>• O firmware do M-ID40 deve suportar <strong className="text-white">HTTP POST com HTTPS e headers customizados</strong>. Consulte o manual Via Onda para confirmar.</p>
+              </div>
+
+              <ol className="space-y-3 text-sm text-zinc-300">
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+                  <span>Conecte o M-ID40 à rede (cabo Ethernet ou Wi-Fi). Descubra o IP do leitor pelo roteador ou display e acesse a <strong className="text-white">interface web</strong> pelo navegador: <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">http://IP_DO_LEITOR</code></span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+                  <span>Localize a seção de <strong className="text-white">integração HTTP, Webhook ou Output</strong> no painel do leitor. Configure:</span>
+                </li>
+              </ol>
+
+              <div className="space-y-2 pl-9">
+                {[
+                  { label: 'URL',          value: GATEWAY_URL },
+                  { label: 'Método',       value: 'POST' },
+                  { label: 'Header',       value: 'x-rfid-api-key: SEU_RFID_GATEWAY_KEY' },
+                  { label: 'Content-Type', value: 'application/json' },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <p className="text-xs text-zinc-600 mb-1">{label}</p>
+                    <CodeBlock>{value}</CodeBlock>
+                  </div>
+                ))}
+              </div>
+
+              <ol className="space-y-3 text-sm text-zinc-300" start={3}>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
+                  <span>Configure o <strong className="text-white">formato do body JSON</strong> que o M-ID40 enviará. O gateway aceita vários nomes de campo — use o formato abaixo ou adapte conforme o que seu firmware suporta:</span>
+                </li>
+              </ol>
+
+              <div className="pl-9 space-y-2">
+                <p className="text-xs text-zinc-600">Formato padrão:</p>
+                <CodeBlock>{`{"reader_id":"reader-1","antenna_index":1,"tag_epc":"E200341400...","rssi":-65}`}</CodeBlock>
+                <p className="text-xs text-zinc-600 mt-2">Formatos alternativos aceitos (campos equivalentes):</p>
+                <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-400 space-y-1 font-mono">
+                  <p><span className="text-zinc-600">reader_id   =</span> reader_id <span className="text-zinc-700">|</span> readerid <span className="text-zinc-700">|</span> reader <span className="text-zinc-700">|</span> ReaderID</p>
+                  <p><span className="text-zinc-600">antenna_index =</span> antenna_index <span className="text-zinc-700">|</span> antennaid <span className="text-zinc-700">|</span> antenna <span className="text-zinc-700">|</span> AntennaID</p>
+                  <p><span className="text-zinc-600">tag_epc     =</span> tag_epc <span className="text-zinc-700">|</span> epc <span className="text-zinc-700">|</span> tagid <span className="text-zinc-700">|</span> EPC</p>
+                  <p><span className="text-zinc-600">rssi        =</span> rssi <span className="text-zinc-700">|</span> signal <span className="text-zinc-700">|</span> RSSI</p>
+                </div>
+              </div>
+
+              <ol className="space-y-3 text-sm text-zinc-300" start={4}>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">4</span>
+                  <span><strong className="text-white">Salve as configurações</strong> e reinicie o leitor. A partir deste momento, cada passagem de pulseira gera um POST automático ao gateway.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">5</span>
+                  <span><strong className="text-white">Teste:</strong> passe uma pulseira e verifique no Supabase → SQL Editor: <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">SELECT * FROM rfid_reads ORDER BY read_at DESC LIMIT 5;</code> — a leitura deve aparecer. Neste modo não há feed ao vivo no browser.</span>
+                </li>
+              </ol>
             </div>
           )}
 
