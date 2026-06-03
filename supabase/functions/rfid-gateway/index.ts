@@ -23,10 +23,20 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { reader_id, antenna_index, tag_epc, rssi, read_at } = body;
 
-    if (!reader_id || antenna_index == null || !tag_epc) {
-      return new Response(JSON.stringify({ error: 'Missing: reader_id, antenna_index, tag_epc' }), {
+    // Normalise payload — accept both our standard format and common M-ID40 native formats:
+    //   Standard : { reader_id, antenna_index, tag_epc, rssi?, read_at? }
+    //   M-ID40 A : { readerid, antennaid, epc, rssi?, timestamp? }
+    //   M-ID40 B : { reader, antenna, tagid, signal?, time? }
+    //   M-ID40 C : { ReaderID, AntennaID, EPC, RSSI?, Time? }
+    const reader_id     = body.reader_id     ?? body.readerid    ?? body.reader    ?? body.ReaderID   ?? null;
+    const antenna_index = body.antenna_index ?? body.antennaid   ?? body.antenna   ?? body.AntennaID  ?? 1;
+    const tag_epc       = (body.tag_epc      ?? body.epc         ?? body.tagid     ?? body.EPC        ?? '').toString().toUpperCase();
+    const rssi          = body.rssi          ?? body.signal      ?? body.RSSI      ?? null;
+    const read_at       = body.read_at       ?? body.timestamp   ?? body.time      ?? body.Time       ?? null;
+
+    if (!reader_id || !tag_epc) {
+      return new Response(JSON.stringify({ error: 'Missing: reader_id and tag_epc (or epc / EPC / tagid) are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
