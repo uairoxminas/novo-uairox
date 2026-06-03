@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Usb, Wifi, WifiOff, Radio, CircleDot, ChevronDown, ChevronUp, Loader2, Send } from 'lucide-react';
+import { Usb, WifiOff, Radio, CircleDot, ChevronDown, ChevronUp, Loader2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ReadLog {
@@ -55,6 +55,7 @@ export default function RFIDBridgePanel({ eventId }: Props) {
   const [rawLog, setRawLog] = useState<string[]>([]);
   const [showRaw, setShowRaw] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const logIdRef = useRef(0);
   const portRef = useRef<SerialPort | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
@@ -185,6 +186,12 @@ export default function RFIDBridgePanel({ eventId }: Props) {
         </h2>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowHelp(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" /> Ajuda {showHelp ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          <button
             onClick={() => setShowConfig(v => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors"
           >
@@ -209,6 +216,44 @@ export default function RFIDBridgePanel({ eventId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Help (collapsible) */}
+      {showHelp && (
+        <div className="p-5 border-b border-[#1a1a1a] bg-[#050505] space-y-4">
+          <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Como conectar o M-ID40 LIGHT</p>
+          <ol className="space-y-3 text-sm text-zinc-300">
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+              <span>Conecte o M-ID40 LIGHT ao notebook via <strong className="text-white">cabo USB</strong>. O Windows deve reconhecê-lo como porta COM (ex: COM3, COM4).</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+              <span>Clique em <strong className="text-white">Config</strong> e informe a <strong className="text-white">API Key</strong> (valor <code className="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-[#EDAC02]">RFID_GATEWAY_KEY</code> configurado no Supabase) e o <strong className="text-white">ID do Leitor</strong> (ex: reader-1 — deve ser idêntico ao configurado nas antenas).</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
+              <span>Selecione o <strong className="text-white">Baud Rate</strong> conforme a especificação do M-ID40 (consulte o manual Via Onda — normalmente <strong className="text-white">9600</strong>).</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">4</span>
+              <span>Clique em <strong className="text-white">Conectar Leitor USB</strong>. O Chrome abrirá um seletor de portas — escolha a porta COM do M-ID40. O indicador ficará <strong className="text-green-400">verde</strong>.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">5</span>
+              <span>Passe uma pulseira pela antena. A leitura aparecerá no feed abaixo. Se o status for <strong className="text-yellow-400">TAG DESCONHECIDA</strong>, a pulseira precisa ser atribuída a um atleta no painel Pulseiras RFID.</span>
+            </li>
+          </ol>
+          <div className="p-3 bg-[#1a1a1a] rounded-xl border border-[#262626] space-y-1.5 text-xs text-zinc-500">
+            <p className="font-bold text-zinc-400">Diagnóstico — status das leituras:</p>
+            <p><span className="text-green-400 font-bold">REGISTRADO</span> — passagem gravada com sucesso no sistema.</p>
+            <p><span className="text-zinc-500 font-bold">DEBOUNCE</span> — leitura ignorada (mesma pulseira na mesma antena em menos de 5s).</p>
+            <p><span className="text-yellow-400 font-bold">TAG DESCONHECIDA</span> — pulseira não atribuída a nenhum atleta.</p>
+            <p><span className="text-orange-400 font-bold">SEM BATERIA ATIVA</span> — nenhuma bateria com status "running" para este atleta.</p>
+            <p><span className="text-red-400 font-bold">ANTENA NÃO CONFIG.</span> — esta entrada não está mapeada para nenhum tapete.</p>
+            <p className="pt-1">Use <strong className="text-zinc-300">Dados brutos</strong> para ver o texto exato que o M-ID40 está enviando e ajustar o parser se necessário.</p>
+          </div>
+        </div>
+      )}
 
       {/* Status bar */}
       <div className={`px-5 py-2.5 flex items-center gap-2 border-b border-[#1a1a1a] ${connected ? 'bg-green-950/20' : 'bg-[#050505]'}`}>

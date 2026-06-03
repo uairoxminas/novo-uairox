@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wifi, Tag, UserCheck, Unlock, Plus, Search, Loader2, ChevronDown, ChevronUp, Radio } from 'lucide-react';
+import { Wifi, Tag, UserCheck, Unlock, Plus, Search, Loader2, ChevronDown, ChevronUp, Radio, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useRFIDTags,
@@ -32,7 +32,11 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
   const saveAntenna = useSaveRFIDAntenna();
 
   // — Cadastrar pulseira
+  const [showHelp, setShowHelp] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [showRegisterHelp, setShowRegisterHelp] = useState(false);
+  const [showAntennasHelp, setShowAntennasHelp] = useState(false);
+  const [showAssignHelp, setShowAssignHelp] = useState(false);
   const [regNumber, setRegNumber] = useState('');
   const [regEpc, setRegEpc] = useState('');
 
@@ -126,6 +130,12 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
         </h2>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowHelp(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" /> Ajuda {showHelp ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          <button
             onClick={() => setShowAntennas(v => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors"
           >
@@ -141,6 +151,36 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Ajuda geral (collapsible) */}
+      {showHelp && (
+        <div className="p-5 border-b border-[#1a1a1a] bg-[#050505] space-y-4">
+          <p className="text-xs font-black text-[#EDAC02] uppercase tracking-widest">Fluxo completo — dia de prova</p>
+          <ol className="space-y-3 text-sm text-zinc-300">
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
+              <span><strong className="text-white">Pré-evento:</strong> Cadastre as 120 pulseiras físicas (botão "Cadastrar Pulseira"). Para isso você precisará do EPC de cada chip — passe cada pulseira pelo leitor e observe os dados brutos no Bridge M-ID40.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
+              <span><strong className="text-white">Pré-evento:</strong> Configure as antenas (botão "Configurar Leitor") — defina qual tapete cada entrada do M-ID40 cobre e o tipo de entrada (Largada, Passagem ou Chegada).</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
+              <span><strong className="text-white">Check-in:</strong> À medida que os atletas chegam, use o formulário abaixo para entregar e registrar cada pulseira. Busque pelo nome ou número de peito.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">4</span>
+              <span><strong className="text-white">Durante a prova:</strong> As passagens são registradas automaticamente quando o atleta cruza o tapete. O Live Monitor atualiza em tempo real.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">5</span>
+              <span><strong className="text-white">Após cada atleta:</strong> Recolha a pulseira física e clique <strong className="text-white">Liberar</strong> na lista abaixo. A pulseira fica disponível para o próximo atleta.</span>
+            </li>
+          </ol>
+          <p className="text-xs text-zinc-600 pt-1">O sistema impede automaticamente que a mesma pulseira seja atribuída a dois atletas ao mesmo tempo, e que um atleta tenha mais de uma pulseira ativa.</p>
+        </div>
+      )}
 
       {/* Status Cards */}
       <div className="grid grid-cols-3 divide-x divide-[#1a1a1a] border-b border-[#1a1a1a]">
@@ -161,7 +201,25 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
       {/* Cadastrar Pulseira (collapsible) */}
       {showRegister && (
         <div className="p-5 border-b border-[#1a1a1a] bg-[#050505] space-y-3">
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Nova Pulseira</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Nova Pulseira</p>
+            <button onClick={() => setShowRegisterHelp(v => !v)} className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+              <HelpCircle className="w-3.5 h-3.5" /> Como obter o EPC? {showRegisterHelp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+          {showRegisterHelp && (
+            <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-400 space-y-2">
+              <p><strong className="text-white">Número:</strong> é o número físico impresso ou colado na pulseira (ex: 42). Você define, de 1 a 120.</p>
+              <p><strong className="text-white">EPC (Tag EPC):</strong> é o código único gravado no chip RFID de cada pulseira. Para descobri-lo:</p>
+              <ol className="list-decimal list-inside space-y-1 pl-2">
+                <li>Conecte o M-ID40 pelo painel Bridge acima</li>
+                <li>Passe a pulseira pela antena</li>
+                <li>Expanda "Dados brutos" no Bridge — o EPC aparecerá como uma sequência hexadecimal (ex: <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">E200341400000001</code>)</li>
+                <li>Copie e cole aqui</li>
+              </ol>
+              <p className="text-zinc-600">Dica: cadastre todas as 120 pulseiras antes do dia da prova passando-as uma a uma pelo leitor.</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-zinc-600 mb-1">Número (1–120)</label>
@@ -186,7 +244,26 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
       {/* Configurar Antenas (collapsible) */}
       {showAntennas && (
         <div className="p-5 border-b border-[#1a1a1a] bg-[#050505] space-y-4">
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Configuração do M-ID40</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Configuração do M-ID40</p>
+            <button onClick={() => setShowAntennasHelp(v => !v)} className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+              <HelpCircle className="w-3.5 h-3.5" /> Como configurar? {showAntennasHelp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+          {showAntennasHelp && (
+            <div className="p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-400 space-y-2">
+              <p><strong className="text-white">ID do Leitor:</strong> nome que identifica este M-ID40 no sistema. Deve ser <strong className="text-white">exatamente igual</strong> ao configurado no painel Bridge acima (ex: reader-1). Se tiver múltiplos leitores, use nomes distintos (reader-1, reader-2).</p>
+              <p><strong className="text-white">Entrada 1 / Entrada 2:</strong> correspondem aos conectores físicos "Entrada 1" e "Entrada 2" na parte frontal do M-ID40. Cada entrada recebe o cabo coaxial de uma antena.</p>
+              <p><strong className="text-white">Tapete / Ponto de Controle:</strong> selecione qual tapete esta antena cobre. Os tapetes são criados na seção "Tapetes e Leitores" desta mesma página.</p>
+              <p><strong className="text-white">Tipo de Entrada:</strong></p>
+              <ul className="list-disc list-inside pl-2 space-y-1">
+                <li><strong className="text-white">Largada</strong> — registra o início da prova do atleta (use na antena da linha de saída)</li>
+                <li><strong className="text-white">Volta / Passagem</strong> — registra uma passagem ou volta (use nos tapetes intermediários)</li>
+                <li><strong className="text-white">Chegada</strong> — registra o fim da prova (use na antena da linha de chegada)</li>
+              </ul>
+              <p className="text-zinc-600">Exemplo típico: Antena 1 = Largada, Antena 2 = Chegada. Para circuito com volta: Antena 1 = Passagem, Antena 2 = Chegada.</p>
+            </div>
+          )}
           <div>
             <label className="block text-xs text-zinc-600 mb-1">ID do Leitor</label>
             <input type="text" value={readerId} onChange={e => setReaderId(e.target.value)} className={inputClass} placeholder="reader-1" />
@@ -229,7 +306,24 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
 
       {/* Atribuir Pulseira */}
       <div className="p-5 border-b border-[#1a1a1a] bg-[#050505]">
-        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Atribuir Pulseira a Atleta</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Atribuir Pulseira a Atleta</p>
+          <button onClick={() => setShowAssignHelp(v => !v)} className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+            <HelpCircle className="w-3.5 h-3.5" /> Como funciona? {showAssignHelp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+        {showAssignHelp && (
+          <div className="mb-4 p-3 bg-[#0a0a0a] rounded-xl border border-[#262626] text-xs text-zinc-400 space-y-2">
+            <p><strong className="text-white">No check-in ou na largada:</strong> entregue fisicamente a pulseira ao atleta e registre a entrega aqui.</p>
+            <ol className="list-decimal list-inside space-y-1 pl-2">
+              <li>Digite o <strong className="text-white">número</strong> da pulseira que está entregando (ex: 42)</li>
+              <li>Busque o atleta pelo <strong className="text-white">nome</strong> ou <strong className="text-white">nº de peito</strong> (mínimo 2 caracteres)</li>
+              <li>Selecione o atleta na lista e clique <strong className="text-white">Atribuir</strong></li>
+            </ol>
+            <p>A pulseira aparecerá como <strong className="text-[#EDAC02]">Em Uso</strong> na lista abaixo. O sistema bloqueará se você tentar atribuir a mesma pulseira para dois atletas.</p>
+            <p><strong className="text-white">Para liberar:</strong> quando o atleta terminar e devolver a pulseira, clique <strong className="text-white">Liberar</strong> na lista. A pulseira voltará para Livre e poderá ser reutilizada.</p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
             <label className="block text-xs text-zinc-600 mb-1">Nº da Pulseira</label>
