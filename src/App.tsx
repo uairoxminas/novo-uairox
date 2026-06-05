@@ -47,6 +47,7 @@ import SquadRankingPage from './pages/SquadRankingPage';
 import PartnerViewPage from './pages/PartnerViewPage';
 import PublicEventSchedule from './pages/PublicEventSchedule';
 import ChallengePortalPage from './pages/ChallengePortalPage';
+import ComprovanteUploadPage from './pages/ComprovanteUploadPage';
 
 // Páginas Juiz
 import JudgePassagesPanel from './pages/judge/JudgePassagesPanel';
@@ -114,6 +115,7 @@ export default function App() {
 
           {/* Portal de Pagamento (Parcelas PIX) */}
           <Route path="/pagamento/:registrationId" element={<PaymentPortal />} />
+          <Route path="/comprovante/:registrationId" element={<ComprovanteUploadPage />} />
 
           {/* Painel do Parceiro — Visualização read-only via token */}
           <Route path="/parceiro/:token" element={<PartnerViewPage />} />

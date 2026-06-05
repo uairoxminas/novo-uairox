@@ -77,6 +77,16 @@ Parcela {{parcela}} em atraso desde {{vencimento}}.
 
 🔖 Código: {{codigo}}`,
 
+  comprovante: `📎 *ENVIE SEU COMPROVANTE — {{evento}}*
+
+Olá, *{{nome}}*! Sua inscrição foi recebida, mas ainda não identificamos o comprovante de pagamento.
+
+Para confirmar sua vaga, acesse o link abaixo e envie o comprovante PIX:
+
+👉 {{link}}
+
+Qualquer dúvida, fale conosco! 💪`,
+
   marco: `🏆 *MARCO ATINGIDO — UAIROX*
 
 Parabéns, *{{nome}}*! Você atingiu *{{count}} indicações* com seu cupom e alcançou o nível *{{nivel}}*!

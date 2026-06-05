@@ -2422,6 +2422,65 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     }
   };
 
+  const [sendingComprovante, setSendingComprovante] = useState(false);
+
+  const handleSendComprovante = async (regIds?: string[]) => {
+    const ids = regIds ?? [...selectedIds];
+    if (ids.length === 0) return;
+    const targets = (registrations || []).filter((r: any) => ids.includes(r.id) && r.status === 'pending');
+    if (targets.length === 0) { toast.error('Nenhuma inscrição pendente selecionada.'); return; }
+    if (!confirm(`Enviar cobrança de comprovante para ${targets.length} atleta(s)?`)) return;
+
+    setSendingComprovante(true);
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: bcfg } = await (supabase as any)
+      .from('botconversa_config')
+      .select('trigger_inscricao_ativo,trigger_inscricao_url,msg_comprovante')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    const webhookUrl = bcfg?.trigger_inscricao_url;
+    if (!webhookUrl) {
+      setSendingComprovante(false);
+      toast.error('Configure o webhook de inscrição no BotConversa antes de usar esta função.');
+      return;
+    }
+
+    const dispatches: { phone: string; name: string; reg: any }[] = [];
+    for (const reg of targets as any[]) {
+      const members = [
+        { phone: reg.athlete_phone, name: reg.athlete_name },
+        ...((reg.team_members as any[] || []).map((m: any) => ({ phone: m.phone, name: m.name }))),
+      ].filter(m => m.phone?.trim());
+      for (const m of members) dispatches.push({ phone: m.phone, name: m.name, reg });
+    }
+
+    const msgTemplate = bcfg?.msg_comprovante || DEFAULT_MESSAGES.comprovante;
+    const baseUrl = window.location.origin;
+
+    toast.info(`📱 Enviando ${dispatches.length} mensagem(ns) com intervalo de 30s...`);
+    dispatches.forEach(({ phone, name, reg }, idx) => {
+      setTimeout(async () => {
+        const link = `${baseUrl}/comprovante/${reg.id}`;
+        const message = interpolate(msgTemplate, {
+          nome: name,
+          evento: event?.title || eventId,
+          link,
+        });
+        const payload = { telefone: phone, message, nome: name, evento: event?.title || eventId, link };
+        const { ok, error: whErr } = await sendWebhook(webhookUrl, payload);
+        if (!ok) toast.warning(`Webhook (${name}) não entregue${whErr ? ` (${whErr})` : ''}`);
+        (supabase as any).from('botconversa_logs').insert({
+          event_id: eventId, registration_id: reg.id,
+          trigger_type: 'comprovante', webhook_url: webhookUrl,
+          payload, status: ok ? 'sent' : 'failed',
+          error_message: ok ? null : whErr,
+        }).then(() => {});
+        if (idx === dispatches.length - 1) setSendingComprovante(false);
+      }, idx * 30_000);
+    });
+  };
+
   const stampPhoto = (blob: Blob, instagram: string, eventTitle: string): Promise<Blob> =>
     new Promise((resolve) => {
       const img = new Image();
@@ -3134,6 +3193,13 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               {label}
             </button>
           ))}
+          <button
+            onClick={() => handleSendComprovante()}
+            disabled={batchUpdating || sendingComprovante}
+            className="px-3 py-1 rounded-lg text-xs font-bold border transition-all disabled:opacity-40 text-orange-400 border-orange-500/30 hover:bg-orange-500/10"
+          >
+            📱 Cobrar Comprovante
+          </button>
           <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-zinc-500 hover:text-white transition-colors">✕ Limpar</button>
         </div>
       )}
@@ -3157,6 +3223,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               <th className="text-right py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">Valor</th>
               <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">📸</th>
               <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">📄</th>
+              <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">📱</th>
               <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">📦</th>
               <th className="text-center py-3 px-3 text-xs text-zinc-500 uppercase tracking-wider font-bold">🗑️</th>
             </tr>
@@ -3213,6 +3280,18 @@ function InscricoesTab({ eventId }: { eventId: string }) {
                     {receiptUrl ? <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded transition-colors" title="Ver Comprovante"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></a> : <span className="text-zinc-700">—</span>}
                   </td>
                   <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
+                    {reg.status === 'pending' && !receiptUrl ? (
+                      <button
+                        onClick={() => handleSendComprovante([reg.id])}
+                        disabled={sendingComprovante}
+                        className="inline-flex p-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 rounded transition-colors disabled:opacity-40"
+                        title="Cobrar comprovante via WhatsApp"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.42 2 2 0 0 1 3.6 1.24h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.83a16 16 0 0 0 6.29 6.29l1.96-1.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                      </button>
+                    ) : <span className="text-zinc-700">—</span>}
+                  </td>
+                  <td className="py-3 px-3 text-center" onClick={e => e.stopPropagation()}>
                     {reg.shipping_address ? (
                       reg.shipping_label_url ? (
                         <a
@@ -3248,7 +3327,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
               );
             })}
             {(!filtered || filtered.length === 0) && (
-              <tr><td colSpan={9} className="text-center py-12 text-zinc-600 text-sm">Nenhuma inscrição encontrada</td></tr>
+              <tr><td colSpan={10} className="text-center py-12 text-zinc-600 text-sm">Nenhuma inscrição encontrada</td></tr>
             )}
           </tbody>
         </table>
