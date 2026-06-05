@@ -2482,7 +2482,11 @@ function InscricoesTab({ eventId }: { eventId: string }) {
         });
         const payload = { telefone: phone, message, nome: name, evento: event?.title || eventId, link };
         const { ok, error: whErr } = await sendWebhook(webhookUrl, payload);
-        if (!ok) toast.warning(`Webhook (${name}) não entregue${whErr ? ` (${whErr})` : ''}`);
+        if (ok) {
+          toast.success(`✅ Mensagem enviada para ${name}`);
+        } else {
+          toast.warning(`Webhook (${name}) não entregue${whErr ? ` (${whErr})` : ''}`);
+        }
         (supabase as any).from('botconversa_logs').insert({
           event_id: eventId, registration_id: reg.id,
           trigger_type: 'comprovante', webhook_url: webhookUrl,
