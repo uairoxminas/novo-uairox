@@ -2448,11 +2448,9 @@ function InscricoesTab({ eventId }: { eventId: string }) {
 
     const dispatches: { phone: string; name: string; reg: any }[] = [];
     for (const reg of targets as any[]) {
-      const members = [
-        { phone: reg.athlete_phone, name: reg.athlete_name },
-        ...((reg.team_members as any[] || []).map((m: any) => ({ phone: m.phone, name: m.name }))),
-      ].filter(m => m.phone?.trim());
-      for (const m of members) dispatches.push({ phone: m.phone, name: m.name, reg });
+      if (reg.athlete_phone?.trim()) {
+        dispatches.push({ phone: reg.athlete_phone, name: reg.athlete_name, reg });
+      }
     }
 
     const msgTemplate = bcfg?.msg_comprovante || DEFAULT_MESSAGES.comprovante;
