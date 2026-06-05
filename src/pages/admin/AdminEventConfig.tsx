@@ -2463,9 +2463,9 @@ function InscricoesTab({ eventId }: { eventId: string }) {
 
     const dispatches: { phone: string; name: string; reg: any }[] = [];
     for (const reg of targets as any[]) {
-      if (reg.athlete_phone?.trim()) {
-        dispatches.push({ phone: reg.athlete_phone, name: reg.athlete_name, reg });
-      }
+      const rawPhone = (reg.athlete_phone || '').replace(/\D/g, '');
+      const phone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+      if (phone.length >= 12) dispatches.push({ phone, name: reg.athlete_name, reg });
     }
 
     const msgTemplate = bcfg?.msg_comprovante || DEFAULT_MESSAGES.comprovante;
