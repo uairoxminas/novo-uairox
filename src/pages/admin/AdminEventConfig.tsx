@@ -1647,6 +1647,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
   const [msgPix1d, setMsgPix1d] = useState(DEFAULT_MESSAGES.pix_1d);
   const [msgPix5d, setMsgPix5d] = useState(DEFAULT_MESSAGES.pix_5d);
   const [msgMarco, setMsgMarco] = useState(DEFAULT_MESSAGES.marco);
+  const [msgComprovante, setMsgComprovante] = useState(DEFAULT_MESSAGES.comprovante);
   const [msgDesafio, setMsgDesafio] = useState('🏋️ *{titulo} ativado!*\nOlá, {nome}! Sua inscrição no *{evento}* foi confirmada.\n\nSeu desafio começa agora: complete *{meta} treinos* antes do evento e garanta sua vaga no sorteio! 🎯\n\n👉 Acesse seu portal pessoal:\n{link}\n\n💪 Vamos nessa!');
   const [broadcastFiltro, setBroadcastFiltro] = useState<'all' | 'pending' | 'confirmed'>('confirmed');
   const [broadcastMessage, setBroadcastMessage] = useState('');
@@ -1673,6 +1674,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     if (cfg.msg_pix_1d)     setMsgPix1d(cfg.msg_pix_1d);
     if (cfg.msg_pix_5d)     setMsgPix5d(cfg.msg_pix_5d);
     if ((cfg as any).msg_marco) setMsgMarco((cfg as any).msg_marco);
+    if ((cfg as any).msg_comprovante) setMsgComprovante((cfg as any).msg_comprovante);
   }, [cfg]);
 
   const handleSave = () => upsert.mutate({
@@ -1694,6 +1696,7 @@ function BotconversaTab({ eventId }: { eventId: string }) {
     msg_pix_1d:     msgPix1d      || null,
     msg_pix_5d:     msgPix5d      || null,
     msg_marco:      msgMarco      || null,
+    msg_comprovante: msgComprovante || null,
   } as any);
 
   const testWebhook = async (url: string, triggerKey: string) => {
@@ -1839,6 +1842,18 @@ function BotconversaTab({ eventId }: { eventId: string }) {
             <MsgEditor label="Editar mensagem de cancelamento" value={msgCancelado} onChange={setMsgCancelado}
               defaultMsg={DEFAULT_MESSAGES.cancelado}
               vars={['nome','evento','categoria','codigo']} />
+          </div>
+        </div>
+        <div className={cardClass}>
+          <div className="p-3.5 flex items-center gap-3">
+            <span className="text-sm font-bold text-white">📎 Cobrar Comprovante PIX</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 text-[10px] font-mono border border-zinc-700">comprovante</span>
+            <span className="text-[10px] text-zinc-500 ml-auto">Disparado manualmente na aba Inscrições</span>
+          </div>
+          <div className="px-3.5 pb-3.5">
+            <MsgEditor label="Editar mensagem de cobrança de comprovante" value={msgComprovante} onChange={setMsgComprovante}
+              defaultMsg={DEFAULT_MESSAGES.comprovante}
+              vars={['nome','evento','link']} />
           </div>
         </div>
       </div>
@@ -2435,7 +2450,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     const { supabase } = await import('@/integrations/supabase/client');
     const { data: bcfg } = await (supabase as any)
       .from('botconversa_config')
-      .select('trigger_inscricao_ativo,trigger_inscricao_url,msg_comprovante')
+      .select('trigger_inscricao_url,msg_comprovante')
       .eq('event_id', eventId)
       .maybeSingle();
 
