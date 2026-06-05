@@ -2450,7 +2450,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     const { supabase } = await import('@/integrations/supabase/client');
     const { data: bcfg } = await (supabase as any)
       .from('botconversa_config')
-      .select('trigger_inscricao_url,msg_comprovante')
+      .select('*')
       .eq('event_id', eventId)
       .maybeSingle();
 
