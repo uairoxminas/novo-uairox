@@ -93,12 +93,16 @@ export function useSearchRegistrations(eventId: string, query: string) {
   return useQuery({
     queryKey: ['registrations-search', eventId, query],
     queryFn: async () => {
-      if (query.trim().length < 2) return [];
+      const q = query.trim();
+      if (q.length < 2) return [];
+      // bib_number é inteiro — ilike quebraria a query. Só filtra por bib quando numérico (eq).
+      const filters = [`athlete_name.ilike.%${q}%`];
+      if (/^\d+$/.test(q)) filters.push(`bib_number.eq.${q}`);
       const { data, error } = await supabase
         .from('registrations' as any)
         .select('id, athlete_name, bib_number, team_name')
         .eq('event_id', eventId)
-        .or(`athlete_name.ilike.%${query}%,bib_number.ilike.%${query}%`)
+        .or(filters.join(','))
         .limit(8);
       if (error) throw error;
       return (data ?? []) as RegistrationResult[];

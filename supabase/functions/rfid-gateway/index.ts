@@ -94,17 +94,30 @@ serve(async (req) => {
       return logAndReturn('no_antenna_config', { event_id, registration_id });
     }
 
-    // 3. Debounce — ignore re-read of same tag on same antenna within debounce_ms
+    // 3. Debounce POR ATLETA (tag), independente de antena.
+    //    Após uma passagem confirmada, a mesma pulseira fica bloqueada por
+    //    debounce_seconds (config do evento, padrão 40s) em QUALQUER antena.
+    const { data: eventCfg } = await supabase
+      .from('events')
+      .select('debounce_seconds, rfid_rssi_min')
+      .eq('id', event_id)
+      .maybeSingle();
+    const debounceSeconds = (eventCfg?.debounce_seconds as number | null) ?? 40;
+
+    // Corte de RSSI (zona de leitura): ignora sinal fraco (atleta longe da antena)
+    const rssiMin = (eventCfg?.rfid_rssi_min as number | null) ?? 0;
+    if (rssiMin > 0 && rssi !== null && rssi < rssiMin) {
+      return logAndReturn('weak_signal', { event_id, registration_id });
+    }
     const debounceFrom = new Date(
-      new Date(readAt).getTime() - antenna.debounce_ms,
+      new Date(readAt).getTime() - debounceSeconds * 1000,
     ).toISOString();
 
     const { data: recentRead } = await supabase
       .from('rfid_reads')
       .select('id')
       .eq('tag_epc', tag_epc)
-      .eq('antenna_index', antenna_index)
-      .eq('processed', true)
+      .eq('processed', true)          // qualquer antena
       .gte('read_at', debounceFrom)
       .limit(1)
       .maybeSingle();
