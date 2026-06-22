@@ -74,9 +74,13 @@ export function useRaceArbitration(eventId: string) {
         const penSec = penByReg.get(lane.registration_id) ?? 0;
         const result = resByReg.get(lane.registration_id) as any;
         const heatStart = heatStartMap.get(lane.heat_id) ?? null;
+        // Tempo = última passagem − 1ª passagem (o cronômetro do atleta inicia
+        // na 1ª leitura, não na largada manual). 1ª passagem conta como marcação 1.
         let computed: number | null = null;
-        if (passCount > 0 && heatStart) {
-          computed = (new Date(sp[passCount - 1].ts).getTime() - new Date(heatStart).getTime()) + penSec * 1000;
+        if (passCount > 0) {
+          const firstTs = new Date(sp[0].ts).getTime();
+          const lastTs  = new Date(sp[passCount - 1].ts).getTime();
+          computed = (lastTs - firstTs) + penSec * 1000;
         }
         let state: AthleteState;
         if (result?.status === 'validated') state = 'validated';
