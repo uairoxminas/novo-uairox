@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import RFIDWristbandsPanel from '@/components/raceday/RFIDWristbandsPanel';
 import RFIDBridgePanel from '@/components/raceday/RFIDBridgePanel';
 import RaceReadinessChecklist from '@/components/raceday/RaceReadinessChecklist';
+import RaceCheckInPanel from '@/components/raceday/RaceCheckInPanel';
 
 export default function AdminRaceDayControlPage() {
   const { id } = useParams<{ id: string }>();
@@ -253,6 +254,9 @@ export default function AdminRaceDayControlPage() {
 
       {/* PAINEL RFID */}
       <RFIDWristbandsPanel eventId={id!} checkpoints={(checkpoints ?? []) as unknown as { id: string; name: string; is_finish_line: boolean }[]} />
+
+      {/* CONFERÊNCIA DE PULSEIRAS (check-in pré-largada) */}
+      <RaceCheckInPanel eventId={id!} />
 
       {/* PAINEL DE BATERIAS */}
       <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">

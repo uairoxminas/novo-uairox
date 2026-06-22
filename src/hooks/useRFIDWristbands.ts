@@ -193,6 +193,15 @@ export function useSaveRFIDAntenna() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (antenna: Omit<RFIDAntenna, 'id'>) => {
+      // Garante 1 evento ativo por leitor+antena: desativa este leitor/antena
+      // em OUTROS eventos (evita ler no evento errado).
+      await supabase
+        .from('rfid_antennas' as any)
+        .update({ is_active: false })
+        .eq('reader_id', antenna.reader_id)
+        .eq('antenna_index', antenna.antenna_index)
+        .neq('event_id', antenna.event_id);
+
       const { data, error } = await supabase
         .from('rfid_antennas' as any)
         .upsert(antenna, { onConflict: 'event_id,reader_id,antenna_index' })
