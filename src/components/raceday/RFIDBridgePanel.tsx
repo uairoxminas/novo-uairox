@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Usb, WifiOff, Wifi, Radio, CircleDot, ChevronDown, ChevronUp, Loader2, HelpCircle, Network, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ReadLog {
   id: number;
@@ -165,6 +166,26 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
 
   useEffect(() => () => { handleDisconnect(); }, [handleDisconnect]);
 
+  // Status do bridge Node (heartbeat em rfid_bridge_status)
+  const [nodeOnline, setNodeOnline] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      const { data } = await supabase
+        .from('rfid_bridge_status' as any)
+        .select('connected, last_seen')
+        .eq('reader_id', readerId)
+        .maybeSingle();
+      if (!active) return;
+      const ls = (data as any)?.last_seen;
+      const recent = ls ? (Date.now() - new Date(ls).getTime() < 60000) : false;
+      setNodeOnline(!!(data as any)?.connected && recent);
+    };
+    check();
+    const t = setInterval(check, 10000);
+    return () => { active = false; clearInterval(t); };
+  }, [readerId]);
+
   const cmdTcp    = `CONNECTION_MODE=tcp RFID_IP=${rfidIp} RFID_PORT=${rfidPort} READER_ID=${readerId} RFID_GATEWAY_KEY=<sua-key> node rfid-bridge.js`;
   const cmdServer = `CONNECTION_MODE=server RFID_PORT=${rfidPort} READER_ID=${readerId} RFID_GATEWAY_KEY=<sua-key> node rfid-bridge.js`;
   const cmdInstall = `cd bridge && npm install && CONNECTION_MODE=tcp RFID_IP=${rfidIp} RFID_GATEWAY_KEY=sua-key node rfid-bridge.js`;
@@ -184,6 +205,9 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
           <Radio className="w-5 h-5 text-[#EDAC02]" /> Bridge M-ID40
           <span className="text-xs font-normal text-zinc-500 normal-case ml-1">Conexão com o leitor RFID</span>
         </h2>
+        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 ${nodeOnline ? 'bg-green-950/40 text-green-400 border border-green-800/40' : 'bg-[#1a1a1a] text-zinc-500 border border-[#262626]'}`}>
+          <CircleDot className={`w-3 h-3 ${nodeOnline ? 'animate-pulse' : ''}`} /> {nodeOnline ? 'Leitor ONLINE' : 'Leitor OFFLINE'}
+        </span>
       </div>
 
       {/* Mode tabs */}
