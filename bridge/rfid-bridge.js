@@ -228,6 +228,38 @@ function restGet(path) {
   });
 }
 
+// POST/upsert ao PostgREST do Supabase (usa a anon key).
+function restPost(path, body, extraHeaders = {}) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body);
+    const url  = new URL(SUPABASE_URL + path);
+    const req = https.request({
+      hostname: url.hostname,
+      path:     url.pathname + url.search,
+      method:   'POST',
+      headers:  {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(data),
+        'apikey':         ANON_KEY,
+        'Authorization':  `Bearer ${ANON_KEY}`,
+        ...extraHeaders,
+      },
+    }, (res) => { res.on('data', () => {}); res.on('end', () => resolve(res.statusCode)); });
+    req.on('error', () => resolve(null));
+    req.setTimeout(5000, () => { req.destroy(); resolve(null); });
+    req.write(data);
+    req.end();
+  });
+}
+
+// Heartbeat → tabela rfid_bridge_status (indicador ONLINE no painel)
+let bridgeConnected = false;
+function sendHeartbeat() {
+  return restPost('/rest/v1/rfid_bridge_status?on_conflict=reader_id',
+    { reader_id: CONFIG.readerId, connected: bridgeConnected, ip: CONFIG.tcpHost, last_seen: new Date().toISOString() },
+    { 'Prefer': 'resolution=merge-duplicates' });
+}
+
 // Descobre o evento que este leitor cobre e lê debounce_seconds + rfid_rssi_min.
 async function syncConfigFromServer() {
   // 1) evento com antena ativa para este reader_id (mais recente)
@@ -305,7 +337,8 @@ async function handleRead(parsed, raw) {
     });
     const status = result.body?.status ?? (result.status === 200 ? 'ok' : 'erro');
     const icon   = { ok: '✅', debounce: '⏱️', unknown_tag: '❓', no_running_heat: '⚠️',
-                     no_antenna_config: '🚧', no_heat_assignment: '⚠️', weak_signal: '🔉' }[status] ?? '⚠️';
+                     no_antenna_config: '🚧', no_heat_assignment: '⚠️', weak_signal: '🔉',
+                     race_complete: '🏁' }[status] ?? '⚠️';
     console.log(`[${hora}] ${icon} ${parsed.tag_epc}  ANT ${parsed.antenna_index}  RSSI ${parsed.rssi ?? 'n/a'}  →  ${status}`);
   } catch (err) {
     console.error(`[${hora}] ❌ ${parsed.tag_epc}  falha ao enviar: ${err.message}`);
@@ -318,11 +351,16 @@ function startTcpClient() {
   function connect() {
     const processChunk = makeProcessor();
     const socket = new net.Socket();
-    socket.connect(CONFIG.tcpPort, CONFIG.tcpHost, () =>
-      console.log(`[OK] Conectado ao M-ID40 em ${CONFIG.tcpHost}:${CONFIG.tcpPort}. Aguardando leituras...\n`));
+    socket.connect(CONFIG.tcpPort, CONFIG.tcpHost, () => {
+      console.log(`[OK] Conectado ao M-ID40 em ${CONFIG.tcpHost}:${CONFIG.tcpPort}. Aguardando leituras...\n`);
+      bridgeConnected = true; sendHeartbeat();
+    });
     socket.on('data',  processChunk);
     socket.on('error', e => console.error('[ERRO TCP]', e.message));
-    socket.on('close', () => { console.warn('[AVISO] Conexão encerrada. Reconectando em 5s...'); setTimeout(connect, 5000); });
+    socket.on('close', () => {
+      bridgeConnected = false; sendHeartbeat();
+      console.warn('[AVISO] Conexão encerrada. Reconectando em 5s...'); setTimeout(connect, 5000);
+    });
   }
   connect();
 }
@@ -379,6 +417,10 @@ async function main() {
     await syncConfigFromServer();
     setInterval(syncConfigFromServer, 60000);
   }
+
+  // Heartbeat para o indicador ONLINE no painel
+  sendHeartbeat();
+  setInterval(sendHeartbeat, 20000);
 
   switch (CONFIG.mode) {
     case 'tcp':    startTcpClient(); break;
