@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useRaceCheckIn } from '@/hooks/useRaceCheckIn';
 import { CheckCircle2, XCircle, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 interface Props {
@@ -64,6 +65,12 @@ export default function RaceReadinessChecklist({
     refetchInterval: 30000,
   });
 
+  // Conferência de pulseiras (atletas detectados antes da largada)
+  const { data: checkin } = useRaceCheckIn(eventId);
+  const verifiedCount = checkin?.verified ?? 0;
+  const checkinTotal  = checkin?.total ?? 0;
+  const allChecked    = checkinTotal > 0 && verifiedCount === checkinTotal;
+
   const online        = !!bridge?.connected && !!bridge?.last_seen && (Date.now() - new Date(bridge.last_seen).getTime() < 60000);
   const hasAntenna    = antennas.some(a => a.reader_id === readerId && a.checkpoint_id);
   const hasCheckpoint = (checkpoints?.length ?? 0) > 0;
@@ -77,13 +84,15 @@ export default function RaceReadinessChecklist({
     { ok: hasCheckpoint, label: 'Tapete / ponto de controle criado',       hint: 'Tapetes e Leitores → adicione um ponto (ex: Largada/Chegada).' },
     { ok: hasVolume,     label: 'Volume de leituras definido',             hint: 'Parâmetros da Etapa → Volume Total de Leituras (ex: 4) → Salvar.' },
     { ok: hasHeats,      label: 'Baterias criadas',                        hint: 'Crie as baterias do evento com os atletas.' },
-    { ok: allBib, warn: true,
+    { ok: allBib,
       label: regStats ? `Atletas com número (bib): ${regStats.total - regStats.semBib}/${regStats.total}` : 'Atletas com número (bib)',
       hint: 'Defina o bib de cada atleta (bib = número da pulseira). Sem bib, o atleta não é identificado.' },
+    { ok: allChecked,
+      label: `Pulseiras conferidas: ${verifiedCount}/${checkinTotal}`,
+      hint: 'Cada atleta deve encostar a pulseira na antena antes da largada (painel Conferência de Pulseiras). Quem não for lido não será cronometrado.' },
   ];
 
-  // Bloqueadores (o "warn" do bib não bloqueia)
-  const ready = online && hasAntenna && hasCheckpoint && hasVolume && hasHeats;
+  const ready = online && hasAntenna && hasCheckpoint && hasVolume && hasHeats && allBib && allChecked;
   useEffect(() => { onReadiness?.(ready); }, [ready, onReadiness]);
 
   return (
