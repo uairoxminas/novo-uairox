@@ -7,6 +7,7 @@ import { useEventTimingConfig, useUpdateEventTiming, useRaceCheckpoints, useCrea
 import { toast } from 'sonner';
 import RFIDWristbandsPanel from '@/components/raceday/RFIDWristbandsPanel';
 import RFIDBridgePanel from '@/components/raceday/RFIDBridgePanel';
+import RaceReadinessChecklist from '@/components/raceday/RaceReadinessChecklist';
 
 export default function AdminRaceDayControlPage() {
   const { id } = useParams<{ id: string }>();
@@ -79,8 +80,14 @@ export default function AdminRaceDayControlPage() {
   };
 
   // ======= OPERAÇÕES DA BATERIA =======
+  const [raceReady, setRaceReady] = useState(false);
+
   const startHeat = useStartHeat();
   const handleStartHeat = (heatId: string) => {
+    if (!raceReady) {
+      toast.error('Complete o checklist de Prontidão (itens em vermelho) antes de largar a bateria.');
+      return;
+    }
     if (confirm('Atenção: Todos os cronômetros desta bateria vão iniciar em tempo real. Deseja LARGAR a bateria agora?')) {
       startHeat.mutate({ id: heatId, event_id: id! }, {
         onSuccess: () => toast.success('Bateria LARGOU! Cronômetro gravado!'),
@@ -130,6 +137,15 @@ export default function AdminRaceDayControlPage() {
           <p className="text-3xl font-black text-white">--</p>
         </div>
       </div>
+
+      {/* CHECKLIST DE PRONTIDÃO — bloqueia a largada até tudo verde */}
+      <RaceReadinessChecklist
+        eventId={id!}
+        checkpoints={(checkpoints ?? []) as unknown as { id: string }[]}
+        heats={(heats ?? []) as unknown as { id: string }[]}
+        timingConfig={timingConfig as { target_passes_volume?: number | null } | null}
+        onReadiness={setRaceReady}
+      />
 
       {/* PAINEL DE TÁTICA (CONFIGURAÇÕES E CHECKPOINTS) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -267,10 +283,11 @@ export default function AdminRaceDayControlPage() {
                   </div>
                   <div>
                     {heat.status === 'pending' ? (
-                      <button 
+                      <button
                         onClick={() => handleStartHeat(heat.id)}
-                        disabled={startHeat.isPending}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-black text-sm uppercase tracking-wide bg-red-600 hover:bg-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)] hover:shadow-[0_0_20px_rgba(220,38,38,0.7)] transition-all"
+                        disabled={startHeat.isPending || !raceReady}
+                        title={!raceReady ? 'Complete o checklist de Prontidão antes de largar' : 'Largar bateria'}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-black text-sm uppercase tracking-wide bg-red-600 hover:bg-red-500 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)] hover:shadow-[0_0_20px_rgba(220,38,38,0.7)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                       >
                         <PlayCircle className="w-5 h-5" />
                         Largar Bateria
