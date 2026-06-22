@@ -16,6 +16,7 @@ interface ReadLog {
 interface Props { eventId: string; }
 
 const GATEWAY_URL = 'https://dhetcnkvgtuatcchropm.supabase.co/functions/v1/rfid-gateway';
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 function parseLine(line: string): { tag_epc: string; antenna_index: number; rssi: number | null } | null {
   const clean = line.trim();
@@ -71,7 +72,7 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
   const [connecting, setConnecting] = useState(false);
   const [apiKey, setApiKey]       = useState(() => localStorage.getItem('rfid_api_key')   || '');
   const [readerId, setReaderId]   = useState(() => localStorage.getItem('rfid_reader_id') || 'reader-1');
-  const [rfidIp, setRfidIp]       = useState(() => localStorage.getItem('rfid_ip')        || '192.168.1.50');
+  const [rfidIp, setRfidIp]       = useState(() => localStorage.getItem('rfid_ip')        || '192.168.0.10');
   const [showHelpUsb, setShowHelpUsb]       = useState(false);
   const [showHelpTcp, setShowHelpTcp]       = useState(false);
   const [showHelpDirect, setShowHelpDirect] = useState(false);
@@ -98,7 +99,7 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
     try {
       const res  = await fetch(GATEWAY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-rfid-api-key': apiKey },
+        headers: { 'Content-Type': 'application/json', 'x-rfid-api-key': apiKey, 'Authorization': `Bearer ${ANON_KEY}`, 'apikey': ANON_KEY },
         body: JSON.stringify({ reader_id: readerId, antenna_index, tag_epc, rssi, read_at: sent_at }),
       });
       const json = await res.json();
@@ -369,7 +370,7 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
                 <ol className="space-y-3">
                   <li className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
-                    <span>Descubra o <strong className="text-white">IP do M-ID40</strong> acessando a interface web do leitor pelo navegador (ex: http://192.168.1.50 — verifique o IP no roteador ou no display do leitor). Informe esse IP no campo abaixo.</span>
+                    <span>Descubra o <strong className="text-white">IP do M-ID40</strong> (padrão de fábrica <strong className="text-white">192.168.0.10</strong>) pelo Software de Configuração da Placa Ethernet ou pelo app M-ID40-Light-Demo. Informe esse IP no campo abaixo.</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
@@ -384,7 +385,7 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
                 <ol className="space-y-3">
                   <li className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">1</span>
-                    <span>Na interface web do M-ID40, configure-o para atuar como <strong className="text-white">servidor TCP</strong> na porta informada abaixo (padrão: 5000).</span>
+                    <span>O M-ID40 já atua como <strong className="text-white">servidor TCP</strong> na porta informada abaixo (padrão de fábrica: 5000). Basta deixá-lo em modo de leitura ativa/tempo-real.</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
@@ -407,7 +408,7 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
                   </li>
                   <li className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">2</span>
-                    <span>Na interface web do M-ID40, configure-o para conectar ao <strong className="text-white">IP deste notebook</strong> na porta configurada (padrão: 5000). Descubra o IP do notebook com <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">ipconfig</code> no terminal.</span>
+                    <span>Na configuração do M-ID40, aponte-o para conectar ao <strong className="text-white">IP deste notebook</strong> na porta configurada (padrão: 5000). Descubra o IP do notebook com <code className="bg-[#1a1a1a] px-1 rounded text-[#EDAC02]">ipconfig</code> no terminal.</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/30 text-[#EDAC02] text-xs font-black flex items-center justify-center shrink-0">3</span>
@@ -422,7 +423,7 @@ export default function RFIDBridgePanel({ eventId: _eventId }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-zinc-600 mb-1">IP do M-ID40</label>
-              <input type="text" value={rfidIp} onChange={e => { setRfidIp(e.target.value); localStorage.setItem('rfid_ip', e.target.value); }} className={inputClass} placeholder="192.168.1.50" />
+              <input type="text" value={rfidIp} onChange={e => { setRfidIp(e.target.value); localStorage.setItem('rfid_ip', e.target.value); }} className={inputClass} placeholder="192.168.0.10" />
             </div>
             <div>
               <label className="block text-xs text-zinc-600 mb-1">Porta TCP</label>

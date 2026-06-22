@@ -8,7 +8,7 @@ export function useEventTimingConfig(eventId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("events" as any)
-        .select("id, target_passes_volume, debounce_seconds")
+        .select("id, target_passes_volume, debounce_seconds, rfid_rssi_min")
         .eq("id", eventId)
         .single();
       if (error) throw error;
@@ -21,12 +21,13 @@ export function useEventTimingConfig(eventId: string) {
 export function useUpdateEventTiming() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { eventId: string; target_passes_volume: number; debounce_seconds: number }) => {
+    mutationFn: async (vars: { eventId: string; target_passes_volume: number; debounce_seconds: number; rfid_rssi_min: number }) => {
       const { error } = await supabase
         .from("events" as any)
         .update({
           target_passes_volume: vars.target_passes_volume,
           debounce_seconds: vars.debounce_seconds,
+          rfid_rssi_min: vars.rfid_rssi_min,
         })
         .eq("id", vars.eventId);
       if (error) throw error;

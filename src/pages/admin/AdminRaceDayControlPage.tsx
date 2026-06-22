@@ -29,12 +29,14 @@ export default function AdminRaceDayControlPage() {
   
   const [targetVolume, setTargetVolume] = useState<string>('');
   const [debounceSec, setDebounceSec] = useState<string>('');
-  
+  const [rssiMin, setRssiMin] = useState<string>('');
+
   // Set initial states once loaded
   React.useEffect(() => {
     if (timingConfig) {
       setTargetVolume(String(timingConfig.target_passes_volume || 1));
       setDebounceSec(String(timingConfig.debounce_seconds || 40));
+      setRssiMin(String(timingConfig.rfid_rssi_min ?? 0));
     }
   }, [timingConfig]);
 
@@ -44,6 +46,7 @@ export default function AdminRaceDayControlPage() {
       eventId: id!,
       target_passes_volume: parseInt(targetVolume),
       debounce_seconds: parseInt(debounceSec),
+      rfid_rssi_min: parseInt(rssiMin) || 0,
     }, {
       onSuccess: () => toast.success('Parâmetros de cronometragem salvos!'),
       onError: (err: any) => toast.error('Erro ao salvar: ' + err.message)
@@ -151,7 +154,12 @@ export default function AdminRaceDayControlPage() {
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mt-4 mb-2">Debounce Time (Zona Cega em Segundos)</label>
                   <input type="number" value={debounceSec} onChange={e => setDebounceSec(e.target.value)} className={inputClass} placeholder="Ex: 40" />
-                  <p className="text-xs text-zinc-600 mt-2">Duração de proteção anti-duplicidade em que o chip será ignorado se lido duas vezes.</p>
+                  <p className="text-xs text-zinc-600 mt-2">Após uma passagem, o atleta fica ignorado por este tempo em <strong className="text-zinc-400">qualquer</strong> antena (anti-duplicidade por atleta).</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mt-4 mb-2">Sinal mínimo p/ contar (RSSI)</label>
+                  <input type="number" value={rssiMin} onChange={e => setRssiMin(e.target.value)} className={inputClass} placeholder="Ex: 70 (0 = ler tudo)" />
+                  <p className="text-xs text-zinc-600 mt-2">Só conta a leitura quando o sinal for igual ou maior que este valor — <strong className="text-zinc-400">quanto maior, mais perto</strong> o atleta precisa estar da antena. <strong className="text-zinc-400">0</strong> desliga o filtro. Referência: parado/longe ≈ 56, passando colado ≈ 80.</p>
                 </div>
               </>
             )}

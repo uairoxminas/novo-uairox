@@ -1,0 +1,29 @@
+# ============================================================
+# UAIROX RFID Bridge — configuração local
+# ------------------------------------------------------------
+# COPIE este arquivo para "config.local.ps1" (no mesmo lugar)
+# e preencha a sua chave. O config.local.ps1 NÃO vai para o git.
+# ============================================================
+
+# Chave do gateway (= RFID_GATEWAY_KEY do Supabase / campo "API Key" do painel)
+$RFID_GATEWAY_KEY = "COLE_AQUI_SUA_CHAVE"
+
+# Identificador deste leitor — TEM que ser igual ao cadastrado no painel de Antenas
+$READER_ID = "reader-1"
+
+# Rede do leitor M-ID40 LIGHT
+$RFID_IP   = "192.168.0.10"
+$RFID_PORT = "5000"
+
+# Corte de RSSI (zona de leitura): ignora leituras fracas (atleta longe da antena).
+# DEIXE COMENTADO para o bridge ler o campo "Sinal mínimo (RSSI)" da tela do evento.
+# Descomente só para FORÇAR um valor fixo (ex: "70"). 0 = ler tudo.
+# $RSSI_MIN  = "70"
+
+# Anti-duplicidade POR ATLETA (em qualquer antena).
+# DEIXE COMENTADO para o bridge ler automaticamente o campo "Zona Cega" do evento
+# (knob único — você só muda na tela). Descomente apenas para FORÇAR um valor fixo.
+# $DEBOUNCE_MS = "40000"
+
+# Verboso: "1" mostra TODA leitura crua (bom pra calibrar RSSI). Deixe "0" na prova.
+$VERBOSE = "0"

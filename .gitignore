@@ -18,6 +18,9 @@ dist-ssr/
 .env.local
 .env.production
 
+# Bridge RFID — config local com a chave (NÃO versionar)
+bridge/config.local.ps1
+
 # IDE
 .vscode/*
 !.vscode/extensions.json
