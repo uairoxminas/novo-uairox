@@ -114,23 +114,16 @@ export default function AdminRaceDayLiveMonitor() {
   };
 
   const handleValidate = (lane: any) => {
-    if (!heat?.start_time) {
-      toast.error('Bateria não possui data de início oficial.');
-      return;
-    }
-    const startTime = new Date(heat.start_time).getTime();
-    
-    // Pegar o timestamp da última passagem (split)
-    const latestSplit = lane.splits?.sort((a: any, b: any) => 
+    // Tempo = última passagem − 1ª passagem (cronômetro inicia na 1ª leitura do atleta)
+    const sorted = lane.splits?.slice().sort((a: any, b: any) =>
       new Date(b.split_timestamp).getTime() - new Date(a.split_timestamp).getTime()
-    )[0];
-
-    if (!latestSplit) {
+    );
+    if (!sorted || !sorted.length) {
       toast.error('Nenhuma passagem registrada para este atleta.');
       return;
     }
-
-    const finishTime = new Date(latestSplit.split_timestamp).getTime();
+    const finishTime = new Date(sorted[0].split_timestamp).getTime();                    // última
+    const startTime  = new Date(sorted[sorted.length - 1].split_timestamp).getTime();    // 1ª passagem
     const rawTimeMs = finishTime - startTime;
 
     const penSeconds = (lane.penalties?.length || 0) * 30;
@@ -258,16 +251,18 @@ export default function AdminRaceDayLiveMonitor() {
                     let finalTimeProjMs: number | null = null;
                     let crossedFinishLine = false;
 
-                    if (lane.splits?.length > 0 && heat?.start_time) {
+                    if (lane.splits?.length > 0) {
                       const finishLineCp = checkpoints?.find((cp: any) => cp.is_finish_line);
                       const sortedSplits = [...lane.splits].sort((a: any, b: any) => new Date(b.split_timestamp).getTime() - new Date(a.split_timestamp).getTime());
-                      const latest = sortedSplits[0];
-                      
+                      const latest   = sortedSplits[0];
+                      const earliest = sortedSplits[sortedSplits.length - 1];
+
                       if (finishLineCp && lane.splits.some((s: any) => s.checkpoint_id === finishLineCp.id)) {
                         crossedFinishLine = true;
                       }
 
-                      const rawMs = new Date(latest.split_timestamp).getTime() - new Date(heat.start_time).getTime();
+                      // Tempo = última passagem − 1ª passagem (cronômetro inicia na 1ª leitura)
+                      const rawMs = new Date(latest.split_timestamp).getTime() - new Date(earliest.split_timestamp).getTime();
                       finalTimeProjMs = rawMs + (totalPens * 30000);
                     }
 

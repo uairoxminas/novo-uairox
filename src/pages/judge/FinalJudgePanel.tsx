@@ -114,23 +114,20 @@ export default function FinalJudgePanel() {
   };
 
   const handleValidate = (lane: any, overrideMs?: number) => {
-    if (!firstHeat?.start_time) {
-      toast.error('Bateria sem horário de largada.');
-      return;
-    }
-
-    const startTime = new Date(firstHeat.start_time).getTime();
     const sortedSplits = [...(lane.splits || [])].sort(
       (a: any, b: any) => new Date(b.split_timestamp).getTime() - new Date(a.split_timestamp).getTime()
     );
-    const latest = sortedSplits[0];
 
-    if (!latest && !overrideMs) {
+    if (!sortedSplits.length && !overrideMs) {
       toast.error('Nenhuma passagem registrada para este atleta.');
       return;
     }
 
-    let rawTimeMs = overrideMs || (new Date(latest.split_timestamp).getTime() - startTime);
+    // Tempo = última passagem − 1ª passagem (cronômetro inicia na 1ª leitura do atleta)
+    const autoMs = sortedSplits.length
+      ? new Date(sortedSplits[0].split_timestamp).getTime() - new Date(sortedSplits[sortedSplits.length - 1].split_timestamp).getTime()
+      : 0;
+    const rawTimeMs = overrideMs || autoMs;
     const penSeconds = (lane.penalties?.length || 0) * 30;
     const penMs = penSeconds * 1000;
     const finalTime = rawTimeMs + penMs;
@@ -253,11 +250,12 @@ export default function FinalJudgePanel() {
 
                 // Calcular tempo projetado
                 let projectedMs: number | null = null;
-                if (lane.splits?.length > 0 && firstHeat?.start_time) {
+                if (lane.splits?.length > 0) {
                   const sorted = [...lane.splits].sort(
                     (a: any, b: any) => new Date(b.split_timestamp).getTime() - new Date(a.split_timestamp).getTime()
                   );
-                  const rawMs = new Date(sorted[0].split_timestamp).getTime() - new Date(firstHeat.start_time).getTime();
+                  // Tempo = última passagem − 1ª passagem (cronômetro inicia na 1ª leitura)
+                  const rawMs = new Date(sorted[0].split_timestamp).getTime() - new Date(sorted[sorted.length - 1].split_timestamp).getTime();
                   projectedMs = rawMs + (totalPens * 30000);
                 }
 
