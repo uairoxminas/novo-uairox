@@ -204,9 +204,32 @@ function sendToGateway(payload) {
       });
     });
     req.on('error', reject);
+    req.setTimeout(8000, () => req.destroy(new Error('timeout')));
     req.write(body);
     req.end();
   });
+}
+
+// ── Buffer offline (reenvio automático quando a internet voltar) ─────────────
+const fs   = require('fs');
+const path = require('path');
+const QUEUE_FILE = path.join(__dirname, 'pending-reads.json');
+let pendingQueue = [];
+function loadQueue() { try { pendingQueue = JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf8')) || []; } catch { pendingQueue = []; } }
+function saveQueue() { try { fs.writeFileSync(QUEUE_FILE, JSON.stringify(pendingQueue)); } catch { /* ignore */ } }
+
+const ICONS = { ok: '✅', debounce: '⏱️', unknown_tag: '❓', no_running_heat: '⚠️',
+                no_antenna_config: '🚧', no_heat_assignment: '⚠️', weak_signal: '🔉', race_complete: '🏁' };
+
+// Reenvia a fila (FIFO) enquanto houver internet. Para na 1ª falha de rede.
+async function flushQueue() {
+  if (!pendingQueue.length) return;
+  let sent = 0;
+  while (pendingQueue.length) {
+    try { await sendToGateway(pendingQueue[0]); pendingQueue.shift(); saveQueue(); sent++; }
+    catch { break; } // internet ainda fora → tenta no próximo ciclo
+  }
+  if (sent > 0) console.log(`[fila] ${sent} leitura(s) reenviada(s). Restam ${pendingQueue.length} na fila.`);
 }
 
 // ── Sincronização do debounce com o evento (campo "Zona Cega") ───────────────
@@ -326,22 +349,29 @@ async function handleRead(parsed, raw) {
   }
   lastSeen.set(key, nowMs);
 
-  // 3) Envia ao gateway
+  // 3) Envia ao gateway (com buffer offline)
+  const payload = {
+    reader_id:     CONFIG.readerId,
+    antenna_index: parsed.antenna_index,
+    tag_epc:       parsed.tag_epc,
+    rssi:          parsed.rssi,
+    read_at:       new Date().toISOString(),   // timestamp da passagem (mantido mesmo se enviar atrasado)
+  };
+
+  // Se já há backlog (internet caiu antes), enfileira pra preservar a ordem.
+  if (pendingQueue.length > 0) {
+    pendingQueue.push(payload); saveQueue();
+    console.log(`[${hora}] 📦 ${parsed.tag_epc}  sem internet — guardado (${pendingQueue.length} na fila)`);
+    return;
+  }
+
   try {
-    const result = await sendToGateway({
-      reader_id:     CONFIG.readerId,
-      antenna_index: parsed.antenna_index,
-      tag_epc:       parsed.tag_epc,
-      rssi:          parsed.rssi,
-      read_at:       new Date().toISOString(),
-    });
+    const result = await sendToGateway(payload);
     const status = result.body?.status ?? (result.status === 200 ? 'ok' : 'erro');
-    const icon   = { ok: '✅', debounce: '⏱️', unknown_tag: '❓', no_running_heat: '⚠️',
-                     no_antenna_config: '🚧', no_heat_assignment: '⚠️', weak_signal: '🔉',
-                     race_complete: '🏁' }[status] ?? '⚠️';
-    console.log(`[${hora}] ${icon} ${parsed.tag_epc}  ANT ${parsed.antenna_index}  RSSI ${parsed.rssi ?? 'n/a'}  →  ${status}`);
+    console.log(`[${hora}] ${ICONS[status] ?? '⚠️'} ${parsed.tag_epc}  ANT ${parsed.antenna_index}  RSSI ${parsed.rssi ?? 'n/a'}  →  ${status}`);
   } catch (err) {
-    console.error(`[${hora}] ❌ ${parsed.tag_epc}  falha ao enviar: ${err.message}`);
+    pendingQueue.push(payload); saveQueue();
+    console.error(`[${hora}] 📦 ${parsed.tag_epc}  SEM INTERNET — guardado p/ reenvio (${pendingQueue.length} na fila)`);
   }
 }
 
@@ -404,6 +434,7 @@ async function main() {
   console.log(`  Protocolo  : ${CONFIG.protocol}`);
   console.log(`  Reader ID  : ${CONFIG.readerId}`);
   console.log(`  Antena     : ${CONFIG.antMode}`);
+  console.log(`  Buffer     : reenvio automático se a internet cair (offline-safe)`);
   console.log(`  RSSI mín.  : ${CONFIG.rssiManual ? (CONFIG.rssiMin > 0 ? CONFIG.rssiMin + ' (fixo)' : 'desligado (fixo)') : 'auto — campo "Sinal mínimo" do evento'}`);
   console.log(`  Debounce   : ${CONFIG.debounceManual ? CONFIG.debounceMs + 'ms (fixo)' : 'auto — campo "Zona Cega" do evento'}`);
   console.log(`  Verboso    : ${CONFIG.verbose ? 'sim' : 'não'}`);
@@ -421,6 +452,11 @@ async function main() {
   // Heartbeat para o indicador ONLINE no painel
   sendHeartbeat();
   setInterval(sendHeartbeat, 20000);
+
+  // Buffer offline: carrega leituras pendentes e reenvia a cada 10s
+  loadQueue();
+  if (pendingQueue.length) console.log(`[fila] ${pendingQueue.length} leitura(s) pendente(s) de sessões anteriores — serão reenviadas.`);
+  setInterval(flushQueue, 10000);
 
   switch (CONFIG.mode) {
     case 'tcp':    startTcpClient(); break;

@@ -20,6 +20,8 @@ dist-ssr/
 
 # Bridge RFID — config local com a chave (NÃO versionar)
 bridge/config.local.ps1
+# Bridge RFID — fila de reenvio offline (dados de runtime)
+bridge/pending-reads.json
 
 # IDE
 .vscode/*

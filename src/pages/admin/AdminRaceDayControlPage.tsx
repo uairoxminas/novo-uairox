@@ -10,6 +10,8 @@ import RFIDWristbandsPanel from '@/components/raceday/RFIDWristbandsPanel';
 import RFIDStatusPanel from '@/components/raceday/RFIDStatusPanel';
 import RaceReadinessChecklist from '@/components/raceday/RaceReadinessChecklist';
 import RaceCheckInPanel from '@/components/raceday/RaceCheckInPanel';
+import RaceArbitrationTab from '@/components/raceday/RaceArbitrationTab';
+import RaceAwardsTab from '@/components/raceday/RaceAwardsTab';
 
 export default function AdminRaceDayControlPage() {
   const { id } = useParams<{ id: string }>();
@@ -94,6 +96,7 @@ export default function AdminRaceDayControlPage() {
 
   // ======= OPERAÇÕES DA BATERIA =======
   const [raceReady, setRaceReady] = useState(false);
+  const [tab, setTab] = useState<'setup' | 'arb' | 'awards'>('setup');
 
   const startHeat = useStartHeat();
   const handleStartHeat = (heatId: string) => {
@@ -135,6 +138,22 @@ export default function AdminRaceDayControlPage() {
         </div>
       </div>
 
+      {/* ABAS POR FASE */}
+      <div className="flex gap-1 border-b border-[#1a1a1a]">
+        {([['setup', '⚙️ Configuração & Largada'], ['arb', '⚖️ Arbitragem'], ['awards', '🏆 Premiação']] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)}
+            className={`px-4 py-3 text-xs font-black uppercase tracking-wide transition-colors ${tab === k ? 'text-[#EDAC02] border-b-2 border-[#EDAC02]' : 'text-zinc-500 hover:text-zinc-300'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'arb' && (
+        <RaceArbitrationTab eventId={id!} checkpoints={(checkpoints ?? []) as unknown as { id: string; is_finish_line?: boolean }[]} />
+      )}
+      {tab === 'awards' && <RaceAwardsTab eventId={id!} />}
+
+      {tab === 'setup' && (<>
       {/* DASHBOARDS RÁPIDOS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-5 rounded-2xl">
@@ -341,6 +360,7 @@ export default function AdminRaceDayControlPage() {
           </div>
         )}
       </div>
+      </>)}
 
     </div>
   );
