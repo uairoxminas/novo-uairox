@@ -99,10 +99,11 @@ serve(async (req) => {
     //    debounce_seconds (config do evento, padrão 40s) em QUALQUER antena.
     const { data: eventCfg } = await supabase
       .from('events')
-      .select('debounce_seconds, rfid_rssi_min')
+      .select('debounce_seconds, rfid_rssi_min, target_passes_volume')
       .eq('id', event_id)
       .maybeSingle();
     const debounceSeconds = (eventCfg?.debounce_seconds as number | null) ?? 40;
+    const targetPasses    = (eventCfg?.target_passes_volume as number | null) ?? 0;
 
     // Corte de RSSI (zona de leitura): ignora sinal fraco (atleta longe da antena)
     const rssiMin = (eventCfg?.rfid_rssi_min as number | null) ?? 0;
@@ -160,6 +161,20 @@ serve(async (req) => {
     }
 
     const heat_id = runningHeat.id;
+
+    // 5b. Trava de conclusão: se o atleta já atingiu o alvo de passagens
+    //     (target_passes_volume), a prova está completa — ignora extras.
+    //     Assim a N-ésima passagem trava o tempo final (qualquer antena).
+    if (targetPasses > 0) {
+      const { count: doneCount } = await supabase
+        .from('race_splits')
+        .select('id', { count: 'exact', head: true })
+        .eq('registration_id', registration_id)
+        .eq('heat_id', heat_id);
+      if ((doneCount ?? 0) >= targetPasses) {
+        return logAndReturn('race_complete', { event_id, registration_id });
+      }
+    }
 
     // 6. Insert into race_splits — same shape the judge panel uses
     const { error: splitError } = await supabase

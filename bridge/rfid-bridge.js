@@ -305,7 +305,8 @@ async function handleRead(parsed, raw) {
     });
     const status = result.body?.status ?? (result.status === 200 ? 'ok' : 'erro');
     const icon   = { ok: '✅', debounce: '⏱️', unknown_tag: '❓', no_running_heat: '⚠️',
-                     no_antenna_config: '🚧', no_heat_assignment: '⚠️', weak_signal: '🔉' }[status] ?? '⚠️';
+                     no_antenna_config: '🚧', no_heat_assignment: '⚠️', weak_signal: '🔉',
+                     race_complete: '🏁' }[status] ?? '⚠️';
     console.log(`[${hora}] ${icon} ${parsed.tag_epc}  ANT ${parsed.antenna_index}  RSSI ${parsed.rssi ?? 'n/a'}  →  ${status}`);
   } catch (err) {
     console.error(`[${hora}] ❌ ${parsed.tag_epc}  falha ao enviar: ${err.message}`);
