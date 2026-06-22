@@ -66,7 +66,16 @@ serve(async (req) => {
       });
     };
 
-    // 1. Find active wristband assignment
+    // 1+2. Resolve atleta + evento + antena (modo HÍBRIDO):
+    //   (a) Vínculo manual (rfid_tag_assignments) tem prioridade — override.
+    //   (b) Senão, modo AUTOMÁTICO: o EPC codifica o número impresso = bib.
+    //       Resolve o evento pela antena ativa do leitor (1 evento por leitor
+    //       por vez) e acha o atleta pelo bib. Sem cadastro/atribuição manual.
+    let registration_id = '';
+    let event_id = '';
+    // deno-lint-ignore no-explicit-any
+    let antenna: any = null;
+
     const { data: assignment } = await supabase
       .from('rfid_tag_assignments')
       .select('registration_id, event_id')
@@ -74,24 +83,61 @@ serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle();
 
-    if (!assignment) {
-      return logAndReturn('unknown_tag');
-    }
+    if (assignment) {
+      // (a) override manual
+      registration_id = assignment.registration_id;
+      event_id        = assignment.event_id;
+      const { data: ant } = await supabase
+        .from('rfid_antennas')
+        .select('checkpoint_id, entry_type, label')
+        .eq('event_id', event_id)
+        .eq('reader_id', reader_id)
+        .eq('antenna_index', antenna_index)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!ant) return logAndReturn('no_antenna_config', { event_id, registration_id });
+      antenna = ant;
+    } else {
+      // (b) automático — entre as antenas ativas deste leitor, escolhe o evento
+      //     com BATERIA EM ANDAMENTO (1 evento por leitor por vez → sem ambiguidade).
+      const { data: ants } = await supabase
+        .from('rfid_antennas')
+        .select('checkpoint_id, entry_type, label, event_id')
+        .eq('reader_id', reader_id)
+        .eq('antenna_index', antenna_index)
+        .eq('is_active', true);
+      if (!ants || ants.length === 0) return logAndReturn('no_antenna_config');
 
-    const { registration_id, event_id } = assignment;
+      // deno-lint-ignore no-explicit-any
+      let chosen: any = ants[0];
+      if (ants.length > 1) {
+        const { data: runHeat } = await supabase
+          .from('heats')
+          .select('event_id')
+          // deno-lint-ignore no-explicit-any
+          .in('event_id', ants.map((a: any) => a.event_id))
+          .eq('status', 'running')
+          .limit(1)
+          .maybeSingle();
+        // deno-lint-ignore no-explicit-any
+        if (runHeat) chosen = ants.find((a: any) => a.event_id === runHeat.event_id) ?? ants[0];
+      }
+      antenna  = chosen;
+      event_id = chosen.event_id;
 
-    // 2. Find antenna config for this reader/port/event
-    const { data: antenna } = await supabase
-      .from('rfid_antennas')
-      .select('checkpoint_id, entry_type, debounce_ms, label')
-      .eq('event_id', event_id)
-      .eq('reader_id', reader_id)
-      .eq('antenna_index', antenna_index)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (!antenna) {
-      return logAndReturn('no_antenna_config', { event_id, registration_id });
+      // EPC = número impresso = bib (decimal com zeros à esquerda)
+      const bibFromEpc = parseInt(tag_epc, 10);
+      if (!Number.isFinite(bibFromEpc) || bibFromEpc <= 0) {
+        return logAndReturn('unknown_tag', { event_id });
+      }
+      const { data: reg } = await supabase
+        .from('registrations')
+        .select('id')
+        .eq('event_id', event_id)
+        .eq('bib_number', bibFromEpc)
+        .maybeSingle();
+      if (!reg) return logAndReturn('unknown_tag', { event_id });
+      registration_id = reg.id;
     }
 
     // 3. Debounce POR ATLETA (tag), independente de antena.
