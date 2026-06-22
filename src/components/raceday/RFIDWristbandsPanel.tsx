@@ -136,17 +136,10 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
             <HelpCircle className="w-3.5 h-3.5" /> Ajuda {showHelp ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
           <button
-            onClick={() => setShowAntennas(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors"
-          >
-            <Radio className="w-3.5 h-3.5" /> Configurar Leitor
-            {showAntennas ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-          <button
             onClick={() => setShowRegister(v => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-[#1a1a1a] hover:bg-[#262626] rounded-lg transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" /> Cadastrar Pulseira
+            <Plus className="w-3.5 h-3.5" /> Avançado (manual)
             {showRegister ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
@@ -304,10 +297,11 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
         </div>
       )}
 
-      {/* Atribuir Pulseira */}
+      {/* Atribuir Pulseira (manual / avançado) */}
+      {showRegister && (
       <div className="p-5 border-b border-[#1a1a1a] bg-[#050505]">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Atribuir Pulseira a Atleta</p>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Atribuir Pulseira a Atleta <span className="text-zinc-600 normal-case">(exceção — o vínculo é automático por bib)</span></p>
           <button onClick={() => setShowAssignHelp(v => !v)} className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
             <HelpCircle className="w-3.5 h-3.5" /> Como funciona? {showAssignHelp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
@@ -378,6 +372,7 @@ export default function RFIDWristbandsPanel({ eventId, checkpoints }: Props) {
           </button>
         </div>
       </div>
+      )}
 
       {/* Lista de Pulseiras Ativas */}
       <div className="divide-y divide-[#1a1a1a]">

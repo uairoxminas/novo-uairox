@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, PlayCircle, Loader2, Save, Plus, Trash2, StopCircle } from 'lucide-react';
-import { useEventTimingConfig, useUpdateEventTiming, useRaceCheckpoints, useCreateRaceCheckpoint, useToggleFinishLine, useDeleteRaceCheckpoint, useStartHeat } from '@/hooks/useRaceDayConfig';
+import { ArrowLeft, PlayCircle, Loader2, Save, Plus, Trash2, StopCircle, Radio } from 'lucide-react';
+import { useEventTimingConfig, useUpdateEventTiming, useRaceCheckpoints, useCreateTimingPoint, useToggleFinishLine, useDeleteRaceCheckpoint, useStartHeat } from '@/hooks/useRaceDayConfig';
+import { useRFIDAntennas } from '@/hooks/useRFIDWristbands';
 import { toast } from 'sonner';
 import RFIDWristbandsPanel from '@/components/raceday/RFIDWristbandsPanel';
-import RFIDBridgePanel from '@/components/raceday/RFIDBridgePanel';
+import RFIDStatusPanel from '@/components/raceday/RFIDStatusPanel';
 import RaceReadinessChecklist from '@/components/raceday/RaceReadinessChecklist';
 import RaceCheckInPanel from '@/components/raceday/RaceCheckInPanel';
 
@@ -57,26 +58,37 @@ export default function AdminRaceDayControlPage() {
 
   // ======= PONTOS DE CONTROLE =======
   const { data: checkpoints, isLoading: loadingCheckpoints } = useRaceCheckpoints(id!);
-  const createCp = useCreateRaceCheckpoint();
+  const { data: antennas = [] } = useRFIDAntennas(id!);
+  const createTimingPoint = useCreateTimingPoint();
   const toggleCp = useToggleFinishLine();
   const deleteCp = useDeleteRaceCheckpoint();
 
-  const [newCpName, setNewCpName] = useState('');
-  const [newCpIsFinish, setNewCpIsFinish] = useState(false);
+  const [newCpName, setNewCpName]       = useState('');
+  const [newPointType, setNewPointType] = useState<'start' | 'lap' | 'finish'>('start');
+  const [newPointAnt, setNewPointAnt]   = useState(1);
+  const READER_ID = 'reader-1';
 
-  const handleAddCheckpoint = () => {
-    if (!newCpName.trim()) return;
-    createCp.mutate({
+  // checkpoint_id -> antena (pra mostrar na lista)
+  const antByCheckpoint = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    (antennas as any[]).forEach(a => { if (a.checkpoint_id && a.is_active) m[a.checkpoint_id] = a.antenna_index; });
+    return m;
+  }, [antennas]);
+
+  const handleAddTimingPoint = () => {
+    if (!newCpName.trim()) { toast.error('Dê um nome ao ponto.'); return; }
+    createTimingPoint.mutate({
       event_id: id!,
       name: newCpName.trim(),
-      is_finish_line: newCpIsFinish
+      entry_type: newPointType,
+      reader_id: READER_ID,
+      antenna_index: newPointAnt,
     }, {
       onSuccess: () => {
-        setNewCpName('');
-        setNewCpIsFinish(false);
-        toast.success('Ponto adicionado!');
+        setNewCpName(''); setNewPointType('start'); setNewPointAnt(1);
+        toast.success('Ponto criado e antena mapeada!');
       },
-      onError: (err: any) => toast.error('Erro ao criar ponto: ' + err.message)
+      onError: (err: any) => toast.error('Erro: ' + err.message),
     });
   };
 
@@ -201,18 +213,27 @@ export default function AdminRaceDayControlPage() {
           </div>
           
           <div className="p-6 bg-[#050505] border-b border-[#1a1a1a] space-y-3">
-            <div>
-               <input type="text" value={newCpName} onChange={e => setNewCpName(e.target.value)} placeholder="Nome do Ponto (Ex: Tapete Central)" className={inputClass} />
+            <input type="text" value={newCpName} onChange={e => setNewCpName(e.target.value)} placeholder="Nome do ponto (ex: Largada, Chegada)" className={inputClass} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Tipo</label>
+                <select value={newPointType} onChange={e => setNewPointType(e.target.value as 'start' | 'lap' | 'finish')} className={inputClass}>
+                  <option value="start">Largada</option>
+                  <option value="lap">Passagem / Volta</option>
+                  <option value="finish">Chegada</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Antena (reader-1)</label>
+                <select value={newPointAnt} onChange={e => setNewPointAnt(parseInt(e.target.value))} className={inputClass}>
+                  {[1, 2, 3, 4].map(n => <option key={n} value={n}>Antena {n}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <label className="flex flex-1 items-center gap-2 p-3 border border-[#262626] rounded-lg cursor-pointer bg-[#1a1a1a]">
-                 <input type="checkbox" checked={newCpIsFinish} onChange={e => setNewCpIsFinish(e.target.checked)} className="accent-[#EDAC02]" />
-                 <span className="text-xs font-bold text-zinc-300 uppercase">É Linha de Chegada Principal?</span>
-              </label>
-              <button onClick={handleAddCheckpoint} disabled={createCp.isPending} className="px-6 py-3 bg-[#EDAC02] hover:bg-[#EDAC02]/90 text-black font-black uppercase rounded-lg transition-colors flex items-center gap-2">
-                <Plus className="w-5 h-5" /> Add
-              </button>
-            </div>
+            <button onClick={handleAddTimingPoint} disabled={createTimingPoint.isPending} className="w-full px-6 py-3 bg-[#EDAC02] hover:bg-[#EDAC02]/90 disabled:opacity-50 text-black font-black uppercase rounded-lg transition-colors flex items-center justify-center gap-2">
+              {createTimingPoint.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />} Criar ponto + mapear antena
+            </button>
+            <p className="text-[11px] text-zinc-600">Cria o tapete E configura a antena do leitor num passo só. Cada ponto usa uma antena (1–4).</p>
           </div>
 
           <div className="p-0 flex-1 overflow-auto bg-[#0a0a0a]">
@@ -226,11 +247,18 @@ export default function AdminRaceDayControlPage() {
                    <li key={cp.id} className="p-4 flex items-center justify-between hover:bg-[#111] transition-colors">
                      <div>
                        <p className="font-bold text-white tracking-tight">{cp.name}</p>
-                       {cp.is_finish_line ? (
-                         <span className="inline-block mt-1 text-[10px] uppercase font-black tracking-widest text-[#EDAC02] px-2 py-0.5 rounded border border-[#EDAC02]/30 bg-[#EDAC02]/10">Chegada Final</span>
-                       ) : (
-                         <span className="inline-block mt-1 text-[10px] uppercase font-bold tracking-widest text-zinc-500">Passagem Padrão</span>
-                       )}
+                       <div className="flex items-center gap-2 mt-1">
+                         {cp.is_finish_line ? (
+                           <span className="text-[10px] uppercase font-black tracking-widest text-[#EDAC02] px-2 py-0.5 rounded border border-[#EDAC02]/30 bg-[#EDAC02]/10">Chegada Final</span>
+                         ) : (
+                           <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Passagem</span>
+                         )}
+                         {antByCheckpoint[cp.id] ? (
+                           <span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-green-400"><Radio className="w-3 h-3" /> Antena {antByCheckpoint[cp.id]}</span>
+                         ) : (
+                           <span className="text-[10px] uppercase font-bold tracking-widest text-red-400">⚠ sem antena</span>
+                         )}
+                       </div>
                      </div>
                      <div className="flex items-center gap-3">
                         {!cp.is_finish_line && (
@@ -249,8 +277,8 @@ export default function AdminRaceDayControlPage() {
 
       </div>
 
-      {/* BRIDGE M-ID40 */}
-      <RFIDBridgePanel eventId={id!} />
+      {/* STATUS DO LEITOR (online + últimas leituras) */}
+      <RFIDStatusPanel eventId={id!} />
 
       {/* PAINEL RFID */}
       <RFIDWristbandsPanel eventId={id!} checkpoints={(checkpoints ?? []) as unknown as { id: string; name: string; is_finish_line: boolean }[]} />

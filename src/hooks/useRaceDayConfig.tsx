@@ -99,6 +99,50 @@ export function useDeleteRaceCheckpoint() {
   });
 }
 
+// ======= HOOK PONTO DE CRONOMETRAGEM (tapete + antena num passo) =======
+export function useCreateTimingPoint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: {
+      event_id: string; name: string;
+      entry_type: 'start' | 'lap' | 'finish';
+      reader_id: string; antenna_index: number;
+    }) => {
+      const is_finish_line = vars.entry_type === 'finish';
+      if (is_finish_line) {
+        await supabase.from("race_checkpoints" as any).update({ is_finish_line: false }).eq("event_id", vars.event_id);
+      }
+      // 1. cria o tapete (checkpoint) e pega o id
+      const { data: cp, error: cpErr } = await supabase
+        .from("race_checkpoints" as any)
+        .insert({ event_id: vars.event_id, name: vars.name, is_finish_line })
+        .select("id")
+        .single();
+      if (cpErr) throw cpErr;
+
+      // 2. garante 1 evento ativo por leitor+antena (desativa nos outros)
+      await supabase.from("rfid_antennas" as any)
+        .update({ is_active: false })
+        .eq("reader_id", vars.reader_id)
+        .eq("antenna_index", vars.antenna_index)
+        .neq("event_id", vars.event_id);
+
+      // 3. mapeia a antena ao tapete
+      const { error: antErr } = await supabase.from("rfid_antennas" as any)
+        .upsert({
+          event_id: vars.event_id, reader_id: vars.reader_id, antenna_index: vars.antenna_index,
+          checkpoint_id: (cp as any).id, entry_type: vars.entry_type, label: vars.name, is_active: true,
+        }, { onConflict: "event_id,reader_id,antenna_index" });
+      if (antErr) throw antErr;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["race_checkpoints", vars.event_id] });
+      qc.invalidateQueries({ queryKey: ["rfid-antennas", vars.event_id] });
+      qc.invalidateQueries({ queryKey: ["readiness-antennas", vars.event_id] });
+    },
+  });
+}
+
 // ======= HOOK HEATS OPERATIONS =======
 export function useStartHeat() {
   const qc = useQueryClient();
