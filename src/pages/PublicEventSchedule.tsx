@@ -194,7 +194,10 @@ function PublicHeatLanes({ heatId, laneCount, category }: { heatId: string; lane
         const reg = lane.registrations as any;
         // Cancelado/excluído some: a raia fica vazia ("—").
         const hasAthlete = !!lane.registration_id && !!reg && reg.status !== 'cancelled';
-        const displayName = reg?.team_name || reg?.athlete_name || '?';
+        // Categoria e nome vêm da PRÓPRIA inscrição (a bateria pode misturar categorias).
+        const regCat = reg?.categories?.name || category;
+        const isTeam = (reg?.categories?.team_size ?? 1) > 1;
+        const displayName = isTeam ? (reg?.team_name || 'Sem Equipe') : (reg?.athlete_name || '?');
         return (
           <div key={lane.id} className={`rounded-xl px-3 py-5 text-center border ${
             hasAthlete ? 'bg-[#16130b] border-[#EDAC02]/20' : 'bg-[#111] border-[#262626]'
@@ -202,7 +205,7 @@ function PublicHeatLanes({ heatId, laneCount, category }: { heatId: string; lane
             <p className="text-sm md:text-base text-zinc-500 uppercase font-bold tracking-wide">Raia {lane.lane_number}</p>
             {hasAthlete ? (
               <>
-                {category && <p className="text-xs md:text-sm text-white uppercase font-bold mt-1 leading-tight break-words">{category}</p>}
+                {regCat && <p className="text-xs md:text-sm text-white uppercase font-bold mt-1 leading-tight break-words">{regCat}</p>}
                 <p className="text-2xl md:text-3xl font-black text-[#EDAC02] mt-4 leading-none">#{reg?.bib_number || '?'}</p>
                 <p className="text-base md:text-xl text-white uppercase font-black mt-1.5 break-words leading-tight" title={displayName}>
                   {displayName}
