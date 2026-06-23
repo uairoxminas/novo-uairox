@@ -58,11 +58,11 @@ const CONFIG = {
   // senão, sincroniza automaticamente com o campo "Sinal mínimo (RSSI)" do evento.
   rssiMin:    parseInt(process.env.RSSI_MIN || '0'),
   rssiManual: process.env.RSSI_MIN !== undefined && process.env.RSSI_MIN !== '',
-  // Anti-duplicidade local POR ATLETA (em qualquer antena). Se DEBOUNCE_MS for
-  // definido no ambiente, usa esse valor fixo (override manual). Senão, o bridge
-  // sincroniza automaticamente com o campo "Zona Cega" do evento (knob único).
-  debounceMs:     parseInt(process.env.DEBOUNCE_MS || '40000'),
-  debounceManual: process.env.DEBOUNCE_MS !== undefined && process.env.DEBOUNCE_MS !== '',
+  // Anti-flood local: só colapsa a rajada de leituras de uma mesma passagem.
+  // NÃO é a regra dos 40s — essa é aplicada pelo GATEWAY (campo "Zona Cega"),
+  // e só durante a prova (após a largada e a 1ª passagem). No cadastro/conferência
+  // não há bloqueio. Aqui é um filtro curto fixo.
+  debounceMs:     parseInt(process.env.DEBOUNCE_MS || '3000'),
   // Verboso: loga TODA leitura crua (útil pra calibrar; deixe desligado na prova)
   verbose:    process.env.VERBOSE === '1' || process.env.VERBOSE === 'true',
   // Comum
@@ -296,14 +296,8 @@ async function syncConfigFromServer() {
   if (!Array.isArray(evs) || !evs.length) return;
   const ev = evs[0];
 
-  // Debounce (se não for override manual)
-  if (!CONFIG.debounceManual && typeof ev.debounce_seconds === 'number' && ev.debounce_seconds > 0) {
-    const ms = ev.debounce_seconds * 1000;
-    if (ms !== CONFIG.debounceMs) {
-      CONFIG.debounceMs = ms;
-      console.log(`[config] Debounce sincronizado do evento: ${ev.debounce_seconds}s`);
-    }
-  }
+  // (O debounce dos 40s NÃO é sincronizado aqui — é regra do gateway. O bridge
+  //  usa só um anti-flood curto fixo.)
 
   // Corte de RSSI (se não for override manual)
   if (!CONFIG.rssiManual && typeof ev.rfid_rssi_min === 'number') {
@@ -436,15 +430,15 @@ async function main() {
   console.log(`  Antena     : ${CONFIG.antMode}`);
   console.log(`  Buffer     : reenvio automático se a internet cair (offline-safe)`);
   console.log(`  RSSI mín.  : ${CONFIG.rssiManual ? (CONFIG.rssiMin > 0 ? CONFIG.rssiMin + ' (fixo)' : 'desligado (fixo)') : 'auto — campo "Sinal mínimo" do evento'}`);
-  console.log(`  Debounce   : ${CONFIG.debounceManual ? CONFIG.debounceMs + 'ms (fixo)' : 'auto — campo "Zona Cega" do evento'}`);
+  console.log(`  Anti-flood : ${CONFIG.debounceMs}ms (local). Os 40s (Zona Cega) são aplicados pelo gateway, só na prova.`);
   console.log(`  Verboso    : ${CONFIG.verbose ? 'sim' : 'não'}`);
   console.log(`  Gateway    : ${CONFIG.gatewayUrl}`);
   console.log('');
 
-  // Sincroniza debounce + corte de RSSI com o evento (campos da tela Race Day).
-  // Pula só se AMBOS forem override manual. ESPERA o 1º sync antes de ler,
-  // pra nenhuma leitura escapar do filtro no arranque.
-  if (!CONFIG.debounceManual || !CONFIG.rssiManual) {
+  // Sincroniza o corte de RSSI com o campo "Sinal mínimo" do evento.
+  // (O debounce dos 40s é regra do gateway — não sincroniza aqui.)
+  // ESPERA o 1º sync antes de ler, pra nenhuma leitura escapar do filtro no arranque.
+  if (!CONFIG.rssiManual) {
     await syncConfigFromServer();
     setInterval(syncConfigFromServer, 60000);
   }

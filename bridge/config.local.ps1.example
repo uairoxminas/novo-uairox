@@ -20,10 +20,10 @@ $RFID_PORT = "5000"
 # Descomente só para FORÇAR um valor fixo (ex: "70"). 0 = ler tudo.
 # $RSSI_MIN  = "70"
 
-# Anti-duplicidade POR ATLETA (em qualquer antena).
-# DEIXE COMENTADO para o bridge ler automaticamente o campo "Zona Cega" do evento
-# (knob único — você só muda na tela). Descomente apenas para FORÇAR um valor fixo.
-# $DEBOUNCE_MS = "40000"
+# Anti-flood local (ms): só colapsa a rajada de leituras de uma passagem.
+# NÃO é a regra dos 40s — essa é a "Zona Cega" do evento, aplicada pelo gateway
+# só durante a prova. Padrão 3000 (3s). Normalmente não precisa mexer.
+# $DEBOUNCE_MS = "3000"
 
 # Verboso: "1" mostra TODA leitura crua (bom pra calibrar RSSI). Deixe "0" na prova.
 $VERBOSE = "0"
