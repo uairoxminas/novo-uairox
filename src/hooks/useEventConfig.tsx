@@ -549,7 +549,7 @@ export function useEventStats(eventId?: string) {
 }
 
 // ============ HEATS (BATERIAS) ============
-export function useHeats(eventId?: string) {
+export function useHeats(eventId?: string, opts?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ["event-heats", eventId],
     queryFn: async () => {
@@ -565,6 +565,7 @@ export function useHeats(eventId?: string) {
       return data;
     },
     enabled: !!eventId,
+    ...(opts?.refetchInterval ? { refetchInterval: opts.refetchInterval, staleTime: 0 } : {}),
   });
 }
 
@@ -618,7 +619,7 @@ export function useDeleteHeat() {
 }
 
 // ============ LANE ASSIGNMENTS ============
-export function useLaneAssignments(heatId?: string) {
+export function useLaneAssignments(heatId?: string, opts?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ["lane-assignments", heatId],
     queryFn: async () => {
@@ -634,6 +635,7 @@ export function useLaneAssignments(heatId?: string) {
       return data;
     },
     enabled: !!heatId,
+    ...(opts?.refetchInterval ? { refetchInterval: opts.refetchInterval, staleTime: 0 } : {}),
   });
 }
 
