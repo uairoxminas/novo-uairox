@@ -627,7 +627,7 @@ export function useLaneAssignments(heatId?: string, opts?: { refetchInterval?: n
         .from("heat_lane_assignments")
         .select(`
           *,
-          registrations(id, bib_number, user_id, status, athlete_name, team_name)
+          registrations(id, bib_number, user_id, status, athlete_name, team_name, categories(name, team_size))
         `)
         .eq("heat_id", heatId!)
         .order("lane_number");
