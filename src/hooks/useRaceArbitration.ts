@@ -11,6 +11,7 @@ export interface ArbAthlete {
   bib: number | null;
   name: string | null;
   team_name: string | null;
+  team_size: number;
   category_id: string | null;
   category_name: string;
   splits: ArbSplit[];
@@ -46,9 +47,10 @@ export function useRaceArbitration(eventId: string) {
 
       const catIds = [...new Set((regs ?? []).map((r: any) => r.category_id).filter(Boolean))];
       const catMap = new Map<string, string>();
+      const catSizeMap = new Map<string, number>();
       if (catIds.length) {
-        const { data: cats } = await supabase.from('categories' as any).select('id, name').in('id', catIds);
-        (cats ?? []).forEach((c: any) => catMap.set(c.id, c.name));
+        const { data: cats } = await supabase.from('categories' as any).select('id, name, team_size').in('id', catIds);
+        (cats ?? []).forEach((c: any) => { catMap.set(c.id, c.name); catSizeMap.set(c.id, c.team_size ?? 1); });
       }
 
       const { data: splits } = await supabase.from('race_splits' as any)
@@ -91,6 +93,7 @@ export function useRaceArbitration(eventId: string) {
         return {
           registration_id: lane.registration_id, heat_id: lane.heat_id, heat_start: heatStart,
           bib: reg?.bib_number ?? null, name: reg?.athlete_name ?? null, team_name: reg?.team_name ?? null,
+          team_size: catSizeMap.get(reg?.category_id) ?? 1,
           category_id: reg?.category_id ?? null, category_name: catMap.get(reg?.category_id) ?? 'Sem categoria',
           splits: sp, passCount, target, penaltiesSec: penSec,
           result: result ? { status: result.status, final_ms: result.final_adjusted_time_ms, dq_reason: result.dq_reason } : null,

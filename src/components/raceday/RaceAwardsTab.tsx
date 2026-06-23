@@ -12,17 +12,19 @@ const fmt = (ms: number | null) => {
 };
 const MEDAL = ['🥇', '🥈', '🥉'];
 
+// Nome a exibir: categoria de equipe (team_size > 1) → nome da equipe; senão → atleta.
+const displayName = (a: ArbAthlete) =>
+  a.team_size > 1 ? (a.team_name || 'Sem Equipe') : (a.name || 'Atleta');
+
 // Monta a mensagem de resultado da categoria (todos os atletas/equipes + tempo)
 function buildMessage(catName: string, ranked: ArbAthlete[], out: ArbAthlete[]): string {
   const lines = [`🏆 *RESULTADO — ${catName}*`, ''];
   ranked.forEach((a, i) => {
     const pos = i < 3 ? MEDAL[i] : `${i + 1}º`;
-    const team = a.team_name ? ` (${a.team_name})` : '';
-    lines.push(`${pos} #${a.bib ?? '?'} ${a.name ?? ''}${team} — ${fmt(a.finalMs)}`);
+    lines.push(`${pos} #${a.bib ?? '?'} ${displayName(a)} — ${fmt(a.finalMs)}`);
   });
   out.forEach(a => {
-    const team = a.team_name ? ` (${a.team_name})` : '';
-    lines.push(`${a.state === 'dnf' ? '🏳 DNF' : '⛔ DSQ'} #${a.bib ?? '?'} ${a.name ?? ''}${team}`);
+    lines.push(`${a.state === 'dnf' ? '🏳 DNF' : '⛔ DSQ'} #${a.bib ?? '?'} ${displayName(a)}`);
   });
   return lines.join('\n');
 }
@@ -105,7 +107,7 @@ export default function RaceAwardsTab({ eventId }: Props) {
                   <div className="flex items-center gap-3">
                     <span className="w-8 text-center text-lg">{idx < 3 ? MEDAL[idx] : <span className="text-sm font-black text-zinc-500">{idx + 1}º</span>}</span>
                     <span className="w-9 text-sm font-black text-white">#{a.bib}</span>
-                    <span className={`text-sm font-bold ${idx < 3 ? 'text-white' : 'text-zinc-300'}`}>{a.name}</span>
+                    <span className={`text-sm font-bold ${idx < 3 ? 'text-white' : 'text-zinc-300'}`}>{displayName(a)}</span>
                   </div>
                   <span className="text-base font-black text-[#EDAC02]">{fmt(a.finalMs)}</span>
                 </div>
@@ -115,7 +117,7 @@ export default function RaceAwardsTab({ eventId }: Props) {
                   <div className="flex items-center gap-3">
                     <span className="w-8 text-center text-zinc-600">{a.state === 'dnf' ? <Flag className="w-4 h-4 inline" /> : <Ban className="w-4 h-4 inline" />}</span>
                     <span className="w-9 text-sm font-black text-zinc-500">#{a.bib}</span>
-                    <span className="text-sm text-zinc-400 line-through">{a.name}</span>
+                    <span className="text-sm text-zinc-400 line-through">{displayName(a)}</span>
                   </div>
                   <span className="text-xs font-black uppercase text-red-400">{a.state === 'dnf' ? 'DNF' : 'DSQ'}</span>
                 </div>
