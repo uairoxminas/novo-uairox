@@ -663,15 +663,33 @@ export function useAssignLane() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, registration_id, heat_id }: { id: string; registration_id: string | null; heat_id: string }) => {
+      // Ocupante atual da raia (pra limpar o heat_id dele se for substituído/removido)
+      const { data: prev } = await supabase
+        .from("heat_lane_assignments")
+        .select("registration_id")
+        .eq("id", id)
+        .maybeSingle();
+      const prevReg = (prev as any)?.registration_id ?? null;
+
       const { error } = await supabase
         .from("heat_lane_assignments")
         .update({ registration_id })
         .eq("id", id);
       if (error) throw error;
+
+      // Mantém registrations.heat_id em sincronia com a raia (igual à geração automática),
+      // pra a aba Inscrições e qualquer tela que use heat_id ficarem corretas.
+      if (prevReg && prevReg !== registration_id) {
+        await supabase.from("registrations").update({ heat_id: null }).eq("id", prevReg);
+      }
+      if (registration_id) {
+        await supabase.from("registrations").update({ heat_id }).eq("id", registration_id);
+      }
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["lane-assignments", vars.heat_id] });
       qc.invalidateQueries({ queryKey: ["unassigned-registrations"] });
+      qc.invalidateQueries({ queryKey: ["event-registrations"] });
     },
   });
 }
