@@ -45,12 +45,13 @@ export default function RaceAwardsTab({ eventId }: Props) {
   const [released, setReleased] = useState<Record<string, boolean>>({});
   const [testPhone, setTestPhone] = useState('');
   const [sendingTest, setSendingTest] = useState<string | null>(null);
-  const [releasing, setReleasing] = useState<string | null>(null);
+  const [sent, setSent] = useState<Record<string, boolean>>({});
+  const [sendingClass, setSendingClass] = useState<string | null>(null);
 
-  // Libera a premiação: enfileira o resultado da categoria para o admin + atletas,
-  // com 30s entre cada (worker envia). Robusto — não depende da aba aberta.
-  async function releaseCategory(g: { id: string; name: string; ranked: ArbAthlete[]; out: ArbAthlete[] }) {
-    setReleasing(g.id);
+  // Enfileira a classificação da categoria para o admin + atletas (todos os
+  // integrantes da equipe), 30s entre cada. Robusto — não depende da aba aberta.
+  async function sendClassification(g: { id: string; name: string; ranked: ArbAthlete[]; out: ArbAthlete[] }) {
+    setSendingClass(g.id);
     try {
       const { data: cfg } = await supabase.from('botconversa_config' as any)
         .select('trigger_broadcast_url').eq('event_id', eventId).maybeSingle();
@@ -75,12 +76,12 @@ export default function RaceAwardsTab({ eventId }: Props) {
 
       const { error } = await supabase.from('premiacao_queue' as any).insert(rows);
       if (error) { toast.error(error.message); return; }
-      setReleased(p => ({ ...p, [g.id]: true }));
-      toast.success(`Premiação liberada — ${rows.length} mensagem(ns) na fila (envio a cada 30s).`);
+      setSent(p => ({ ...p, [g.id]: true }));
+      toast.success(`Classificação na fila — ${rows.length} mensagem(ns), envio a cada 30s.`);
     } catch (e: any) {
-      toast.error(e?.message || 'Erro ao liberar premiação.');
+      toast.error(e?.message || 'Erro ao enviar classificação.');
     } finally {
-      setReleasing(null);
+      setSendingClass(null);
     }
   }
 
@@ -126,6 +127,7 @@ export default function RaceAwardsTab({ eventId }: Props) {
     <div className="space-y-4">
       {groups.map(g => {
         const isReleased = !!released[g.id];
+        const isSent = !!sent[g.id];
         return (
           <div key={g.id} className={`rounded-2xl border overflow-hidden ${g.allFinal ? 'border-[#EDAC02]/30' : 'border-[#1a1a1a]'}`}>
             <div className="p-5 border-b border-[#1a1a1a] flex items-center justify-between gap-3 flex-wrap bg-[#0a0a0a]">
@@ -134,16 +136,28 @@ export default function RaceAwardsTab({ eventId }: Props) {
                 <span className="text-xs font-normal text-zinc-500">{g.total} atleta(s)</span>
               </h3>
               {g.allFinal ? (
-                isReleased ? (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-green-600/20 text-green-400 border border-green-600/40"><Unlock className="w-3.5 h-3.5" /> Premiação liberada</span>
-                ) : (
-                  <button onClick={() => releaseCategory({ id: g.id, name: g.name, ranked: g.ranked, out: g.out })} disabled={releasing === g.id}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black uppercase bg-[#EDAC02] hover:bg-[#EDAC02]/90 text-black disabled:opacity-50">
-                    {releasing === g.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />} Liberar e notificar
-                  </button>
-                )
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* 1) Liberar premiação — torna o pódio oficial (não envia mensagem) */}
+                  {isReleased ? (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-green-600/20 text-green-400 border border-green-600/40"><Unlock className="w-3.5 h-3.5" /> Premiação liberada</span>
+                  ) : (
+                    <button onClick={() => setReleased(p => ({ ...p, [g.id]: true }))}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black uppercase bg-[#EDAC02] hover:bg-[#EDAC02]/90 text-black">
+                      <Unlock className="w-3.5 h-3.5" /> Liberar premiação
+                    </button>
+                  )}
+                  {/* 2) Enviar classificação — dispara o WhatsApp (atletas + admin) */}
+                  {isSent ? (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-blue-600/20 text-blue-300 border border-blue-600/40"><Send className="w-3.5 h-3.5" /> Classificação enviada</span>
+                  ) : (
+                    <button onClick={() => sendClassification({ id: g.id, name: g.name, ranked: g.ranked, out: g.out })} disabled={sendingClass === g.id}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black uppercase bg-[#1a1a1a] hover:bg-[#222] text-[#EDAC02] border border-[#EDAC02]/40 disabled:opacity-50">
+                      {sendingClass === g.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Enviar classificação
+                    </button>
+                  )}
+                </div>
               ) : (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#1a1a1a] text-zinc-500 border border-[#262626]" title="Finalize todos os atletas (validar/DNF/DSQ) para liberar">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#1a1a1a] text-zinc-500 border border-[#262626]" title="Finalize todos os atletas (validar/DNF/DSQ)">
                   <Lock className="w-3.5 h-3.5" /> Faltam {g.pendingCount} atleta(s) finalizar
                 </span>
               )}
