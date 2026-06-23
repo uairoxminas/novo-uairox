@@ -29,7 +29,7 @@ export default function PublicEventSchedule() {
     resolveEvent();
   }, [id]);
 
-  const { data: heats, isLoading: heatsLoading } = useHeats(resolvedId || undefined);
+  const { data: heats, isLoading: heatsLoading } = useHeats(resolvedId || undefined, { refetchInterval: 30000 });
   const { data: stages } = useEventStages(resolvedId || undefined);
 
   const [catStats, setCatStats] = useState<{ name: string; count: number }[]>([]);
@@ -39,12 +39,12 @@ export default function PublicEventSchedule() {
     async function fetchCatStats() {
       const { data } = await (supabase as any)
         .from('heats')
-        .select('categories(name), heat_lane_assignments(registration_id)')
+        .select('categories(name), heat_lane_assignments(registration_id, registrations(status))')
         .eq('event_id', resolvedId);
       const acc: Record<string, number> = {};
       for (const h of data || []) {
         const cat = (h.categories as any)?.name || 'Sem categoria';
-        const count = (h.heat_lane_assignments || []).filter((a: any) => a.registration_id).length;
+        const count = (h.heat_lane_assignments || []).filter((a: any) => a.registration_id && a.registrations?.status !== 'cancelled').length;
         acc[cat] = (acc[cat] || 0) + count;
       }
       setCatStats(Object.entries(acc).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count));
@@ -173,7 +173,7 @@ export default function PublicEventSchedule() {
 }
 
 function PublicHeatLanes({ heatId, laneCount, category }: { heatId: string; laneCount: number; category?: string }) {
-  const { data: lanes, isLoading } = useLaneAssignments(heatId);
+  const { data: lanes, isLoading } = useLaneAssignments(heatId, { refetchInterval: 30000 });
 
   if (isLoading) return <div className="text-center py-6"><div className="w-6 h-6 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin mx-auto" /></div>;
 
@@ -191,8 +191,9 @@ function PublicHeatLanes({ heatId, laneCount, category }: { heatId: string; lane
   return (
     <div className={`grid ${cols} gap-3 md:gap-4`}>
       {cells.map((lane: any) => {
-        const hasAthlete = !!lane.registration_id;
         const reg = lane.registrations as any;
+        // Cancelado/excluído some: a raia fica vazia ("—").
+        const hasAthlete = !!lane.registration_id && !!reg && reg.status !== 'cancelled';
         const displayName = reg?.team_name || reg?.athlete_name || '?';
         return (
           <div key={lane.id} className={`rounded-xl px-3 py-5 text-center border ${
