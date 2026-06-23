@@ -59,9 +59,12 @@ export default function RaceAwardsTab({ eventId }: Props) {
 
       const recipients = new Map<string, string>(); // telefone -> nome
       recipients.set(normalizePhone(ADMIN_PHONE), 'Admin');
+      // Cada inscrição: atleta principal + TODOS os integrantes da equipe (dupla/quarteto).
       [...g.ranked, ...g.out].forEach(a => {
-        const p = normalizePhone(a.phone);
-        if (p.length >= 12 && !recipients.has(p)) recipients.set(p, displayName(a));
+        [a.phone, ...a.member_phones].forEach(raw => {
+          const p = normalizePhone(raw);
+          if (p.length >= 12 && !recipients.has(p)) recipients.set(p, displayName(a));
+        });
       });
 
       const mensagem = buildMessage(g.name, g.ranked, g.out);

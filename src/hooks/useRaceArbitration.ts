@@ -10,7 +10,8 @@ export interface ArbAthlete {
   heat_start: string | null;
   bib: number | null;
   name: string | null;
-  phone: string | null;
+  phone: string | null;            // atleta principal (cap. da equipe em dupla/quarteto)
+  member_phones: string[];         // demais integrantes da equipe (team_members[].phone)
   team_name: string | null;
   team_size: number;
   category_id: string | null;
@@ -43,7 +44,7 @@ export function useRaceArbitration(eventId: string) {
       const regIds = [...new Set(laneList.map(l => l.registration_id).filter(Boolean))];
       if (!regIds.length) return { athletes: [], target };
 
-      const { data: regs } = await supabase.from('registrations' as any).select('id, bib_number, athlete_name, athlete_phone, team_name, category_id').in('id', regIds);
+      const { data: regs } = await supabase.from('registrations' as any).select('id, bib_number, athlete_name, athlete_phone, team_members, team_name, category_id').in('id', regIds);
       const regMap = new Map((regs ?? []).map((r: any) => [r.id, r]));
 
       const catIds = [...new Set((regs ?? []).map((r: any) => r.category_id).filter(Boolean))];
@@ -93,8 +94,9 @@ export function useRaceArbitration(eventId: string) {
         else state = passCount >= target ? 'complete' : 'incomplete';
         return {
           registration_id: lane.registration_id, heat_id: lane.heat_id, heat_start: heatStart,
-          bib: reg?.bib_number ?? null, name: reg?.athlete_name ?? null, phone: reg?.athlete_phone ?? null, team_name: reg?.team_name ?? null,
-          team_size: catSizeMap.get(reg?.category_id) ?? 1,
+          bib: reg?.bib_number ?? null, name: reg?.athlete_name ?? null, phone: reg?.athlete_phone ?? null,
+          member_phones: Array.isArray(reg?.team_members) ? reg.team_members.map((m: any) => m?.phone).filter(Boolean) : [],
+          team_name: reg?.team_name ?? null, team_size: catSizeMap.get(reg?.category_id) ?? 1,
           category_id: reg?.category_id ?? null, category_name: catMap.get(reg?.category_id) ?? 'Sem categoria',
           splits: sp, passCount, target, penaltiesSec: penSec,
           result: result ? { status: result.status, final_ms: result.final_adjusted_time_ms, dq_reason: result.dq_reason } : null,
