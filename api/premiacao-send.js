@@ -44,7 +44,8 @@ export default async function handler(req) {
     const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trigger: 'premiacao', nome: nome || '', telefone: phone, mensagem }),
+      // O fluxo de Broadcast do BotConversa lê o campo "message" (igual ao broadcast/comprovante).
+      body: JSON.stringify({ telefone: phone, message: mensagem, nome: nome || '' }),
     });
 
     return new Response(JSON.stringify({ ok: res.ok, status: res.status }), { headers: { ...cors, 'Content-Type': 'application/json' } });

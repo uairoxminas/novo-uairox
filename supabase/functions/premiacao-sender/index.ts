@@ -53,7 +53,8 @@ serve(async (req) => {
       const res = await fetch(msg.webhook_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trigger: 'premiacao', nome: msg.nome ?? '', telefone: msg.telefone, mensagem: msg.mensagem }),
+        // O fluxo de Broadcast do BotConversa lê o campo "message".
+        body: JSON.stringify({ telefone: msg.telefone, message: msg.mensagem, nome: msg.nome ?? '' }),
       });
       ok = res.ok;
     } catch (_) {
