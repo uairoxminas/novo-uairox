@@ -102,14 +102,16 @@ Regra: após um atleta confirmar uma passagem em **qualquer** antena, ele fica
 **bloqueado por 40s** — nenhuma nova passagem é confirmada nesse intervalo, nem
 na mesma nem em outra antena. Isso vale **por pulseira (atleta)**, não por antena.
 
-Aplicado em **dois lugares**:
+Onde é aplicado:
 - **Gateway (servidor):** usa o campo `debounce_seconds` do evento (campo "Zona Cega"
-  na tela Race Day, padrão **40**). É a **garantia real** — vê todas as antenas/leitores.
-  Para mudar a janela, é só alterar esse campo na tela e salvar.
-- **Bridge (local):** `DEBOUNCE_MS` (padrão **40000**), por pulseira, ignorando antena.
-  Otimização pra nem enviar leituras redundantes.
+  na tela Race Day, padrão **40**). É a **regra real** dos 40s e só vale **durante a prova**
+  (após a largada e a 1ª passagem confirmada). No **cadastro/conferência NÃO há bloqueio**.
+  Para mudar a janela, altere esse campo na tela e salve.
+- **Bridge (local):** apenas um **anti-flood curto** (`DEBOUNCE_MS`, padrão **3000ms**) que
+  colapsa a rajada de leituras de uma mesma passagem. NÃO é a regra dos 40s.
 
-> Trade-off: voltas/repasses em **menos de 40s** não são contadas. É o esperado pela regra.
+> Trade-off: voltas/repasses em **menos de 40s** não são contadas na prova. É o esperado pela regra.
+> Na conferência de pulseiras, dá pra reler a mesma pulseira na hora (após ~3s).
 
 Para **calibrar/depurar**, ligue `$VERBOSE = "1"` no `config.local.ps1` — mostra toda
 leitura crua e os motivos de cada descarte (RSSI baixo / debounce). Na prova, deixe `"0"`.

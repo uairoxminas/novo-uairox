@@ -133,18 +133,15 @@ export default function PublicEventSchedule() {
           <div className="space-y-12 pl-2">
               {Object.entries(timeGroups).map(([time, items]) => (
                 <div key={time} className="relative">
-                  <div className="mb-4">
-                    <span className="text-xl md:text-2xl font-black text-white font-mono tracking-tight bg-[#111] px-3 py-1 rounded border border-[#262626] inline-block">{time}</span>
+                  <div className="mb-5">
+                    <span className="inline-block text-3xl md:text-5xl font-black text-white font-mono tracking-tight bg-[#0f0f0f] px-5 py-3 rounded-2xl border border-[#262626]">{time}</span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-6">
                     {(items as any).map((item: any) => (
-                      <div key={item.id} className="bg-[#0a0a0a] border border-[#EDAC02]/40 p-5 rounded-xl">
-                        <div className="flex flex-col">
-                          <h3 className="text-xl md:text-2xl font-black text-white uppercase italic tracking-tight">{item.title}</h3>
-                          
-                          <PublicHeatLanes heatId={item.id} laneCount={item.lanes} />
-                        </div>
+                      <div key={item.id} className="bg-[#0a0a0a] border border-[#EDAC02]/40 p-6 md:p-8 rounded-2xl">
+                        <h3 className="text-2xl md:text-4xl font-black text-white uppercase italic tracking-tight mb-6">{item.title}</h3>
+                        <PublicHeatLanes heatId={item.id} laneCount={item.lanes} category={item.category} />
                       </div>
                     ))}
                   </div>
@@ -175,46 +172,47 @@ export default function PublicEventSchedule() {
   );
 }
 
-function PublicHeatLanes({ heatId, laneCount }: { heatId: string; laneCount: number }) {
+function PublicHeatLanes({ heatId, laneCount, category }: { heatId: string; laneCount: number; category?: string }) {
   const { data: lanes, isLoading } = useLaneAssignments(heatId);
 
-  if (isLoading) return <div className="pt-4 mt-4 border-t border-[#1a1a1a] text-center"><div className="w-5 h-5 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin mx-auto" /></div>;
+  if (isLoading) return <div className="text-center py-6"><div className="w-6 h-6 border-2 border-[#EDAC02] border-t-transparent rounded-full animate-spin mx-auto" /></div>;
+
+  // Usa as raias reais; se ainda não houver, mostra raias vazias pelo lane_count.
+  const cells = (lanes && lanes.length > 0)
+    ? lanes
+    : Array.from({ length: laneCount || 0 }, (_, i) => ({ id: `empty-${i}`, lane_number: i + 1, registration_id: null }));
+
+  const n = cells.length;
+  const cols = n <= 2 ? 'grid-cols-2'
+    : n === 3 ? 'grid-cols-3'
+    : n <= 4 ? 'grid-cols-2 sm:grid-cols-4'
+    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
 
   return (
-    <div className="pt-4 mt-2">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {(lanes && lanes.length > 0) ? lanes.map((lane: any) => {
-          const hasAthlete = !!lane.registration_id;
-          const reg = lane.registrations as any;
-          const displayName = reg?.team_name || reg?.athlete_name || '?';
-          return (
-            <div key={lane.id} className={`rounded p-2 text-center border ${
-              hasAthlete
-                ? 'bg-[#EDAC02]/10 border-[#EDAC02]/20'
-                : 'bg-[#111] border-[#262626]'
-            }`}>
-              <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Raia {lane.lane_number}</p>
-              {hasAthlete ? (
-                <>
-                  <p className="text-[11px] font-black text-[#EDAC02] leading-none mb-0.5">#{reg?.bib_number || '?'}</p>
-                  <p className="text-[10px] text-white uppercase font-bold px-1 break-words leading-tight" title={displayName}>
-                    {displayName}
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs font-bold text-zinc-600">—</p>
-              )}
-            </div>
-          );
-        }) : (
-          Array.from({ length: laneCount }, (_, i) => (
-            <div key={i} className="rounded p-2 text-center border border-[#262626] bg-[#111]">
-              <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Raia {i + 1}</p>
-              <p className="text-xs font-bold text-zinc-600">—</p>
-            </div>
-          ))
-        )}
-      </div>
+    <div className={`grid ${cols} gap-3 md:gap-4`}>
+      {cells.map((lane: any) => {
+        const hasAthlete = !!lane.registration_id;
+        const reg = lane.registrations as any;
+        const displayName = reg?.team_name || reg?.athlete_name || '?';
+        return (
+          <div key={lane.id} className={`rounded-xl px-3 py-5 text-center border ${
+            hasAthlete ? 'bg-[#16130b] border-[#EDAC02]/20' : 'bg-[#111] border-[#262626]'
+          }`}>
+            <p className="text-sm md:text-base text-zinc-500 uppercase font-bold tracking-wide">Raia {lane.lane_number}</p>
+            {hasAthlete ? (
+              <>
+                {category && <p className="text-xs md:text-sm text-white uppercase font-bold mt-1 leading-tight break-words">{category}</p>}
+                <p className="text-2xl md:text-3xl font-black text-[#EDAC02] mt-4 leading-none">#{reg?.bib_number || '?'}</p>
+                <p className="text-base md:text-xl text-white uppercase font-black mt-1.5 break-words leading-tight" title={displayName}>
+                  {displayName}
+                </p>
+              </>
+            ) : (
+              <p className="text-lg font-bold text-zinc-600 mt-6">—</p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
