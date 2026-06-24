@@ -4133,7 +4133,7 @@ function CronogramaTab({ eventId }: { eventId: string }) {
         supabaseAny.from('events').select('title').eq('id', eventId).maybeSingle(),
         supabaseAny
           .from('heats')
-          .select('*, categories(name), heat_lane_assignments(lane_number, registrations(bib_number, athlete_name, team_name, categories(name)))')
+          .select('*, categories(name), heat_lane_assignments(lane_number, registrations(bib_number, athlete_name, team_name, categories(name, team_size)))')
           .eq('event_id', eventId)
           .order('start_time'),
       ]);
@@ -4154,10 +4154,12 @@ function CronogramaTab({ eventId }: { eventId: string }) {
         if (!assigned.length) continue;
         assigned.forEach((a: any, i: number) => {
           const r = a.registrations;
+          const isTeam = ((r.categories as any)?.team_size ?? 1) > 1;
           dataRows.push([
             i === 0 ? heat.start_time : '',
             r.bib_number ?? '',
-            r.team_name || r.athlete_name || '',
+            // Nome pelo team_size (igual à tela): equipe em dupla/quarteto, atleta no individual.
+            isTeam ? (r.team_name || r.athlete_name || '') : (r.athlete_name || r.team_name || ''),
             // Categoria da INSCRIÇÃO (a bateria pode misturar categorias) — bug #55.
             (r.categories as any)?.name || (heat.categories as any)?.name || '',
             '', '', '',
