@@ -325,6 +325,18 @@ export default function PublicEventRegistration() {
 
   return (
     <div className="min-h-screen bg-[#050505]">
+      {/* ============ MODO TESTE BANNER ============ */}
+      {(event as any).is_test_mode && (
+        <div className="sticky top-0 z-50 w-full bg-cyan-500/10 border-b border-cyan-500/40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3">
+            <span className="text-lg">🧪</span>
+            <p className="text-xs font-black text-cyan-300 uppercase tracking-widest">
+              Evento em Modo Teste — Este evento está oculto do público. Inscrições serão marcadas como TESTE.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ============ HERO ============ */}
       <section className="relative min-h-[80vh] flex items-end overflow-hidden">
         {event.image_url ? (
@@ -1327,6 +1339,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         athlete_gym: a1.gym.trim() || null,
         athlete_photo_url: a1.photo_url || null,
         team_name: isTeam ? teamName.trim() : null, team_members: teamMembersData,
+        is_test: !!(event as any).is_test_mode,
         ...(event?.slug === 'selecao' && selectedFreight ? {
           shipping_address: shippingAddress,
           shipping_service_id: selectedFreight.id,

@@ -1,7 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion, useInView } from 'framer-motion';
-import { Wind, Dumbbell, Trophy, X, MapPin, Calendar, ChevronRight, AlertTriangle } from 'lucide-react';
+import { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Wind, Dumbbell, Trophy, MapPin, Calendar, Users, ChevronRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { usePublicEvents } from '@/hooks/useEvents';
 
+// ── Instagram Icon ─────────────────────────────────────────────────────────────
 function InstagramIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -10,149 +14,254 @@ function InstagramIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-// ── SEO ──────────────────────────────────────────────────────────────────────
-function useSEO() {
-  useEffect(() => {
-    document.title = 'UAIROX | 8ª Edição — 27/06 Nova Lima';
-    const setMeta = (name: string, content: string) => {
-      let el = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
-      if (!el) { el = document.createElement('meta'); el.setAttribute('name', name); document.head.appendChild(el); }
-      el.setAttribute('content', content);
-    };
-    setMeta('description', 'Garanta sua vaga na maior corrida híbrida de MG. 27 de junho em Nova Lima. Vagas limitadas.');
-    return () => { document.title = 'UAIROX - Hybrid RUN'; };
-  }, []);
-}
+// ── Capacity Bar ──────────────────────────────────────────────────────────────
+function CapacityBar({ registered, capacity }: { registered: number; capacity: number | null }) {
+  if (!capacity) return null;
+  const pct = Math.min(100, Math.round((registered / capacity) * 100));
+  const spotsLeft = Math.max(0, capacity - registered);
+  const isCritical = pct >= 85;
+  const isHigh = pct >= 60;
 
-// ── Animated Progress Bar ─────────────────────────────────────────────────────
-function ProgressBar({ pct, color = '#EDAC02' }: { pct: number; color?: string }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
   return (
-    <div ref={ref} className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-      <motion.div
-        className="h-full rounded-full"
-        style={{ backgroundColor: color }}
-        initial={{ width: 0 }}
-        animate={{ width: inView ? `${pct}%` : 0 }}
-        transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
-      />
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-zinc-500 flex items-center gap-1">
+          <Users size={11} className="text-zinc-600" />
+          {registered} / {capacity} inscritos
+        </span>
+        <span className={`font-black ${isCritical ? 'text-red-400' : isHigh ? 'text-amber-400' : 'text-[#EDAC02]'}`}>
+          {spotsLeft === 0 ? 'LOTADO' : `${spotsLeft} vagas`}
+        </span>
+      </div>
+      <div className="w-full h-1.5 bg-white/8 rounded-full overflow-hidden">
+        <motion.div
+          className={`h-full rounded-full ${isCritical ? 'bg-red-500' : isHigh ? 'bg-amber-400' : 'bg-[#EDAC02]'}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.max(2, pct)}%` }}
+          transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+        />
+      </div>
     </div>
   );
 }
 
 // ── Event Card ────────────────────────────────────────────────────────────────
-function EventCard({
-  badge, title, distance, pct, includes, href,
-}: {
-  badge: string; title: string; distance: string; pct: number; includes: string[]; href: string;
-}) {
+function EventCard({ event }: { event: any }) {
+  const slug = event.slug || event.id;
+  const href = `/evento/${slug}`;
+  const eventDate = new Date(event.date);
+  const registered = event._registrations_count || 0;
+  const capacity = event.max_capacity || null;
+  const isFull = capacity !== null && registered >= capacity;
+
   return (
-    <div className="flex flex-col border border-[#EDAC02]/20 bg-[#0d0d0d] rounded-2xl overflow-hidden hover:border-[#EDAC02]/50 transition-colors">
-      <div className="px-5 pt-5 pb-4 flex-1">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <span className="inline-block text-[10px] font-black uppercase tracking-widest text-[#EDAC02] bg-[#EDAC02]/10 px-2 py-0.5 rounded mb-2">
-              {badge}
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col border border-[#EDAC02]/20 bg-[#0d0d0d] rounded-2xl overflow-hidden hover:border-[#EDAC02]/50 transition-all duration-300 group"
+    >
+      {/* Cover Image */}
+      {event.image_url ? (
+        <div className="relative aspect-video overflow-hidden">
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-transparent to-transparent" />
+          {/* Status pill */}
+          <div className="absolute top-3 left-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 border border-green-500/30 text-green-400 text-[10px] font-black uppercase tracking-widest rounded-full backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Inscrições Abertas
             </span>
-            <h3 className="text-xl font-black text-white uppercase italic leading-tight">{title}</h3>
-            <p className="text-[#EDAC02] font-bold text-sm mt-0.5">{distance}</p>
           </div>
         </div>
+      ) : (
+        <div className="relative aspect-video bg-gradient-to-br from-[#EDAC02]/15 via-[#0a0a0a] to-[#0a0a0a] flex items-center justify-center overflow-hidden">
+          <span className="text-7xl font-black text-[#EDAC02]/8 select-none uppercase">
+            {event.title.slice(0, 2)}
+          </span>
+          <div className="absolute top-3 left-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 border border-green-500/30 text-green-400 text-[10px] font-black uppercase tracking-widest rounded-full backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Inscrições Abertas
+            </span>
+          </div>
+        </div>
+      )}
 
-        <div className="space-y-1.5 mb-4">
+      {/* Content */}
+      <div className="px-5 pt-4 pb-5 flex flex-col flex-1 gap-4">
+        {/* Title */}
+        <div>
+          <h3 className="text-lg font-black text-white uppercase italic leading-tight">
+            {event.title}
+          </h3>
+          {event.description && (
+            <p className="text-zinc-500 text-xs mt-1 line-clamp-2 leading-relaxed">
+              {event.description}
+            </p>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-zinc-400 text-xs">
-            <Calendar size={12} className="text-[#EDAC02]" />
-            <span>27/06/2026</span>
+            <Calendar size={12} className="text-[#EDAC02] flex-shrink-0" />
+            <span>{format(eventDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
           </div>
           <div className="flex items-center gap-2 text-zinc-400 text-xs">
-            <MapPin size={12} className="text-[#EDAC02]" />
-            <span>Club 415, Nova Lima — MG</span>
+            <MapPin size={12} className="text-[#EDAC02] flex-shrink-0" />
+            <span className="line-clamp-1">{event.location}</span>
           </div>
         </div>
 
-        <ul className="space-y-1 mb-4">
-          {includes.map(item => (
-            <li key={item} className="flex items-start gap-2 text-zinc-400 text-xs">
-              <span className="text-[#EDAC02] mt-0.5 flex-shrink-0">✓</span>
-              {item}
-            </li>
-          ))}
-        </ul>
+        {/* Capacity Bar */}
+        {capacity && (
+          <CapacityBar registered={registered} capacity={capacity} />
+        )}
 
-        <div className="mb-1.5">
-          <div className="flex justify-between text-xs text-zinc-500 mb-1">
-            <span>Vagas preenchidas</span>
-            <span className="text-[#EDAC02] font-bold">{pct}%</span>
-          </div>
-          <ProgressBar pct={pct} />
-        </div>
-      </div>
-
-      <div className="px-5 pb-5">
+        {/* CTA */}
         <a
-          href={href}
-          className="block w-full py-3.5 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest text-center hover:bg-[#d49b02] transition-colors rounded-xl skew-x-[-4deg]"
+          href={isFull ? href : href}
+          className={`block w-full py-3.5 font-black text-sm uppercase tracking-widest text-center transition-all rounded-xl skew-x-[-3deg] ${
+            isFull
+              ? 'bg-zinc-700 text-zinc-400 cursor-default'
+              : 'bg-[#EDAC02] text-black hover:bg-[#d49b02] hover:scale-[1.01] active:scale-[0.99]'
+          }`}
         >
-          <span className="block skew-x-[4deg]">GARANTIR VAGA →</span>
+          <span className="block skew-x-[3deg] flex items-center justify-center gap-2">
+            {isFull ? 'LISTA DE ESPERA' : 'GARANTIR VAGA'}
+            {!isFull && <ChevronRight size={16} />}
+          </span>
         </a>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Skeleton Card ─────────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col border border-[#1a1a1a] bg-[#0d0d0d] rounded-2xl overflow-hidden animate-pulse">
+      <div className="aspect-video bg-[#1a1a1a]" />
+      <div className="px-5 pt-4 pb-5 space-y-4">
+        <div className="space-y-2">
+          <div className="h-5 bg-[#1a1a1a] rounded w-3/4" />
+          <div className="h-3 bg-[#1a1a1a] rounded w-1/2" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 bg-[#1a1a1a] rounded w-2/3" />
+          <div className="h-3 bg-[#1a1a1a] rounded w-1/2" />
+        </div>
+        <div className="h-12 bg-[#1a1a1a] rounded-xl" />
       </div>
     </div>
   );
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────────
-function InscricaoModal({ onClose }: { onClose: () => void }) {
+// ── Empty State ───────────────────────────────────────────────────────────────
+function EmptyState() {
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center md:items-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <motion.div
-        initial={{ y: 60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        transition={{ type: 'spring', damping: 22 }}
-        className="w-full max-w-sm bg-[#0d0d0d] border border-[#EDAC02]/30 rounded-2xl p-6 space-y-4"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <p className="font-black text-white uppercase tracking-widest text-sm">Escolha seu formato</p>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={20} /></button>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="text-center py-20 px-6"
+    >
+      {/* Animated icon */}
+      <div className="relative w-24 h-24 mx-auto mb-6">
+        <div className="absolute inset-0 rounded-full bg-[#EDAC02]/10 animate-ping" style={{ animationDuration: '2.5s' }} />
+        <div className="relative w-24 h-24 rounded-full bg-[#EDAC02]/10 border border-[#EDAC02]/20 flex items-center justify-center">
+          <Trophy size={36} className="text-[#EDAC02]/60" />
         </div>
+      </div>
+
+      <h2 className="text-2xl font-black text-white uppercase italic mb-2">
+        Próxima edição<br />
+        <span className="text-[#EDAC02]">Em breve</span>
+      </h2>
+      <p className="text-zinc-500 text-sm max-w-xs mx-auto mb-8 leading-relaxed">
+        No momento não há provas oficiais com inscrições abertas. Fique de olho nas nossas redes para não perder o lançamento!
+      </p>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <a
-          href="/evento/8experience"
-          className="flex items-center justify-between w-full px-4 py-4 border border-[#EDAC02]/30 bg-[#EDAC02]/5 hover:bg-[#EDAC02]/15 rounded-xl transition-colors group"
+          href="https://instagram.com/uairox.hybridrun"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[#EDAC02] text-black font-black text-xs uppercase tracking-widest rounded-xl hover:bg-[#d49b02] transition-colors"
         >
-          <div>
-            <p className="font-black text-white text-sm uppercase">Experience</p>
-            <p className="text-zinc-500 text-xs">500m por volta • Para quem está começando</p>
-          </div>
-          <ChevronRight size={18} className="text-[#EDAC02] group-hover:translate-x-1 transition-transform" />
+          <InstagramIcon size={14} />
+          Seguir no Instagram
         </a>
         <a
-          href="/evento/8oficial"
-          className="flex items-center justify-between w-full px-4 py-4 bg-[#EDAC02] hover:bg-[#d49b02] rounded-xl transition-colors group"
+          href="/"
+          className="inline-flex items-center gap-2 px-6 py-3 border border-[#262626] text-zinc-400 font-bold text-xs uppercase tracking-widest rounded-xl hover:border-zinc-500 hover:text-white transition-colors"
         >
-          <div>
-            <p className="font-black text-black text-sm uppercase">Oficial</p>
-            <p className="text-black/60 text-xs">1km por volta • Distância oficial completa</p>
-          </div>
-          <ChevronRight size={18} className="text-black group-hover:translate-x-1 transition-transform" />
+          Ver todos os eventos →
         </a>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LinkPage() {
-  useSEO();
-  const [modalOpen, setModalOpen] = useState(false);
+  const { data: allEvents, isLoading } = usePublicEvents();
+
+  // Filter: only official events with open registrations
+  const openEvents = (allEvents || []).filter(
+    (e: any) => e.event_type === 'oficial' && e.status === 'open'
+  );
+
+  // Dynamic SEO
+  useEffect(() => {
+    if (isLoading) return;
+    if (openEvents.length === 0) {
+      document.title = 'UAIROX | Em Breve — Próxima Prova Oficial';
+    } else if (openEvents.length === 1) {
+      const ev = openEvents[0];
+      const d = new Date(ev.date);
+      document.title = `UAIROX | ${ev.title} — ${format(d, "dd/MM", { locale: ptBR })}`;
+    } else {
+      document.title = `UAIROX | ${openEvents.length} Provas Oficiais com Inscrições Abertas`;
+    }
+
+    const setMeta = (name: string, content: string) => {
+      let el = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute('name', name); document.head.appendChild(el); }
+      el.setAttribute('content', content);
+    };
+    setMeta('description',
+      openEvents.length === 0
+        ? 'Aguarde! A próxima prova oficial UAIROX está chegando. Fique de olho.'
+        : `Garanta sua vaga na maior corrida híbrida de MG. ${openEvents.map((e: any) => e.title).join(' • ')}.`
+    );
+    return () => { document.title = 'UAIROX - Hybrid RUN'; };
+  }, [isLoading, openEvents.length]);
+
+  const heroTitle = openEvents.length === 0
+    ? 'Em Breve'
+    : openEvents.length === 1
+    ? openEvents[0].title
+    : `${openEvents.length} Provas Abertas`;
+
+  const heroSubtitle = openEvents.length === 0
+    ? 'Próxima edição chegando em breve'
+    : openEvents.length === 1
+    ? `${format(new Date(openEvents[0].date), "dd 'de' MMMM", { locale: ptBR })} · ${openEvents[0].location}`
+    : 'Escolha a prova e garanta sua vaga';
 
   return (
     <div className="min-h-screen bg-[#050505] text-white antialiased font-sans selection:bg-[#EDAC02] selection:text-black">
 
       {/* ── 1. HERO ─────────────────────────────────────────────────────── */}
       <section className="relative flex flex-col items-center justify-center text-center px-4 pt-14 pb-10 min-h-[100svh] overflow-hidden">
-        {/* Glow */}
+        {/* Background effects */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_40%,rgba(237,172,2,0.08)_0%,transparent_70%)] pointer-events-none" />
         <div className="absolute inset-0 bg-[size:40px_40px] [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] pointer-events-none" />
 
@@ -171,35 +280,47 @@ export default function LinkPage() {
           </span>
 
           {/* Title */}
-          <h1 className="text-5xl font-black uppercase italic tracking-tighter leading-none text-white mb-2">
-            8ª Edição<br /><span className="text-[#EDAC02]">UAIROX</span>
+          <h1 className="text-4xl sm:text-5xl font-black uppercase italic tracking-tighter leading-none text-white mb-2">
+            {isLoading ? (
+              <span className="block h-12 w-64 bg-[#1a1a1a] rounded-lg animate-pulse" />
+            ) : (
+              <>
+                {heroTitle.includes('UAIROX') || heroTitle.includes('Em Breve') || heroTitle.includes('Provas')
+                  ? <><span className="text-[#EDAC02]">UAIROX</span><br />{heroTitle.replace('UAIROX', '').trim() || ''}</>
+                  : heroTitle
+                }
+              </>
+            )}
           </h1>
 
           {/* Subtitle */}
           <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mt-3 mb-8">
-            27 de junho • Nova Lima, MG
+            {isLoading ? (
+              <span className="block h-4 w-48 bg-[#1a1a1a] rounded animate-pulse mx-auto" />
+            ) : heroSubtitle}
           </p>
 
-          {/* Primary CTAs */}
-          <div className="grid grid-cols-2 gap-3 w-full mb-3">
-            <a
-              href="/evento/8experience"
-              className="flex flex-col items-center justify-center py-4 px-3 border-2 border-[#EDAC02] text-[#EDAC02] font-black text-xs uppercase tracking-wider rounded-xl hover:bg-[#EDAC02]/10 transition-colors text-center leading-tight"
-            >
-              <span className="text-[9px] text-[#EDAC02]/60 font-bold mb-0.5">Inscrição</span>
-              EXPERIENCE<br />500m
-            </a>
-            <a
-              href="/evento/8oficial"
-              className="flex flex-col items-center justify-center py-4 px-3 bg-[#EDAC02] text-black font-black text-xs uppercase tracking-wider rounded-xl hover:bg-[#d49b02] transition-colors text-center leading-tight"
-            >
-              <span className="text-[9px] text-black/50 font-bold mb-0.5">Inscrição</span>
-              OFICIAL<br />1km
-            </a>
-          </div>
+          {/* Quick CTAs — only when there are events */}
+          {!isLoading && openEvents.length > 0 && (
+            <div className={`grid gap-3 w-full mb-3 ${openEvents.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {openEvents.slice(0, 2).map((ev: any) => {
+                const slug = (ev as any).slug || ev.id;
+                return (
+                  <a
+                    key={ev.id}
+                    href={`/evento/${slug}`}
+                    className="flex flex-col items-center justify-center py-4 px-3 bg-[#EDAC02] text-black font-black text-xs uppercase tracking-wider rounded-xl hover:bg-[#d49b02] transition-colors text-center leading-tight"
+                  >
+                    <span className="text-[9px] text-black/50 font-bold mb-0.5">Inscrição</span>
+                    {ev.title.replace(/UAIROX\s*/i, '').trim() || ev.title}
+                  </a>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Secondary link */}
-          <a href="/#etapas" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 transition-colors">
+          {/* Link to homepage */}
+          <a href="/" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 transition-colors">
             Ver todos os eventos →
           </a>
         </motion.div>
@@ -214,15 +335,19 @@ export default function LinkPage() {
         </motion.div>
       </section>
 
-      {/* ── 2. URGÊNCIA ─────────────────────────────────────────────────── */}
-      <div className="bg-[#EDAC02] py-3 px-4 text-center">
-        <p className="text-black font-black text-xs md:text-sm uppercase tracking-wide flex items-center justify-center gap-2 flex-wrap">
-          <AlertTriangle size={14} className="flex-shrink-0" />
-          Últimas vagas! Experience: 74% preenchida&nbsp;•&nbsp;Oficial: 76% preenchida
-        </p>
-      </div>
+      {/* ── 2. URGENCY BAR — only if there are events ───────────────────── */}
+      {!isLoading && openEvents.length > 0 && (
+        <div className="bg-[#EDAC02] py-3 px-4 text-center">
+          <p className="text-black font-black text-xs md:text-sm uppercase tracking-wide">
+            🔥 {openEvents.length === 1
+              ? `${openEvents[0].title} — Vagas limitadas, inscreva-se agora!`
+              : `${openEvents.length} provas com inscrições abertas — Vagas limitadas!`
+            }
+          </p>
+        </div>
+      )}
 
-      {/* ── 3. O QUE É A UAIROX ─────────────────────────────────────────── */}
+      {/* ── 3. O QUE É ──────────────────────────────────────────────────── */}
       <section className="py-14 px-4">
         <div className="max-w-2xl mx-auto">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#EDAC02] text-center mb-2">O que é</p>
@@ -232,21 +357,9 @@ export default function LinkPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              {
-                icon: <Wind size={28} className="text-[#EDAC02]" />,
-                title: 'Corra',
-                desc: '8 km intercalados em 8 voltas de 1km',
-              },
-              {
-                icon: <Dumbbell size={28} className="text-[#EDAC02]" />,
-                title: 'Force',
-                desc: '8 estações funcionais: Ski Erg, Sled, Rowing e mais',
-              },
-              {
-                icon: <Trophy size={28} className="text-[#EDAC02]" />,
-                title: 'Vença',
-                desc: 'Medalha para todos os finishers',
-              },
+              { icon: <Wind size={28} className="text-[#EDAC02]" />, title: 'Corra', desc: 'Voltas de corrida intercaladas em percurso cronometrado' },
+              { icon: <Dumbbell size={28} className="text-[#EDAC02]" />, title: 'Force', desc: 'Estações funcionais: Ski Erg, Sled, Rowing e mais' },
+              { icon: <Trophy size={28} className="text-[#EDAC02]" />, title: 'Vença', desc: 'Medalha para todos os finishers e pódio por categoria' },
             ].map(card => (
               <motion.div
                 key={card.title}
@@ -265,55 +378,55 @@ export default function LinkPage() {
         </div>
       </section>
 
-      {/* ── 4. FORMATOS ─────────────────────────────────────────────────── */}
+      {/* ── 4. PROVAS COM INSCRIÇÕES ABERTAS ─────────────────────────────── */}
       <section className="py-14 px-4 bg-[#080808] border-y border-[#1a1a1a]">
-        <div className="max-w-2xl mx-auto">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#EDAC02] text-center mb-2">Escolha seu formato</p>
+        <div className="max-w-3xl mx-auto">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#EDAC02] text-center mb-2">
+            {isLoading ? 'Carregando...' : openEvents.length > 0 ? 'Inscrições Abertas' : 'Próximas Edições'}
+          </p>
           <h2 className="text-3xl md:text-4xl font-black uppercase italic text-center text-white mb-10 leading-tight">
-            Dois formatos.<br />Mesma adrenalina.
+            {isLoading
+              ? 'Buscando provas...'
+              : openEvents.length > 0
+              ? openEvents.length === 1
+                ? 'Garanta sua vaga agora.'
+                : `${openEvents.length} provas disponíveis.`
+              : 'Em breve.'}
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <EventCard
-              badge="Para quem está começando"
-              title="8ª Edição — Experience"
-              distance="500m por volta"
-              pct={74}
-              href="/evento/8experience"
-              includes={[
-                'Medalha finisher',
-                'Cronômetro oficial',
-                'Estações oficiais em 500m',
-              ]}
-            />
-            <EventCard
-              badge="Distância oficial completa"
-              title="8ª Edição — Oficial"
-              distance="1km por volta"
-              pct={76}
-              href="/evento/8oficial"
-              includes={[
-                'Medalha finisher',
-                'UAIROX Flag para top 3 de cada categoria',
-                'Cronômetro oficial',
-              ]}
-            />
-          </div>
+          {/* Loading State */}
+          {isLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          )}
+
+          {/* Events Grid */}
+          {!isLoading && openEvents.length > 0 && (
+            <div className={`grid grid-cols-1 gap-5 ${openEvents.length > 1 ? 'md:grid-cols-2' : 'max-w-md mx-auto'}`}>
+              {openEvents.map((event: any) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && openEvents.length === 0 && <EmptyState />}
         </div>
       </section>
 
-      {/* ── 5. PROVA SOCIAL ─────────────────────────────────────────────── */}
+      {/* ── 5. STATS ─────────────────────────────────────────────────────── */}
       <section className="py-14 px-4">
         <div className="max-w-2xl mx-auto">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#EDAC02] text-center mb-2">Histórico</p>
           <h2 className="text-3xl md:text-4xl font-black uppercase italic text-center text-white mb-10 leading-tight">
-            8 edições.<br />Vagas que esgotam.
+            Edições que esgotam.
           </h2>
 
-          {/* Números */}
           <div className="grid grid-cols-3 gap-4 mb-10">
             {[
-              { num: '8ª', label: 'Edição' },
+              { num: '8+', label: 'Edições realizadas' },
               { num: '+500', label: 'Atletas por edição' },
               { num: '3×', label: 'Últimas edições esgotadas' },
             ].map(stat => (
@@ -331,7 +444,7 @@ export default function LinkPage() {
             ))}
           </div>
 
-          {/* Galeria */}
+          {/* Gallery */}
           <div className="grid grid-cols-2 gap-3">
             {[
               { src: '/pica-pau-arco.png', alt: 'UAIROX — Pórtico de chegada' },
@@ -369,21 +482,29 @@ export default function LinkPage() {
         <p className="text-zinc-700 text-[10px]">© 2026 UAIROX Hybrid RUN</p>
       </footer>
 
-      {/* ── STICKY CTA (mobile only) ─────────────────────────────────────── */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100] p-3 bg-[#050505]/95 backdrop-blur-sm border-t border-[#1a1a1a]">
-        <button
-          onClick={() => setModalOpen(true)}
-          className="w-full py-4 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest rounded-xl hover:bg-[#d49b02] transition-colors"
-        >
-          GARANTIR MINHA VAGA →
-        </button>
-      </div>
+      {/* ── STICKY CTA — only when there are events ──────────────────────── */}
+      {!isLoading && openEvents.length > 0 && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100] p-3 bg-[#050505]/95 backdrop-blur-sm border-t border-[#1a1a1a]">
+          {openEvents.length === 1 ? (
+            <a
+              href={`/evento/${(openEvents[0] as any).slug || openEvents[0].id}`}
+              className="block w-full py-4 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest rounded-xl hover:bg-[#d49b02] transition-colors text-center"
+            >
+              GARANTIR MINHA VAGA →
+            </a>
+          ) : (
+            <a
+              href="#eventos"
+              className="block w-full py-4 bg-[#EDAC02] text-black font-black text-sm uppercase tracking-widest rounded-xl hover:bg-[#d49b02] transition-colors text-center"
+            >
+              VER {openEvents.length} PROVAS ABERTAS →
+            </a>
+          )}
+        </div>
+      )}
 
-      {/* Add bottom padding on mobile so sticky bar doesn't cover content */}
-      <div className="md:hidden h-20" />
-
-      {/* ── MODAL ─────────────────────────────────────────────────────────── */}
-      {modalOpen && <InscricaoModal onClose={() => setModalOpen(false)} />}
+      {/* Bottom padding for sticky bar */}
+      {!isLoading && openEvents.length > 0 && <div className="md:hidden h-20" />}
     </div>
   );
 }

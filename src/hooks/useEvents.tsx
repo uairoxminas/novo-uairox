@@ -20,6 +20,7 @@ export interface EventRow {
   max_capacity: number | null;
   pix_installments_enabled: boolean;
   pix_installments_deadline: string | null;
+  is_test_mode: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -40,7 +41,7 @@ export const EVENT_STATUS_MAP: Record<EventStatus, { label: string; color: strin
   completed: { label: 'Realizado', color: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
 };
 
-export type DisplayStatus = 'pre_venda' | 'em_breve' | 'open' | 'closed' | 'completed';
+export type DisplayStatus = 'pre_venda' | 'em_breve' | 'open' | 'closed' | 'completed' | 'test_mode';
 
 export const EVENT_DISPLAY_STATUSES: { key: DisplayStatus; label: string; status: EventStatus; visivel: boolean; color: string }[] = [
   { key: 'pre_venda',  label: 'Pré-Venda',            status: 'planning',  visivel: false, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
@@ -50,7 +51,14 @@ export const EVENT_DISPLAY_STATUSES: { key: DisplayStatus; label: string; status
   { key: 'completed', label: 'Realizado',             status: 'completed', visivel: false, color: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' },
 ];
 
-export function getDisplayStatus(status: EventStatus, visivel: boolean): DisplayStatus {
+export const TEST_MODE_DISPLAY = {
+  key: 'test_mode' as DisplayStatus,
+  label: '🧪 Modo Teste',
+  color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+};
+
+export function getDisplayStatus(status: EventStatus, visivel: boolean, isTestMode?: boolean): DisplayStatus {
+  if (isTestMode) return 'test_mode';
   if (status === 'planning') return visivel ? 'em_breve' : 'pre_venda';
   if (status === 'open') return 'open';
   if (status === 'closed') return 'closed';
@@ -279,6 +287,7 @@ export function usePublicEvents() {
         .select("*")
         .neq("status", "completed")
         .neq("visivel_no_site" as any, false)
+        .neq("is_test_mode" as any, true)
         .order("date", { ascending: true });
 
       if (error) throw error;
@@ -362,6 +371,30 @@ export function useUpdateEventStatus() {
     },
     onError: (error) => {
       toast.error("Erro ao atualizar status: " + error.message);
+    },
+  });
+}
+
+// ============ CLEAR TEST REGISTRATIONS ============
+export function useClearTestRegistrations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      const { error } = await supabase
+        .from("registrations")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("is_test" as any, true);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-events"] });
+      toast.success("Inscrições de teste removidas com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao limpar inscrições de teste: " + error.message);
     },
   });
 }

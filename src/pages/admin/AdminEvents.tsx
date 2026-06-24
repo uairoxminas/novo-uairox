@@ -11,7 +11,9 @@ import {
   useDeleteEvent,
   useUpdateEventStatus,
   useDuplicateEvent,
+  useClearTestRegistrations,
   EVENT_DISPLAY_STATUSES,
+  TEST_MODE_DISPLAY,
   getDisplayStatus,
   type EventWithStats,
   type EventStatus,
@@ -19,7 +21,14 @@ import {
 } from '@/hooks/useEvents';
 
 // ============ STATUS BADGE ============
-function StatusBadge({ status, visivel }: { status: string | null; visivel?: boolean }) {
+function StatusBadge({ status, visivel, isTestMode }: { status: string | null; visivel?: boolean; isTestMode?: boolean }) {
+  if (isTestMode) {
+    return (
+      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${TEST_MODE_DISPLAY.color}`}>
+        {TEST_MODE_DISPLAY.label}
+      </span>
+    );
+  }
   const ds = getDisplayStatus((status || 'planning') as EventStatus, visivel ?? true);
   const info = EVENT_DISPLAY_STATUSES.find(s => s.key === ds) || EVENT_DISPLAY_STATUSES[1];
   return (
@@ -58,6 +67,7 @@ function EventFormDialog({
   const [description, setDescription] = useState(event?.description || '');
   const [status, setStatus] = useState<EventStatus>((event?.status as EventStatus) || 'planning');
   const [visivelNoSite, setVisivelNoSite] = useState<boolean>((event as any)?.visivel_no_site ?? false);
+  const [isTestMode, setIsTestMode] = useState<boolean>((event as any)?.is_test_mode ?? false);
   const [imageUrl, setImageUrl] = useState(event?.image_url || '');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(event?.image_url || null);
@@ -107,6 +117,7 @@ function EventFormDialog({
       description: description.trim() || null,
       status,
       visivel_no_site: visivelNoSite,
+      is_test_mode: isTestMode,
       event_type: eventType,
       image_url: finalImageUrl.trim() || null,
       whatsapp_group_link: whatsappLink.trim() || null,
@@ -376,6 +387,34 @@ function EventFormDialog({
             )}
           </div>
 
+          {/* Modo Teste */}
+          <div className={`p-4 rounded-xl border transition-all ${isTestMode ? 'border-cyan-500/40 bg-cyan-500/5' : 'border-[#262626] bg-[#050505]'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-white flex items-center gap-2">
+                  🧪 Modo Teste
+                  {isTestMode && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">ATIVO</span>}
+                </p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Evento oculto do público. Acessível via link direto para testes completos (inscrição, pagamento, race day, etc.)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTestMode(!isTestMode)}
+                className={`w-11 h-6 rounded-full transition-colors relative ${isTestMode ? 'bg-cyan-500' : 'bg-[#262626]'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isTestMode ? 'left-[22px]' : 'left-0.5'}`} />
+              </button>
+            </div>
+            {isTestMode && (
+              <div className="mt-3 flex items-start gap-2 p-2.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                <span className="text-cyan-400 text-sm">ℹ️</span>
+                <p className="text-[10px] text-cyan-300/80">
+                  Inscrições feitas neste evento serão marcadas como <strong className="text-cyan-300">"teste"</strong> e podem ser limpas com 1 clique no card do evento.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-[#1a1a1a]">
             <button
@@ -460,6 +499,7 @@ function EventCard({
   onDelete,
   onDuplicate,
   onStatusChange,
+  onClearTests,
 }: {
   event: EventWithStats;
   onConfig: () => void;
@@ -467,10 +507,12 @@ function EventCard({
   onDelete: () => void;
   onDuplicate: () => void;
   onStatusChange: (status: EventStatus, visivel: boolean) => void;
+  onClearTests: () => void;
 }) {
   const eventDate = new Date(event.date);
   const daysUntil = differenceInDays(eventDate, new Date());
   const isEventPast = isPast(eventDate);
+  const isTestMode = !!(event as any).is_test_mode;
   const [showStatusMenu, setShowStatusMenu] = useState(false);
 
   const daysLabel = isEventPast
@@ -482,19 +524,29 @@ function EventCard({
   return (
     <div className="group bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl overflow-hidden hover:border-[#EDAC02]/30 transition-all duration-300">
       {/* Cover Image */}
-      <div className="aspect-video relative overflow-hidden">
+      <div className={`aspect-video relative overflow-hidden ${isTestMode ? 'ring-1 ring-cyan-500/40' : ''}`}>
         {event.image_url ? (
-          <img src={event.image_url} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={event.image_url} alt={event.title} className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isTestMode ? 'opacity-70' : ''}`} />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#EDAC02]/20 via-[#0a0a0a] to-[#0a0a0a] flex items-center justify-center">
-            <span className="text-6xl font-black text-[#EDAC02]/10 select-none">{event.title.slice(0, 2).toUpperCase()}</span>
+          <div className={`w-full h-full flex items-center justify-center ${isTestMode ? 'bg-gradient-to-br from-cyan-500/10 via-[#0a0a0a] to-[#0a0a0a]' : 'bg-gradient-to-br from-[#EDAC02]/20 via-[#0a0a0a] to-[#0a0a0a]'}`}>
+            <span className={`text-6xl font-black select-none ${isTestMode ? 'text-cyan-500/10' : 'text-[#EDAC02]/10'}`}>{event.title.slice(0, 2).toUpperCase()}</span>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
 
+        {/* Test Mode Overlay Banner */}
+        {isTestMode && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-cyan-500/10 border border-cyan-500/30 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center gap-2">
+              <span className="text-lg">🧪</span>
+              <span className="text-xs font-black text-cyan-300 uppercase tracking-widest">Modo Teste</span>
+            </div>
+          </div>
+        )}
+
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
-          <StatusBadge status={event.status} visivel={(event as any).visivel_no_site ?? true} />
+          <StatusBadge status={event.status} visivel={(event as any).visivel_no_site ?? true} isTestMode={isTestMode} />
         </div>
 
         {/* Days counter & Link */}
@@ -661,6 +713,21 @@ function EventCard({
             )}
           </div>
         </div>
+
+        {/* Test Mode: Clear Registrations Button */}
+        {isTestMode && (
+          <button
+            onClick={() => {
+              if (confirm(`Limpar todas as inscrições de teste do evento "${event.title}"? Esta ação não pode ser desfeita.`)) {
+                onClearTests();
+              }
+            }}
+            className="w-full mt-2 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-2"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            🧹 Limpar Inscrições de Teste ({event._registrations_count})
+          </button>
+        )}
       </div>
     </div>
   );
@@ -671,6 +738,7 @@ export default function AdminEvents() {
   const { data: events, isLoading } = useEvents();
   const updateStatus = useUpdateEventStatus();
   const duplicateEvent = useDuplicateEvent();
+  const clearTestRegistrations = useClearTestRegistrations();
   const navigate = useNavigate();
 
   const [showForm, setShowForm] = useState(false);
@@ -680,7 +748,9 @@ export default function AdminEvents() {
 
   const filteredEvents = filterStatus === 'all'
     ? events
-    : events?.filter(e => getDisplayStatus(e.status as EventStatus, (e as any).visivel_no_site ?? true) === filterStatus);
+    : filterStatus === 'test_mode'
+    ? events?.filter(e => !!(e as any).is_test_mode)
+    : events?.filter(e => !(e as any).is_test_mode && getDisplayStatus(e.status as EventStatus, (e as any).visivel_no_site ?? true) === filterStatus);
 
   // Stats
   const totalEvents = events?.length || 0;
@@ -731,20 +801,29 @@ export default function AdminEvents() {
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
-        {([{ key: 'all', label: 'Todos' }, ...EVENT_DISPLAY_STATUSES.map(s => ({ key: s.key, label: s.label }))]).map(({ key, label }) => (
+        {([
+          { key: 'all', label: 'Todos' },
+          ...EVENT_DISPLAY_STATUSES.map(s => ({ key: s.key, label: s.label })),
+          { key: 'test_mode', label: '🧪 Modo Teste' },
+        ]).map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setFilterStatus(key)}
             className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
               filterStatus === key
-                ? 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
+                ? key === 'test_mode'
+                  ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
+                  : 'border-[#EDAC02] bg-[#EDAC02]/10 text-[#EDAC02]'
                 : 'border-[#262626] text-zinc-500 hover:border-zinc-600'
             }`}
           >
             {label}
             {key !== 'all' && (
               <span className="ml-1.5 text-zinc-600">
-                ({events?.filter(e => getDisplayStatus(e.status as EventStatus, (e as any).visivel_no_site ?? true) === key).length || 0})
+                ({key === 'test_mode'
+                  ? (events?.filter(e => !!(e as any).is_test_mode).length || 0)
+                  : (events?.filter(e => !(e as any).is_test_mode && getDisplayStatus(e.status as EventStatus, (e as any).visivel_no_site ?? true) === key).length || 0)
+                })
               </span>
             )}
           </button>
@@ -771,6 +850,7 @@ export default function AdminEvents() {
                 }
               }}
               onStatusChange={(status, visivel) => updateStatus.mutate({ id: event.id, status, visivel_no_site: visivel } as any)}
+              onClearTests={() => clearTestRegistrations.mutate(event.id)}
             />
           ))}
         </div>
