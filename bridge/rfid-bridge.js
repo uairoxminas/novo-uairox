@@ -54,6 +54,12 @@ const CONFIG = {
   baudRate:   parseInt(process.env.BAUD_RATE || '57600'),
   // Antena
   antMode:    process.env.ANT_MODE         || 'bitmask',
+  // Habilitar as antenas no leitor ao conectar (comando 0x3F SetAntennaMultiplexing).
+  // antMask = bitmask: ANT1=1, ANT2=2, ANT3=4, ANT4=8. Padrão 3 = ANT1+ANT2.
+  // ANT_SET=off desliga; ANT_SET_HEX define um frame cru (caso o comando precise mudar).
+  antMask:    parseInt(process.env.ANT_MASK || '3'),
+  antSetHex:  process.env.ANT_SET_HEX || '',
+  antSet:     (process.env.ANT_SET || 'on') !== 'off',
   // Corte de RSSI (0 = desligado). Se RSSI_MIN for definido, usa fixo (manual);
   // senão, sincroniza automaticamente com o campo "Sinal mínimo (RSSI)" do evento.
   rssiMin:    parseInt(process.env.RSSI_MIN || '0'),
@@ -83,6 +89,36 @@ function crcOk(buf) {
     }
   }
   return (crc & 0xFFFF) === 0;
+}
+
+// CRC-16 para GERAR comandos (mesmo polinômio). Anexa-se LSB depois MSB ao frame.
+function crc16(buf) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) crc = (crc & 1) ? ((crc >> 1) ^ 0x8408) : (crc >> 1);
+  }
+  return crc & 0xFFFF;
+}
+
+// Monta frame de comando [Len][Adr][Cmd][Data...][CRC_L][CRC_H]
+// (Len = nº de bytes APÓS si mesmo = Adr+Cmd+Data+CRC).
+function buildFrame(adr, cmd, data) {
+  const len  = 1 + 1 + data.length + 2;
+  const head = Buffer.from([len, adr, cmd, ...data]);
+  const crc  = crc16(head);
+  return Buffer.concat([head, Buffer.from([crc & 0xFF, (crc >> 8) & 0xFF])]);
+}
+
+// Frame que habilita as antenas no leitor (0x3F = SetAntennaMultiplexing, byte = bitmask).
+function antennaFrame() {
+  if (CONFIG.antSetHex) return Buffer.from(CONFIG.antSetHex.replace(/[^0-9a-fA-F]/g, ''), 'hex');
+  return buildFrame(0x00, 0x3F, [CONFIG.antMask & 0xFF]);
+}
+
+// "1+2" a partir do bitmask, pra log.
+function maskToList(m) {
+  return [1, 2, 3, 4].filter(n => m & (1 << (n - 1))).join('+') || '—';
 }
 
 // ── Decodifica o byte de antena ───────────────────────────────────────────────
@@ -378,6 +414,14 @@ function startTcpClient() {
     socket.connect(CONFIG.tcpPort, CONFIG.tcpHost, () => {
       console.log(`[OK] Conectado ao M-ID40 em ${CONFIG.tcpHost}:${CONFIG.tcpPort}. Aguardando leituras...\n`);
       bridgeConnected = true; sendHeartbeat();
+      // Habilita as antenas no leitor (sobrevive a reset; não depende do Demo).
+      if (CONFIG.antSet) {
+        const f = antennaFrame();
+        setTimeout(() => {
+          try { socket.write(f); } catch (_) {}
+          console.log(`[ANTENAS] Habilitando ${maskToList(CONFIG.antMask)} no leitor → ${f.toString('hex').toUpperCase()}`);
+        }, 500);
+      }
     });
     socket.on('data',  processChunk);
     socket.on('error', e => console.error('[ERRO TCP]', e.message));
@@ -428,6 +472,7 @@ async function main() {
   console.log(`  Protocolo  : ${CONFIG.protocol}`);
   console.log(`  Reader ID  : ${CONFIG.readerId}`);
   console.log(`  Antena     : ${CONFIG.antMode}`);
+  console.log(`  Antenas    : ${CONFIG.antSet ? 'habilitando ' + maskToList(CONFIG.antMask) + ' no leitor ao conectar' : 'não mexe (ANT_SET=off)'}`);
   console.log(`  Buffer     : reenvio automático se a internet cair (offline-safe)`);
   console.log(`  RSSI mín.  : ${CONFIG.rssiManual ? (CONFIG.rssiMin > 0 ? CONFIG.rssiMin + ' (fixo)' : 'desligado (fixo)') : 'auto — campo "Sinal mínimo" do evento'}`);
   console.log(`  Anti-flood : ${CONFIG.debounceMs}ms (local). Os 40s (Zona Cega) são aplicados pelo gateway, só na prova.`);
