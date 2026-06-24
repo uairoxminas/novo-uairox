@@ -4133,7 +4133,7 @@ function CronogramaTab({ eventId }: { eventId: string }) {
         supabaseAny.from('events').select('title').eq('id', eventId).maybeSingle(),
         supabaseAny
           .from('heats')
-          .select('*, categories(name), heat_lane_assignments(lane_number, registrations(bib_number, athlete_name, team_name))')
+          .select('*, categories(name), heat_lane_assignments(lane_number, registrations(bib_number, athlete_name, team_name, categories(name)))')
           .eq('event_id', eventId)
           .order('start_time'),
       ]);
@@ -4158,7 +4158,8 @@ function CronogramaTab({ eventId }: { eventId: string }) {
             i === 0 ? heat.start_time : '',
             r.bib_number ?? '',
             r.team_name || r.athlete_name || '',
-            (heat.categories as any)?.name || '',
+            // Categoria da INSCRIÇÃO (a bateria pode misturar categorias) — bug #55.
+            (r.categories as any)?.name || (heat.categories as any)?.name || '',
             '', '', '',
           ]);
         });
