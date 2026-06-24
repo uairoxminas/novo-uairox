@@ -27,18 +27,20 @@ export default function LeaderboardPage() {
         .select(`
           id, bib_number, raw_time_ms, total_penalties_seconds, final_adjusted_time_ms, status,
           registrations (
-             athlete_name, 
-             team_name, 
-             categories (name, team_size)
+             athlete_name,
+             team_name,
+             categories (name, team_size, results_published)
           )
         `)
         .eq('event_id', selectedEventId)
         .in('status', ['validated', 'dnf', 'disqualified']);
-        
+
       if (error) throw error;
-      return (data || []) as any[];
+      // Só mostra resultados de categorias já LIBERADAS (botão "Liberar premiação").
+      return ((data || []) as any[]).filter((r: any) => r.registrations?.categories?.results_published === true);
     },
-    enabled: !!selectedEventId
+    enabled: !!selectedEventId,
+    refetchInterval: 30000,
   });
 
   // Extrair Categorias Únicas

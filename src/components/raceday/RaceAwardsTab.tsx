@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRaceArbitration, type ArbAthlete } from '@/hooks/useRaceArbitration';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -47,6 +47,26 @@ export default function RaceAwardsTab({ eventId }: Props) {
   const [sendingTest, setSendingTest] = useState<string | null>(null);
   const [sent, setSent] = useState<Record<string, boolean>>({});
   const [sendingClass, setSendingClass] = useState<string | null>(null);
+
+  // Carrega quais categorias já estão liberadas (publicadas no /leaderboard).
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('categories' as any).select('id, results_published').eq('event_id', eventId);
+      const seed: Record<string, boolean> = {};
+      (data ?? []).forEach((c: any) => { if (c.results_published) seed[c.id] = true; });
+      if (Object.keys(seed).length) setReleased(prev => ({ ...seed, ...prev }));
+    })();
+  }, [eventId]);
+
+  // Liberar premiação: publica os resultados da categoria na página pública (/leaderboard).
+  async function liberarPremiacao(catId: string) {
+    if (catId !== 'none') {
+      const { error } = await supabase.from('categories' as any).update({ results_published: true }).eq('id', catId);
+      if (error) { toast.error(error.message); return; }
+    }
+    setReleased(p => ({ ...p, [catId]: true }));
+    toast.success('Premiação liberada — resultados publicados no /leaderboard.');
+  }
 
   // Enfileira a classificação da categoria para o admin + atletas (todos os
   // integrantes da equipe), 30s entre cada. Robusto — não depende da aba aberta.
@@ -141,7 +161,7 @@ export default function RaceAwardsTab({ eventId }: Props) {
                   {isReleased ? (
                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black uppercase bg-green-600/20 text-green-400 border border-green-600/40"><Unlock className="w-3.5 h-3.5" /> Premiação liberada</span>
                   ) : (
-                    <button onClick={() => setReleased(p => ({ ...p, [g.id]: true }))}
+                    <button onClick={() => liberarPremiacao(g.id)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black uppercase bg-[#EDAC02] hover:bg-[#EDAC02]/90 text-black">
                       <Unlock className="w-3.5 h-3.5" /> Liberar premiação
                     </button>
