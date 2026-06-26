@@ -46,6 +46,7 @@ import SquadPortalPage from './pages/SquadPortalPage';
 import SquadRankingPage from './pages/SquadRankingPage';
 import PartnerViewPage from './pages/PartnerViewPage';
 import PublicEventSchedule from './pages/PublicEventSchedule';
+import EventLivePhases from './pages/EventLivePhases';
 import ChallengePortalPage from './pages/ChallengePortalPage';
 import ComprovanteUploadPage from './pages/ComprovanteUploadPage';
 
@@ -103,6 +104,7 @@ export default function App() {
           {/* Inscrição Pública em Eventos */}
           <Route path="/evento/:id" element={<PublicEventRegistration />} />
           <Route path="/evento/:id/cronograma" element={<PublicEventSchedule />} />
+          <Route path="/evento/:id/ao-vivo" element={<EventLivePhases />} />
 
           {/* Sorteio Público ao Vivo */}
           <Route path="/sorteio/:slug" element={<RaffleLivePage />} />
