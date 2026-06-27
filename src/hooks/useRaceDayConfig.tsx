@@ -186,7 +186,7 @@ export function useHeatAthletesWithSplits(heatId: string) {
         .from('heat_lane_assignments')
         .select(`
           id, lane_number, registration_id,
-          registrations(id, bib_number, athlete_name, team_name)
+          registrations(id, bib_number, athlete_name, team_name, categories(team_size))
         `)
         .eq('heat_id', heatId)
         .order('lane_number', { ascending: true });

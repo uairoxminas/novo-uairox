@@ -243,7 +243,11 @@ export default function AdminRaceDayLiveMonitor() {
                  )}
                  {radar?.filter((l: any) => l.registration_id).map((lane: any) => {
                     const bib = lane.registrations?.bib_number || '--';
-                    const name = lane.registrations?.athlete_name || lane.registrations?.team_name || 'Desconhecido';
+                    // Dupla/quarteto (team_size > 1) → nome da equipe; individual → atleta.
+                    const isTeam = (lane.registrations?.categories?.team_size ?? 1) > 1;
+                    const name = isTeam
+                      ? (lane.registrations?.team_name || lane.registrations?.athlete_name || 'Equipe')
+                      : (lane.registrations?.athlete_name || lane.registrations?.team_name || 'Desconhecido');
                     const passCount = lane.splits?.length || 0;
                     const totalPens = lane.penalties?.length || 0;
                     const isDone = passCount >= (timingConfig?.target_passes_volume || 999);

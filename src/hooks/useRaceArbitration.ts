@@ -8,6 +8,7 @@ export interface ArbAthlete {
   registration_id: string;
   heat_id: string | null;
   heat_start: string | null;
+  heat_title: string | null;
   bib: number | null;
   name: string | null;
   phone: string | null;            // atleta principal (cap. da equipe em dupla/quarteto)
@@ -33,9 +34,10 @@ export function useRaceArbitration(eventId: string) {
       const { data: ev } = await supabase.from('events' as any).select('target_passes_volume').eq('id', eventId).maybeSingle();
       const target = ((ev as any)?.target_passes_volume as number) || 1;
 
-      const { data: heats } = await supabase.from('heats' as any).select('id, start_time').eq('event_id', eventId);
+      const { data: heats } = await supabase.from('heats' as any).select('id, start_time, title').eq('event_id', eventId);
       const heatList = (heats ?? []) as any[];
       const heatStartMap = new Map(heatList.map(h => [h.id, h.start_time]));
+      const heatTitleMap = new Map(heatList.map(h => [h.id, h.title]));
       const heatIds = heatList.map(h => h.id);
       if (!heatIds.length) return { athletes: [], target };
 
@@ -94,6 +96,7 @@ export function useRaceArbitration(eventId: string) {
         else state = passCount >= target ? 'complete' : 'incomplete';
         return {
           registration_id: lane.registration_id, heat_id: lane.heat_id, heat_start: heatStart,
+          heat_title: heatTitleMap.get(lane.heat_id) ?? null,
           bib: reg?.bib_number ?? null, name: reg?.athlete_name ?? null, phone: reg?.athlete_phone ?? null,
           member_phones: Array.isArray(reg?.team_members) ? reg.team_members.map((m: any) => m?.phone).filter(Boolean) : [],
           team_name: reg?.team_name ?? null, team_size: catSizeMap.get(reg?.category_id) ?? 1,

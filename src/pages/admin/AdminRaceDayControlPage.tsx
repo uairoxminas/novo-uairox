@@ -309,9 +309,14 @@ export default function AdminRaceDayControlPage() {
       <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">
         <div className="p-6 border-b border-[#1a1a1a] flex items-center justify-between">
           <h2 className="text-xl font-black text-white uppercase tracking-tight">Controle de Baterias (Largada)</h2>
-          <button className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold rounded-lg transition-colors">
-            + Nova Bateria
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate(`/admin/raceday/${id}/todas`)} className="px-4 py-2 bg-[#EDAC02]/15 hover:bg-[#EDAC02]/25 text-[#EDAC02] border border-[#EDAC02]/40 text-sm font-bold rounded-lg transition-colors">
+              📺 Ver Todas as Baterias
+            </button>
+            <button className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold rounded-lg transition-colors">
+              + Nova Bateria
+            </button>
+          </div>
         </div>
         
         {loadingHeats ? (

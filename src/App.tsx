@@ -31,6 +31,7 @@ import AdminEventConfig from './pages/admin/AdminEventConfig';
 import AdminRaceDayPage from './pages/admin/AdminRaceDayPage';
 import AdminRaceDayControlPage from './pages/admin/AdminRaceDayControlPage';
 import AdminRaceDayLiveMonitor from './pages/admin/AdminRaceDayLiveMonitor';
+import AdminRaceDayAllHeats from './pages/admin/AdminRaceDayAllHeats';
 import AdminResultsEventsPage from './pages/admin/AdminResultsEventsPage';
 import AdminResultsManagerPage from './pages/admin/AdminResultsManagerPage';
 import AdminStore from './pages/admin/AdminStore';
@@ -139,6 +140,7 @@ export default function App() {
             <Route path="raceday" element={<AdminRaceDayPage />} />
             <Route path="raceday/:id" element={<AdminRaceDayControlPage />} />
             <Route path="raceday/:id/heat/:heatId" element={<AdminRaceDayLiveMonitor />} />
+            <Route path="raceday/:id/todas" element={<AdminRaceDayAllHeats />} />
             <Route path="results" element={<AdminResultsEventsPage />} />
             <Route path="results/:id" element={<AdminResultsManagerPage />} />
             <Route path="store" element={<AdminStore />} />
