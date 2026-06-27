@@ -24,6 +24,7 @@ export interface ArbAthlete {
   result: { status: string; final_ms: number | null; dq_reason: string | null } | null;
   finalMs: number | null;   // tempo a exibir (result salvo ou calculado)
   computedMs: number | null;
+  outOfSync: boolean;       // resultado validado cujo tempo salvo ≠ passagens atuais
   state: AthleteState;
 }
 
@@ -105,6 +106,10 @@ export function useRaceArbitration(eventId: string) {
           result: result ? { status: result.status, final_ms: result.final_adjusted_time_ms, dq_reason: result.dq_reason } : null,
           finalMs: result?.final_adjusted_time_ms ?? computed,
           computedMs: computed,
+          // Validado mas o tempo salvo não corresponde mais às passagens (passagem/penalidade
+          // mudou após validar). Sinaliza pra recalcular — não altera nada sozinho.
+          outOfSync: state === 'validated' && result?.final_adjusted_time_ms != null && computed != null
+            && Math.abs((result.final_adjusted_time_ms as number) - computed) > 2000,
           state,
         };
       }).sort((a, b) => (a.bib ?? 0) - (b.bib ?? 0));

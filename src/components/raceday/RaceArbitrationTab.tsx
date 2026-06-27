@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRaceArbitration, useArbitrationActions, type ArbAthlete } from '@/hooks/useRaceArbitration';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Plus, Trash2, Flag, Ban, Clock, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Loader2, CheckCircle2, Plus, Trash2, Flag, Ban, Clock, ChevronDown, ChevronUp, Pencil, RefreshCw } from 'lucide-react';
 
 interface Props { eventId: string; checkpoints: { id: string; is_finish_line?: boolean }[]; }
 
@@ -40,6 +40,12 @@ export default function RaceArbitrationTab({ eventId, checkpoints }: Props) {
     if (a.finalMs == null) { toast.error('Sem tempo — adicione passagens ou edite o tempo.'); return; }
     setResult.mutate({ registration_id: a.registration_id, heat_id: a.heat_id, bib: a.bib, status: 'validated', final_ms: a.finalMs },
       { onSuccess: () => toast.success(`#${a.bib} validado`), onError: (e: any) => toast.error(e.message) });
+  };
+  // Re-salva o tempo pelas passagens atuais (última − 1ª + penalidades). Só quando você clica.
+  const onRecalc = (a: ArbAthlete) => {
+    if (a.computedMs == null) { toast.error('Sem passagens pra recalcular.'); return; }
+    setResult.mutate({ registration_id: a.registration_id, heat_id: a.heat_id, bib: a.bib, status: 'validated', final_ms: a.computedMs },
+      { onSuccess: () => toast.success(`#${a.bib} recalculado: ${fmt(a.computedMs)}`), onError: (e: any) => toast.error(e.message) });
   };
   const onDNF = (a: ArbAthlete) => {
     if (!confirm(`Marcar #${a.bib} ${a.name ?? ''} como DNF (desistência)?`)) return;
@@ -106,6 +112,7 @@ export default function RaceArbitrationTab({ eventId, checkpoints }: Props) {
                   </button>
                 )}
                 {a.penaltiesSec > 0 && <p className="text-[10px] text-red-500 font-bold">+{a.penaltiesSec}s pen.</p>}
+                {a.outOfSync && <p className="text-[10px] text-orange-400 font-bold" title="O tempo salvo não corresponde às passagens atuais — clique em Recalcular">⚠ salvo ≠ passagens ({fmt(a.computedMs)})</p>}
               </div>
 
               <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border ${st.cls}`}>{st.txt}</span>
@@ -115,6 +122,11 @@ export default function RaceArbitrationTab({ eventId, checkpoints }: Props) {
                 {a.state !== 'validated' && (
                   <button onClick={() => onValidate(a)} title="Validar tempo" className="flex items-center gap-1 px-3 py-2 rounded-lg bg-green-600/15 hover:bg-green-600/25 text-green-400 border border-green-600/40 text-xs font-black uppercase">
                     <CheckCircle2 className="w-4 h-4" /> Validar
+                  </button>
+                )}
+                {a.outOfSync && (
+                  <button onClick={() => onRecalc(a)} title="Recalcular o tempo pelas passagens atuais" className="flex items-center gap-1 px-3 py-2 rounded-lg bg-orange-600/15 hover:bg-orange-600/25 text-orange-300 border border-orange-600/40 text-xs font-black uppercase">
+                    <RefreshCw className="w-4 h-4" /> Recalcular
                   </button>
                 )}
                 <button onClick={() => onDNF(a)} title="Desistência (DNF)" className="p-2 rounded-lg bg-[#1a1a1a] hover:bg-red-900/30 text-zinc-400 hover:text-red-400"><Flag className="w-4 h-4" /></button>
