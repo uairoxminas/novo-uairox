@@ -10,6 +10,9 @@ const fmt = (ms: number | null) => {
   const m = Math.floor(ms / 60000); const s = Math.floor((ms % 60000) / 1000);
   return `${m}m ${String(s).padStart(2, '0')}s`;
 };
+// Dupla/quarteto (team_size > 1) → nome da equipe; individual → atleta.
+const displayName = (a: ArbAthlete) =>
+  a.team_size > 1 ? (a.team_name || a.name || 'Equipe') : (a.name || 'Atleta');
 
 const STATE: Record<string, { txt: string; cls: string }> = {
   racing:     { txt: 'EM PROVA',                cls: 'bg-zinc-700/30 text-zinc-400 border-zinc-600/40' },
@@ -48,12 +51,12 @@ export default function RaceArbitrationTab({ eventId, checkpoints }: Props) {
       { onSuccess: () => toast.success(`#${a.bib} recalculado: ${fmt(a.computedMs)}`), onError: (e: any) => toast.error(e.message) });
   };
   const onDNF = (a: ArbAthlete) => {
-    if (!confirm(`Marcar #${a.bib} ${a.name ?? ''} como DNF (desistência)?`)) return;
+    if (!confirm(`Marcar #${a.bib} ${displayName(a)} como DNF (desistência)?`)) return;
     setResult.mutate({ registration_id: a.registration_id, heat_id: a.heat_id, bib: a.bib, status: 'dnf', final_ms: null },
       { onSuccess: () => toast.success(`#${a.bib} marcado DNF`), onError: (e: any) => toast.error(e.message) });
   };
   const onDSQ = (a: ArbAthlete) => {
-    const reason = prompt(`Motivo da desclassificação de #${a.bib} ${a.name ?? ''}:`, a.state === 'incomplete' ? 'Não completou as passagens' : '');
+    const reason = prompt(`Motivo da desclassificação de #${a.bib} ${displayName(a)}:`, a.state === 'incomplete' ? 'Não completou as passagens' : '');
     if (reason === null) return;
     setResult.mutate({ registration_id: a.registration_id, heat_id: a.heat_id, bib: a.bib, status: 'disqualified', final_ms: a.finalMs, dq_reason: reason || null },
       { onSuccess: () => toast.success(`#${a.bib} desclassificado`), onError: (e: any) => toast.error(e.message) });
@@ -87,7 +90,7 @@ export default function RaceArbitrationTab({ eventId, checkpoints }: Props) {
                   <span className="text-sm font-black text-white">{a.bib ?? '?'}</span>
                 </div>
                 <div>
-                  <p className="font-bold text-white text-sm">{a.name ?? '—'}</p>
+                  <p className="font-bold text-white text-sm">{displayName(a)}</p>
                   <p className="text-xs text-zinc-600">{a.category_name}</p>
                 </div>
               </div>
