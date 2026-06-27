@@ -60,6 +60,11 @@ const CONFIG = {
   antMask:    parseInt(process.env.ANT_MASK || '3'),
   antSetHex:  process.env.ANT_SET_HEX || '',
   antSet:     (process.env.ANT_SET || 'on') !== 'off',
+  // Potência de RF (dBm) aplicada no leitor ao conectar (comando 0x2F SetRfPower).
+  // OPT-IN: só envia se RF_POWER for definido (ex: "15"). POWER_SET_HEX = frame cru.
+  rfPower:    (process.env.RF_POWER !== undefined && process.env.RF_POWER !== '') ? parseInt(process.env.RF_POWER) : null,
+  powerCmd:   parseInt(process.env.POWER_CMD || '0x2F'),
+  powerSetHex: process.env.POWER_SET_HEX || '',
   // Corte de RSSI (0 = desligado). Se RSSI_MIN for definido, usa fixo (manual);
   // senão, sincroniza automaticamente com o campo "Sinal mínimo (RSSI)" do evento.
   rssiMin:    parseInt(process.env.RSSI_MIN || '0'),
@@ -114,6 +119,12 @@ function buildFrame(adr, cmd, data) {
 function antennaFrame() {
   if (CONFIG.antSetHex) return Buffer.from(CONFIG.antSetHex.replace(/[^0-9a-fA-F]/g, ''), 'hex');
   return buildFrame(0x00, 0x3F, [CONFIG.antMask & 0xFF]);
+}
+
+// Frame que ajusta a potência de RF (0x2F = SetRfPower, byte = dBm; 15 → 0x0F).
+function powerFrame() {
+  if (CONFIG.powerSetHex) return Buffer.from(CONFIG.powerSetHex.replace(/[^0-9a-fA-F]/g, ''), 'hex');
+  return buildFrame(0x00, CONFIG.powerCmd, [CONFIG.rfPower & 0xFF]);
 }
 
 // "1+2" a partir do bitmask, pra log.
@@ -422,6 +433,14 @@ function startTcpClient() {
           console.log(`[ANTENAS] Habilitando ${maskToList(CONFIG.antMask)} no leitor → ${f.toString('hex').toUpperCase()}`);
         }, 500);
       }
+      // Ajusta a potência (só se RF_POWER definido ou POWER_SET_HEX).
+      if (CONFIG.rfPower !== null || CONFIG.powerSetHex) {
+        const p = powerFrame();
+        setTimeout(() => {
+          try { socket.write(p); } catch (_) {}
+          console.log(`[POTÊNCIA] Ajustando para ${CONFIG.rfPower ?? '(hex)'} dBm → ${p.toString('hex').toUpperCase()}`);
+        }, 900);
+      }
     });
     socket.on('data',  processChunk);
     socket.on('error', e => console.error('[ERRO TCP]', e.message));
@@ -473,6 +492,7 @@ async function main() {
   console.log(`  Reader ID  : ${CONFIG.readerId}`);
   console.log(`  Antena     : ${CONFIG.antMode}`);
   console.log(`  Antenas    : ${CONFIG.antSet ? 'habilitando ' + maskToList(CONFIG.antMask) + ' no leitor ao conectar' : 'não mexe (ANT_SET=off)'}`);
+  console.log(`  Potência   : ${CONFIG.rfPower !== null ? CONFIG.rfPower + ' dBm (ao conectar)' : (CONFIG.powerSetHex ? 'hex fixo' : 'não mexe (defina RF_POWER)')}`);
   console.log(`  Buffer     : reenvio automático se a internet cair (offline-safe)`);
   console.log(`  RSSI mín.  : ${CONFIG.rssiManual ? (CONFIG.rssiMin > 0 ? CONFIG.rssiMin + ' (fixo)' : 'desligado (fixo)') : 'auto — campo "Sinal mínimo" do evento'}`);
   console.log(`  Anti-flood : ${CONFIG.debounceMs}ms (local). Os 40s (Zona Cega) são aplicados pelo gateway, só na prova.`);

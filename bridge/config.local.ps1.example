@@ -25,5 +25,10 @@ $RFID_PORT = "5000"
 # só durante a prova. Padrão 3000 (3s). Normalmente não precisa mexer.
 # $DEBOUNCE_MS = "3000"
 
+# Potência de RF (dBm) aplicada no leitor ao conectar (sem depender do Demo).
+# Descomente e ajuste pra mudar o alcance: maior = pega mais longe. Ex: "15".
+# Deixe comentado pra NÃO mexer na potência salva do leitor.
+# $RF_POWER = "15"
+
 # Verboso: "1" mostra TODA leitura crua (bom pra calibrar RSSI). Deixe "0" na prova.
 $VERBOSE = "0"
