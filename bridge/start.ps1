@@ -38,5 +38,11 @@ $env:VERBOSE          = if ($VERBOSE)     { $VERBOSE }     else { '0' }
 if ($DEBOUNCE_MS) { $env:DEBOUNCE_MS = $DEBOUNCE_MS } else { Remove-Item Env:DEBOUNCE_MS -ErrorAction SilentlyContinue }
 if ($RSSI_MIN -ne $null -and $RSSI_MIN -ne '') { $env:RSSI_MIN = $RSSI_MIN } else { Remove-Item Env:RSSI_MIN -ErrorAction SilentlyContinue }
 
+# Ajustes opcionais de leitor (potência e antenas) — exporta só os que estiverem preenchidos.
+foreach ($v in 'RF_POWER','POWER_SET_HEX','POWER_CMD','ANT_MASK','ANT_SET','ANT_SET_HEX') {
+  $val = Get-Variable -Name $v -ValueOnly -ErrorAction SilentlyContinue
+  if ($null -ne $val -and '' -ne $val) { Set-Item "Env:$v" $val } else { Remove-Item "Env:$v" -ErrorAction SilentlyContinue }
+}
+
 Write-Host "Iniciando bridge UAIROX (Ctrl+C para parar)..." -ForegroundColor Cyan
 node rfid-bridge.js
