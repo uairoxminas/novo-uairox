@@ -67,6 +67,7 @@ export default function EventLivePhases() {
     },
     enabled: !!resolvedId,
     refetchInterval: 4000,
+    refetchIntervalInBackground: true,
   });
 
   // Fase atual a partir da contagem de passagens

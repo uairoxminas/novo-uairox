@@ -230,6 +230,7 @@ export function useHeatAthletesWithSplits(heatId: string) {
       });
     },
     refetchInterval: 3000, // Real-time polling
+    refetchIntervalInBackground: true, // continua atualizando mesmo sem foco
     enabled: !!heatId
   });
 }

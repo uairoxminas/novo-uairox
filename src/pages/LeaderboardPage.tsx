@@ -41,6 +41,7 @@ export default function LeaderboardPage() {
     },
     enabled: !!selectedEventId,
     refetchInterval: 30000,
+    refetchIntervalInBackground: true,
   });
 
   // Extrair Categorias Únicas

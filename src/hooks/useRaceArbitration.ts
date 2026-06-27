@@ -117,6 +117,7 @@ export function useRaceArbitration(eventId: string) {
       return { athletes, target };
     },
     refetchInterval: 5000,
+    refetchIntervalInBackground: true, // continua atualizando mesmo sem foco (teclado/2ª janela)
     enabled: !!eventId,
   });
 }

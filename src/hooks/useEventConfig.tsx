@@ -565,7 +565,7 @@ export function useHeats(eventId?: string, opts?: { refetchInterval?: number }) 
       return data;
     },
     enabled: !!eventId,
-    ...(opts?.refetchInterval ? { refetchInterval: opts.refetchInterval, staleTime: 0 } : {}),
+    ...(opts?.refetchInterval ? { refetchInterval: opts.refetchInterval, refetchIntervalInBackground: true, staleTime: 0 } : {}),
   });
 }
 
@@ -635,7 +635,7 @@ export function useLaneAssignments(heatId?: string, opts?: { refetchInterval?: n
       return data;
     },
     enabled: !!heatId,
-    ...(opts?.refetchInterval ? { refetchInterval: opts.refetchInterval, staleTime: 0 } : {}),
+    ...(opts?.refetchInterval ? { refetchInterval: opts.refetchInterval, refetchIntervalInBackground: true, staleTime: 0 } : {}),
   });
 }
 
