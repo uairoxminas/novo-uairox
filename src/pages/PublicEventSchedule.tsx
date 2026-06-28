@@ -72,19 +72,34 @@ export default function PublicEventSchedule() {
   }
 
   // Build timeline items
+  const formatTime = (iso: string | null | undefined): string => {
+    if (!iso) return '??:??';
+    try {
+      return new Date(iso).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo',
+      });
+    } catch {
+      return iso;
+    }
+  };
+
   const timelineItems = (heats || []).map((h: any) => ({
     id: h.id,
     time: h.start_time,
+    timeLabel: formatTime(h.start_time),
     title: h.title,
     category: (h.categories as any)?.name || '',
     status: h.status,
     lanes: h.lane_count,
-  })).sort((a: any, b: any) => a.time.localeCompare(b.time));
+  })).sort((a: any, b: any) => (a.time ?? '').localeCompare(b.time ?? ''));
 
   const timeGroups: Record<string, typeof timelineItems> = {};
   timelineItems.forEach((item: any) => {
-    if (!timeGroups[item.time]) timeGroups[item.time] = [];
-    timeGroups[item.time].push(item);
+    const key = item.timeLabel;
+    if (!timeGroups[key]) timeGroups[key] = [];
+    timeGroups[key].push(item);
   });
 
 
