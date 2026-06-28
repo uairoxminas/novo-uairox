@@ -316,6 +316,7 @@ export interface WhatsAppSupportConfig {
 
 export interface AdminNotificationsConfig {
   webhook_url: string;
+  admin_phone: string;
   message_template: string;
   enabled: boolean;
 }

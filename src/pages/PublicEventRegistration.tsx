@@ -1502,7 +1502,7 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             .eq('key', 'admin_notifications')
             .maybeSingle();
           const notifCfg = cfgRows?.value as any;
-          if (!notifCfg?.enabled || !notifCfg?.webhook_url) return;
+          if (!notifCfg?.enabled || !notifCfg?.webhook_url || !notifCfg?.admin_phone) return;
 
           const categoryName = selectedCategory?.name || 'N/A';
           const valorFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPrice / 100);
@@ -1518,7 +1518,8 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
             .replace(/\{\{valor\}\}/g, valorFmt)
             .replace(/\{\{status\}\}/g, statusLabel);
 
-          await sendWebhook(notifCfg.webhook_url, { message });
+          const adminPhone = (notifCfg.admin_phone || '').replace(/\D/g, '');
+          await sendWebhook(notifCfg.webhook_url, { telefone: adminPhone, message });
         } catch { /* silently ignore */ }
       })();
 

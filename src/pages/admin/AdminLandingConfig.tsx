@@ -55,6 +55,7 @@ export default function AdminLandingConfig() {
   });
   const [adminNotificationsConfig, setAdminNotificationsConfig] = useState(config?.admin_notifications || {
     webhook_url: '',
+    admin_phone: '',
     message_template: '🔔 *Nova Inscrição!*\n\n*Evento:* {{evento}}\n*Atleta:* {{atleta}}\n*E-mail:* {{email}}\n*Telefone:* {{telefone}}\n*Categoria:* {{categoria}}\n*Valor:* {{valor}}\n*Status:* {{status}}\n\n👉 uairox.com.br/admin',
     enabled: true,
   });
@@ -1014,17 +1015,30 @@ export default function AdminLandingConfig() {
           </ol>
         </div>
 
-        {/* Webhook URL */}
-        <div>
-          <label className="block text-sm font-bold text-zinc-400 mb-2">URL do Webhook (BotConversa)</label>
-          <input
-            type="text"
-            placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..."
-            className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2.5 text-white font-mono text-xs focus:border-[#EDAC02]/50 outline-none"
-            value={adminNotificationsConfig.webhook_url || ''}
-            onChange={(e) => setAdminNotificationsConfig(prev => ({ ...prev, webhook_url: e.target.value }))}
-          />
-          <p className="text-[10px] text-zinc-600 mt-1">Este webhook recebe notificações de inscrições de <strong className="text-zinc-400">todos</strong> os eventos</p>
+        {/* Webhook URL + Telefone do Admin */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">URL do Webhook (BotConversa)</label>
+            <input
+              type="text"
+              placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..."
+              className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2.5 text-white font-mono text-xs focus:border-[#EDAC02]/50 outline-none"
+              value={adminNotificationsConfig.webhook_url || ''}
+              onChange={(e) => setAdminNotificationsConfig(prev => ({ ...prev, webhook_url: e.target.value }))}
+            />
+            <p className="text-[10px] text-zinc-600 mt-1">Webhook de <strong className="text-zinc-400">todos</strong> os eventos</p>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-zinc-400 mb-2">WhatsApp do Admin (com DDI)</label>
+            <input
+              type="text"
+              placeholder="5531999999999"
+              className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2.5 text-white font-mono text-sm focus:border-[#EDAC02]/50 outline-none"
+              value={adminNotificationsConfig.admin_phone || ''}
+              onChange={(e) => setAdminNotificationsConfig(prev => ({ ...prev, admin_phone: e.target.value.replace(/\D/g, '') }))}
+            />
+            <p className="text-[10px] text-zinc-600 mt-1">Só números: ex. <code className="text-zinc-400">5531999990000</code></p>
+          </div>
         </div>
 
         {/* Message Template */}
@@ -1057,18 +1071,19 @@ export default function AdminLandingConfig() {
         <div className="flex gap-3 justify-end pt-2 border-t border-[#262626]">
           {/* Test button */}
           <button
-            disabled={!adminNotificationsConfig.webhook_url}
+            disabled={!adminNotificationsConfig.webhook_url || !adminNotificationsConfig.admin_phone}
             onClick={async () => {
-              if (!adminNotificationsConfig.webhook_url) return;
+              if (!adminNotificationsConfig.webhook_url || !adminNotificationsConfig.admin_phone) return;
               const msg = (adminNotificationsConfig.message_template || '')
-                .replace('{{evento}}', '9ª Edição UAIROX — Lagoa Santa')
-                .replace('{{atleta}}', 'João Silva (TESTE)')
-                .replace('{{email}}', 'joao@email.com')
-                .replace('{{telefone}}', '(31) 99999-9999')
-                .replace('{{categoria}}', 'Individual Masculino')
-                .replace('{{valor}}', 'R$ 180,00')
-                .replace('{{status}}', 'Pendente');
-              const { ok, error } = await sendWebhook(adminNotificationsConfig.webhook_url, { message: msg });
+                .replace(/\{\{evento\}\}/g, '9ª Edição UAIROX — Lagoa Santa')
+                .replace(/\{\{atleta\}\}/g, 'João Silva (TESTE)')
+                .replace(/\{\{email\}\}/g, 'joao@email.com')
+                .replace(/\{\{telefone\}\}/g, '(31) 99999-9999')
+                .replace(/\{\{categoria\}\}/g, 'Individual Masculino')
+                .replace(/\{\{valor\}\}/g, 'R$ 180,00')
+                .replace(/\{\{status\}\}/g, 'Pendente');
+              const phone = adminNotificationsConfig.admin_phone.replace(/\D/g, '');
+              const { ok, error } = await sendWebhook(adminNotificationsConfig.webhook_url, { telefone: phone, message: msg });
               if (ok) toast.success('✅ Mensagem de teste enviada com sucesso!');
               else toast.error(`Erro ao enviar teste: ${error}`);
             }}
