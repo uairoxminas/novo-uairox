@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useSiteConfig, useUpdateSiteConfig } from "@/hooks/useSiteConfig";
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Upload, Trash2, Play } from 'lucide-react';
+import { Loader2, Upload, Trash2, Play, Bell, TestTube } from 'lucide-react';
+import { sendWebhook } from '@/lib/botconversa';
+import { toast } from 'sonner';
 export default function AdminLandingConfig() {
   const { data: config, isLoading } = useSiteConfig();
   const updateConfig = useUpdateSiteConfig();
@@ -51,6 +53,11 @@ export default function AdminLandingConfig() {
     tier_elite_label: "Elite",
     tier_elite_desc: "Patrocínio Oficial UAIROX e Vagas."
   });
+  const [adminNotificationsConfig, setAdminNotificationsConfig] = useState(config?.admin_notifications || {
+    webhook_url: '',
+    message_template: '🔔 *Nova Inscrição!*\n\n*Evento:* {{evento}}\n*Atleta:* {{atleta}}\n*E-mail:* {{email}}\n*Telefone:* {{telefone}}\n*Categoria:* {{categoria}}\n*Valor:* {{valor}}\n*Status:* {{status}}\n\n👉 uairox.com.br/admin',
+    enabled: true,
+  });
 
   const [isUploading, setIsUploading] = useState(false);
   const [editingRaceTypeIdx, setEditingRaceTypeIdx] = useState(0);
@@ -65,6 +72,7 @@ export default function AdminLandingConfig() {
     if (config?.home_footer) setFooterConfig(config.home_footer);
     if (config?.squad_page) setSquadPageConfig(config.squad_page);
     if (config?.whatsapp_support) setWhatsappConfig(config.whatsapp_support);
+    if (config?.admin_notifications) setAdminNotificationsConfig(config.admin_notifications);
     
     // Migração em tempo de execução para os 3 tipos de prova (Race Types legados)
     if (config?.home_format_new) {
@@ -87,6 +95,7 @@ export default function AdminLandingConfig() {
   const handleSaveFooter = () => updateConfig.mutate({ key: "home_footer", value: footerConfig });
   const handleSaveSquad = () => updateConfig.mutate({ key: "squad_page", value: squadPageConfig });
   const handleSaveWhatsapp = () => updateConfig.mutate({ key: "whatsapp_support", value: whatsappConfig });
+  const handleSaveAdminNotifications = () => updateConfig.mutate({ key: "admin_notifications", value: adminNotificationsConfig });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -967,6 +976,115 @@ export default function AdminLandingConfig() {
         </div>
         <div className="flex justify-end">
           <button onClick={handleSaveWhatsapp} className="bg-brand-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-brand-500 disabled:opacity-50" disabled={updateConfig.isPending}>Salvar WhatsApp</button>
+        </div>
+      </div>
+
+      {/* ── NOTIFICAÇÕES DO ADMIN ──────────────────────────────────────── */}
+      <div className="bg-[#121212] border border-[#262626] rounded-xl p-6 space-y-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-[#EDAC02]/10 border border-[#EDAC02]/20 flex items-center justify-center">
+            <Bell size={16} className="text-[#EDAC02]" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Notificações do Administrador</h2>
+            <p className="text-xs text-zinc-500">Receba um WhatsApp a cada nova inscrição em qualquer evento</p>
+          </div>
+          <div className="ml-auto">
+            <button
+              onClick={() => setAdminNotificationsConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                adminNotificationsConfig.enabled ? 'bg-[#EDAC02]' : 'bg-zinc-700'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                adminNotificationsConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Instruções */}
+        <div className="bg-[#0a0a0a] border border-cyan-500/20 rounded-lg p-4 space-y-2">
+          <p className="text-xs font-bold text-cyan-400 uppercase tracking-widest">📋 Como configurar</p>
+          <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside">
+            <li>No BotConversa, crie um <strong className="text-white">Webhook de entrada</strong></li>
+            <li>Defina o número de destino como o WhatsApp do administrador</li>
+            <li>Cole a URL do webhook no campo abaixo</li>
+            <li>Salve e use o botão <strong className="text-white">Testar</strong> para confirmar</li>
+          </ol>
+        </div>
+
+        {/* Webhook URL */}
+        <div>
+          <label className="block text-sm font-bold text-zinc-400 mb-2">URL do Webhook (BotConversa)</label>
+          <input
+            type="text"
+            placeholder="https://backend.botconversa.com.br/api/v1/webhooks/..."
+            className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2.5 text-white font-mono text-xs focus:border-[#EDAC02]/50 outline-none"
+            value={adminNotificationsConfig.webhook_url || ''}
+            onChange={(e) => setAdminNotificationsConfig(prev => ({ ...prev, webhook_url: e.target.value }))}
+          />
+          <p className="text-[10px] text-zinc-600 mt-1">Este webhook recebe notificações de inscrições de <strong className="text-zinc-400">todos</strong> os eventos</p>
+        </div>
+
+        {/* Message Template */}
+        <div>
+          <label className="block text-sm font-bold text-zinc-400 mb-1">Mensagem de Notificação</label>
+          <p className="text-[10px] text-zinc-600 mb-2">Variáveis disponíveis: <code className="text-[#EDAC02]">{'{{evento}}'}</code> <code className="text-[#EDAC02]">{'{{atleta}}'}</code> <code className="text-[#EDAC02]">{'{{email}}'}</code> <code className="text-[#EDAC02]">{'{{telefone}}'}</code> <code className="text-[#EDAC02]">{'{{categoria}}'}</code> <code className="text-[#EDAC02]">{'{{valor}}'}</code> <code className="text-[#EDAC02]">{'{{status}}'}</code></p>
+          <textarea
+            rows={8}
+            className="w-full bg-[#050505] border border-[#262626] rounded-lg p-2.5 text-white text-xs font-mono focus:border-[#EDAC02]/50 outline-none resize-none"
+            value={adminNotificationsConfig.message_template || ''}
+            onChange={(e) => setAdminNotificationsConfig(prev => ({ ...prev, message_template: e.target.value }))}
+          />
+        </div>
+
+        {/* Preview */}
+        <div className="bg-[#0a0a0a] border border-[#262626] rounded-lg p-4">
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Preview da mensagem</p>
+          <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed">
+            {(adminNotificationsConfig.message_template || '')
+              .replace('{{evento}}', '9ª Edição UAIROX — Lagoa Santa')
+              .replace('{{atleta}}', 'João Silva')
+              .replace('{{email}}', 'joao@email.com')
+              .replace('{{telefone}}', '(31) 99999-9999')
+              .replace('{{categoria}}', 'Individual Masculino')
+              .replace('{{valor}}', 'R$ 180,00')
+              .replace('{{status}}', 'Pendente')}
+          </pre>
+        </div>
+
+        <div className="flex gap-3 justify-end pt-2 border-t border-[#262626]">
+          {/* Test button */}
+          <button
+            disabled={!adminNotificationsConfig.webhook_url}
+            onClick={async () => {
+              if (!adminNotificationsConfig.webhook_url) return;
+              const msg = (adminNotificationsConfig.message_template || '')
+                .replace('{{evento}}', '9ª Edição UAIROX — Lagoa Santa')
+                .replace('{{atleta}}', 'João Silva (TESTE)')
+                .replace('{{email}}', 'joao@email.com')
+                .replace('{{telefone}}', '(31) 99999-9999')
+                .replace('{{categoria}}', 'Individual Masculino')
+                .replace('{{valor}}', 'R$ 180,00')
+                .replace('{{status}}', 'Pendente');
+              const { ok, error } = await sendWebhook(adminNotificationsConfig.webhook_url, { message: msg });
+              if (ok) toast.success('✅ Mensagem de teste enviada com sucesso!');
+              else toast.error(`Erro ao enviar teste: ${error}`);
+            }}
+            className="flex items-center gap-2 px-4 py-2 border border-cyan-500/30 text-cyan-400 text-sm font-bold rounded-lg hover:bg-cyan-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <TestTube size={14} />
+            Testar
+          </button>
+          <button
+            onClick={handleSaveAdminNotifications}
+            disabled={updateConfig.isPending}
+            className="flex items-center gap-2 px-5 py-2 bg-[#EDAC02] text-black text-sm font-black rounded-lg hover:bg-[#d49b02] transition-colors disabled:opacity-50"
+          >
+            <Bell size={14} />
+            Salvar Notificações
+          </button>
         </div>
       </div>
 

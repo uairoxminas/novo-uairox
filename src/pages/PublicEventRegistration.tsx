@@ -1493,6 +1493,35 @@ function RegistrationForm({ eventId, event, categories, batches, kits, initialCa
         }).catch(() => {});
       }
 
+      // ── Notificação do Admin (fire-and-forget) ───────────────────────────
+      ;(async () => {
+        try {
+          const { data: cfgRows } = await supabase
+            .from('site_config')
+            .select('value')
+            .eq('key', 'admin_notifications')
+            .maybeSingle();
+          const notifCfg = cfgRows?.value as any;
+          if (!notifCfg?.enabled || !notifCfg?.webhook_url) return;
+
+          const categoryName = selectedCategory?.name || 'N/A';
+          const valorFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPrice / 100);
+          const statusLabel = effectiveIsEventFull ? 'Lista de Espera' : 'Pendente';
+          const testLabel = (event as any)?.is_test_mode ? ' [TESTE]' : '';
+
+          const message = (notifCfg.message_template || '')
+            .replace(/\{\{evento\}\}/g, (event?.title || 'Evento') + testLabel)
+            .replace(/\{\{atleta\}\}/g, a1.name.trim())
+            .replace(/\{\{email\}\}/g, a1.email.trim())
+            .replace(/\{\{telefone\}\}/g, a1.phone.trim())
+            .replace(/\{\{categoria\}\}/g, categoryName)
+            .replace(/\{\{valor\}\}/g, valorFmt)
+            .replace(/\{\{status\}\}/g, statusLabel);
+
+          await sendWebhook(notifCfg.webhook_url, { message });
+        } catch { /* silently ignore */ }
+      })();
+
       setSuccess(true);
       sendConfirmationMessages(data.id);
     } catch (err: any) { toast.error('Erro ao salvar inscrição: ' + err.message); }

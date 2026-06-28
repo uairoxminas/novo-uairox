@@ -314,6 +314,12 @@ export interface WhatsAppSupportConfig {
   whatsapp_link: string;
 }
 
+export interface AdminNotificationsConfig {
+  webhook_url: string;
+  message_template: string;
+  enabled: boolean;
+}
+
 export interface SiteConfig {
   hero: HeroConfig;
   featured_event: FeaturedEventConfig;
@@ -335,6 +341,7 @@ export interface SiteConfig {
   squad_page?: SquadPageConfig;
   experience_page?: ExperiencePageConfig;
   home_sponsors_new?: HomeSponsorsNewConfig;
+  admin_notifications?: AdminNotificationsConfig;
 }
 
 const defaultConfig: SiteConfig = {
