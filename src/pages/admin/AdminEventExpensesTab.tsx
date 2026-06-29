@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useEventExpenseCategories, useCreateExpenseCategory, useDeleteExpenseCategory, useEventExpenses, useCreateEventExpense, useDeleteEventExpense, useEventStats } from '@/hooks/useEventConfig';
+import EventPartnerReport from './EventPartnerReport';
 
 const cardClass = "bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl";
 const inputClass = "w-full bg-[#111] border border-[#262626] rounded-lg px-4 py-2.5 text-white placeholder-zinc-600 focus:border-[#EDAC02] focus:ring-1 focus:ring-[#EDAC02] outline-none transition-all";
@@ -268,6 +269,17 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
           </div>
         </div>
       </div>
+
+      {/* RELATÓRIO PARA SÓCIOS (Excel + PDF + divisão) */}
+      <EventPartnerReport
+        eventId={eventId}
+        revenue={revenue}
+        totalExecuted={totalExecuted}
+        totalPaid={totalPaid}
+        totalPlanned={totalPlanned}
+        netProfit={netProfit}
+        expenses={expenses}
+      />
 
       {/* MODAL: Nova Categoria/Orçamento */}
       {showCatModal && (
