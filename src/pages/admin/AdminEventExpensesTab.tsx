@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useEventExpenseCategories, useCreateExpenseCategory, useDeleteExpenseCategory, useEventExpenses, useCreateEventExpense, useDeleteEventExpense, useEventStats } from '@/hooks/useEventConfig';
+import { useEventExpenseCategories, useCreateExpenseCategory, useDeleteExpenseCategory, useEventExpenses, useCreateEventExpense, useUpdateEventExpense, useDeleteEventExpense, useEventStats } from '@/hooks/useEventConfig';
 import EventPartnerReport from './EventPartnerReport';
 
 const cardClass = "bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl";
@@ -22,7 +22,9 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
   const createCategory = useCreateExpenseCategory();
   const deleteCategory = useDeleteExpenseCategory();
   const createExpense = useCreateEventExpense();
+  const updateExpense = useUpdateEventExpense();
   const deleteExpense = useDeleteEventExpense();
+  const [editingExpId, setEditingExpId] = useState<string | null>(null);
 
   const [showCatModal, setShowCatModal] = useState(false);
   const [newCat, setNewCat] = useState({ name: '', planned_amount: '' });
@@ -119,25 +121,45 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
         receiptUrl = urlData.publicUrl;
       }
 
-      await createExpense.mutateAsync({
+      const base: any = {
         event_id: eventId,
         category_id: newExp.category_id,
         description: newExp.description,
         amount: parseFloat(newExp.amount),
         expense_date: newExp.expense_date,
         status: newExp.status,
-        receipt_url: receiptUrl,
         paid_by: newExp.paid_by || null,
-      });
+      };
+      if (editingExpId) {
+        if (receiptUrl) base.receipt_url = receiptUrl; // mantém o comprovante atual se não enviar um novo
+        await updateExpense.mutateAsync({ id: editingExpId, ...base });
+      } else {
+        await createExpense.mutateAsync({ ...base, receipt_url: receiptUrl });
+      }
 
       setShowExpModal(false);
+      setEditingExpId(null);
       setNewExp({ category_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0], status: 'paid', paid_by: '' });
       clearReceipt();
     } catch (err: any) {
-      toast.error('Erro ao lançar despesa: ' + err.message);
+      toast.error('Erro ao salvar despesa: ' + err.message);
     } finally {
       setUploading(false);
     }
+  };
+
+  const startEditExpense = (exp: any) => {
+    setEditingExpId(exp.id);
+    setNewExp({
+      category_id: exp.category_id || '',
+      description: exp.description || '',
+      amount: String(exp.amount ?? ''),
+      expense_date: exp.expense_date ? String(exp.expense_date).split('T')[0] : new Date().toISOString().split('T')[0],
+      status: exp.status || 'paid',
+      paid_by: exp.paid_by || '',
+    });
+    clearReceipt();
+    setShowExpModal(true);
   };
 
   const isReceiptImage = (url: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
@@ -221,8 +243,11 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
                   toast.error("Crie pelo menos uma área de orçamento primeiro!");
                   return;
                 }
+                setEditingExpId(null);
+                setNewExp({ category_id: '', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0], status: 'paid', paid_by: '' });
+                clearReceipt();
                 setShowExpModal(true);
-              }} 
+              }}
               className="px-3 py-1.5 bg-[#EDAC02] text-black text-xs font-bold rounded hover:bg-[#EDAC02]/90 transition-colors"
             >
               + Lançar Despesa
@@ -262,7 +287,14 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                   <span className="text-sm font-bold text-white">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  <button 
+                  <button
+                    onClick={() => startEditExpense(exp)}
+                    className="p-1.5 text-zinc-500 hover:text-[#EDAC02] opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Editar despesa"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  </button>
+                  <button
                     onClick={() => deleteExpense.mutate({ id: exp.id, event_id: eventId })}
                     className="p-1.5 text-zinc-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
@@ -317,8 +349,8 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0a0a0a] border border-[#262626] rounded-xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-[#262626] flex justify-between items-center sticky top-0 bg-[#0a0a0a] z-10">
-              <h3 className="text-lg font-black text-white">Lançar Despesa Real</h3>
-              <button onClick={() => { setShowExpModal(false); clearReceipt(); }} className="text-zinc-500 hover:text-white">✕</button>
+              <h3 className="text-lg font-black text-white">{editingExpId ? 'Editar Despesa' : 'Lançar Despesa Real'}</h3>
+              <button onClick={() => { setShowExpModal(false); setEditingExpId(null); clearReceipt(); }} className="text-zinc-500 hover:text-white">✕</button>
             </div>
             <form onSubmit={handleCreateExpense} className="p-5 space-y-4">
               <div>
@@ -412,9 +444,9 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => { setShowExpModal(false); clearReceipt(); }} className={btnGhost}>Cancelar</button>
-                <button type="submit" disabled={createExpense.isPending || uploading} className={btnGold}>
-                  {uploading ? 'Enviando...' : createExpense.isPending ? 'Salvando...' : 'Lançar Despesa'}
+                <button type="button" onClick={() => { setShowExpModal(false); setEditingExpId(null); clearReceipt(); }} className={btnGhost}>Cancelar</button>
+                <button type="submit" disabled={createExpense.isPending || updateExpense.isPending || uploading} className={btnGold}>
+                  {uploading ? 'Enviando...' : (createExpense.isPending || updateExpense.isPending) ? 'Salvando...' : (editingExpId ? 'Salvar Alterações' : 'Lançar Despesa')}
                 </button>
               </div>
             </form>
