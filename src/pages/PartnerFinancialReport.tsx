@@ -22,7 +22,7 @@ export default function PartnerFinancialReport() {
       // 2. Dados do evento + finanças
       const [{ data: ev }, { data: regs }, { data: exps }, { data: cats }, { data: partners }] = await Promise.all([
         supabase.from('events' as any).select('title').eq('id', eid).maybeSingle(),
-        supabase.from('registrations' as any).select('total_paid').eq('event_id', eid),
+        supabase.from('registrations' as any).select('bib_number, athlete_name, team_name, total_paid, categories(name, team_size)').eq('event_id', eid).order('bib_number'),
         supabase.from('event_expenses' as any).select('*, event_expense_categories(name)').eq('event_id', eid).order('expense_date'),
         supabase.from('event_expense_categories' as any).select('planned_amount').eq('event_id', eid),
         supabase.from('event_partners' as any).select('name, percent').eq('event_id', eid).order('created_at'),
@@ -35,7 +35,7 @@ export default function PartnerFinancialReport() {
       const totalPlanned = (cats ?? []).reduce((s: number, c: any) => s + Number(c.planned_amount || 0), 0);
       const netProfit = revenue - totalPaid;
 
-      setData({ title: ev?.title || 'Evento', revenue, totalExecuted, totalPaid, totalPlanned, netProfit, expenses, partners: partners ?? [] });
+      setData({ title: ev?.title || 'Evento', revenue, totalExecuted, totalPaid, totalPlanned, netProfit, expenses, partners: partners ?? [], registrations: regs ?? [] });
       setState('ok');
     })();
   }, [token]);
@@ -76,6 +76,29 @@ export default function PartnerFinancialReport() {
                 <tr key={i}><td className="p-3 font-bold">{p.name}</td><td className="p-3 text-right text-zinc-400">{Number(p.percent)}%</td><td className="p-3 text-right font-black text-emerald-400">{brl(d.netProfit * Number(p.percent) / 100)}</td></tr>
               ))}
               {d.partners.length > 0 && <tr className="bg-[#0a0a0a]"><td className="p-3 font-black">TOTAL</td><td className="p-3 text-right">{totalPct}%</td><td className="p-3 text-right font-black">{brl(d.netProfit * totalPct / 100)}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Inscrições / Receita */}
+        <h2 className="text-lg font-black uppercase italic text-[#EDAC02] border-b border-[#EDAC02]/30 pb-1 mb-3">Inscrições / Receita ({brl(d.revenue)})</h2>
+        <div className="rounded-xl border border-[#1a1a1a] overflow-hidden mb-8">
+          <table className="w-full text-sm">
+            <thead className="bg-[#0a0a0a] text-zinc-500 uppercase text-xs"><tr><th className="text-left p-3">Nº</th><th className="text-left p-3">Nome / Equipe</th><th className="text-left p-3">Categoria</th><th className="text-right p-3">Valor pago</th></tr></thead>
+            <tbody className="divide-y divide-[#111]">
+              {d.registrations.length === 0 ? <tr><td colSpan={4} className="p-3 text-zinc-600 text-center">Sem inscrições.</td></tr>
+              : d.registrations.map((r: any, i: number) => {
+                const isTeam = (r.categories?.team_size ?? 1) > 1;
+                const nome = (isTeam ? (r.team_name || r.athlete_name) : (r.athlete_name || r.team_name)) || '—';
+                return (
+                  <tr key={i}>
+                    <td className="p-3 text-zinc-400">{r.bib_number ?? '—'}</td>
+                    <td className="p-3 font-bold">{nome}</td>
+                    <td className="p-3 text-zinc-400">{r.categories?.name || '—'}</td>
+                    <td className="p-3 text-right font-bold">{brl(r.total_paid)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -126,7 +126,15 @@ export default function EventPartnerReport(props: Props) {
   };
 
   // ── PDF (janela de impressão → "Salvar como PDF") ────────────────────────────
-  const exportPDF = () => {
+  const exportPDF = async () => {
+    const { data: regs } = await supabase.from('registrations' as any)
+      .select('bib_number, athlete_name, team_name, total_paid, categories(name, team_size)')
+      .eq('event_id', eventId).order('bib_number');
+    const inscRows = (regs ?? []).map((r: any) => {
+      const isTeam = (r.categories?.team_size ?? 1) > 1;
+      const nome = ((isTeam ? (r.team_name || r.athlete_name) : (r.athlete_name || r.team_name)) || '').replace(/</g, '&lt;');
+      return `<tr><td>${r.bib_number ?? ''}</td><td>${nome}</td><td>${r.categories?.name || ''}</td><td class="r">${brl(r.total_paid)}</td></tr>`;
+    }).join('');
     const despRows = expenses.map((e: any) => `<tr><td>${new Date(e.expense_date).toLocaleDateString('pt-BR')}</td><td>${e.event_expense_categories?.name || ''}</td><td>${(e.description || '').replace(/</g, '&lt;')}</td><td>${e.status === 'paid' ? 'Pago' : 'Pendente'}</td><td class="r">${brl(e.amount)}</td></tr>`).join('');
     const divRows = partners.map((p: any) => `<tr><td>${(p.name || '').replace(/</g, '&lt;')}</td><td>${p.percent}%</td><td class="r">${brl(netProfit * Number(p.percent) / 100)}</td></tr>`).join('');
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Relatório ${eventTitle}</title>
@@ -147,6 +155,8 @@ export default function EventPartnerReport(props: Props) {
       </div>
       <h2>Divisão entre Sócios</h2>
       <table><thead><tr><th>Sócio</th><th>%</th><th class="r">Valor a receber</th></tr></thead><tbody>${divRows || '<tr><td colspan="3">Sem sócios cadastrados</td></tr>'}</tbody></table>
+      <h2>Inscrições / Receita (${brl(revenue)})</h2>
+      <table><thead><tr><th>Nº</th><th>Nome / Equipe</th><th>Categoria</th><th class="r">Valor pago</th></tr></thead><tbody>${inscRows || '<tr><td colspan="4">Sem inscrições</td></tr>'}</tbody></table>
       <h2>Despesas (${brl(totalExecuted)} lançadas)</h2>
       <table><thead><tr><th>Data</th><th>Área</th><th>Descrição</th><th>Status</th><th class="r">Valor</th></tr></thead><tbody>${despRows || '<tr><td colspan="5">Sem despesas</td></tr>'}</tbody></table>
       </body></html>`;
