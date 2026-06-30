@@ -2319,6 +2319,9 @@ function KitsTab({ eventId }: { eventId: string }) {
 function InscricoesTab({ eventId }: { eventId: string }) {
   const { data: event } = useEvent(eventId);
   const { data: registrations, refetch } = useEventRegistrations(eventId);
+  const qc = useQueryClient();
+  // Atualiza a lista E a receita (event-stats) — senão a aba Despesas fica com valor antigo.
+  const refetchAll = () => { refetch(); qc.invalidateQueries({ queryKey: ['event-stats', eventId] }); };
   const { data: categories } = useCategories(eventId);
   const [filter, setFilter] = useState<string | null>(null);
   
@@ -2378,7 +2381,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success(`${selectedIds.size} inscrição(ões) atualizadas!`);
     setSelectedIds(new Set());
-    refetch();
+    refetchAll();
 
     // BotConversa: envia para confirmado/cancelado com intervalo de 30s entre disparos
     if ((newStatus === 'confirmed' || newStatus === 'cancelled') && affectedRegs.length > 0) {
@@ -2743,7 +2746,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     ));
     setIsBulkSaving(false);
     setShowBulkModal(false);
-    refetch();
+    refetchAll();
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2846,7 +2849,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
       setImportData([]);
       setImportHeaders([]);
       setImportMapping({});
-      refetch();
+      refetchAll();
     } catch (err: any) {
       toast.error('Erro ao importar: ' + err.message);
     } finally {
@@ -3083,7 +3086,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     }
     
     setIsSaving(false);
-    if (!error) { setEditingReg(null); refetch(); toast.success(editingReg.id === 'new' ? 'Inscrição criada!' : 'Inscrição atualizada!'); }
+    if (!error) { setEditingReg(null); refetchAll(); toast.success(editingReg.id === 'new' ? 'Inscrição criada!' : 'Inscrição atualizada!'); }
     else { toast.error("Erro: " + error.message); }
   };
 
@@ -3097,7 +3100,7 @@ function InscricoesTab({ eventId }: { eventId: string }) {
     if (!error) {
       toast.success('Inscrição excluída!');
       if (editingReg?.id === regId) setEditingReg(null);
-      refetch();
+      refetchAll();
     } else {
       toast.error('Erro ao excluir: ' + error.message);
     }

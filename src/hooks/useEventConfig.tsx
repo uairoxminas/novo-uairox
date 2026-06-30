@@ -545,6 +545,7 @@ export function useEventStats(eventId?: string) {
       };
     },
     enabled: !!eventId,
+    staleTime: 0, // receita sempre fresca: rebusca ao reabrir a aba/refocar
   });
 }
 
