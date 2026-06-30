@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useEventExpenseCategories, useCreateExpenseCategory, useDeleteExpenseCategory, useEventExpenses, useCreateEventExpense, useDeleteEventExpense, useEventStats } from '@/hooks/useEventConfig';
@@ -13,6 +14,10 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
   const { data: categories = [], isLoading: isLoadingCats } = useEventExpenseCategories(eventId);
   const { data: expenses = [], isLoading: isLoadingExp } = useEventExpenses(eventId);
   const { data: eventStats } = useEventStats(eventId);
+  const { data: partnersList = [] } = useQuery({
+    queryKey: ['partners-for-expense', eventId],
+    queryFn: async () => ((await supabase.from('event_partners' as any).select('id, name').eq('event_id', eventId).order('created_at')).data ?? []) as any[],
+  });
 
   const createCategory = useCreateExpenseCategory();
   const deleteCategory = useDeleteExpenseCategory();
@@ -345,8 +350,12 @@ export default function AdminEventExpensesTab({ eventId }: { eventId: string }) 
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Quem Pagou</label>
-                <input type="text" className={inputClass} placeholder="Ex: João, Empresa X..." value={newExp.paid_by} onChange={e => setNewExp({ ...newExp, paid_by: e.target.value })} />
+                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Quem Pagou (sócio) — define o reembolso no acerto</label>
+                <select className={inputClass} value={newExp.paid_by} onChange={e => setNewExp({ ...newExp, paid_by: e.target.value })}>
+                  <option value="">Caixa comum (sem reembolso)</option>
+                  {partnersList.map((p: any) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
+                {partnersList.length === 0 && <p className="text-[10px] text-orange-400 mt-1">Cadastre os sócios em "Relatório para Sócios" pra atribuir quem pagou.</p>}
               </div>
 
               {/* Receipt Upload */}

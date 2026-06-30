@@ -37,6 +37,20 @@ export default function EventPartnerReport(props: Props) {
 
   const totalPct = partners.reduce((s, p) => s + Number(p.percent || 0), 0);
 
+  // ── Acerto: reembolso do que cada sócio pagou + parte do lucro ───────────────
+  const norm = (s: string) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toUpperCase().trim();
+  const reembolsoFor = (partnerName: string) => {
+    const pn = norm(partnerName);
+    if (!pn) return 0;
+    return expenses.filter((e: any) => { const pb = norm(e.paid_by); return pb && (pb === pn || pb.includes(pn)); })
+      .reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+  };
+  const lucroFor = (p: any) => netProfit * Number(p.percent) / 100;
+  const acertoFor = (p: any) => lucroFor(p) + reembolsoFor(p.name);
+  const totReembolso = partners.reduce((s: number, p: any) => s + reembolsoFor(p.name), 0);
+  const totAcerto = partners.reduce((s: number, p: any) => s + acertoFor(p), 0);
+  const caixaComum = expenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0) - totReembolso;
+
   const addPartner = async () => {
     const pct = parseFloat(percent);
     if (!name.trim() || isNaN(pct)) { toast.error('Informe nome e %.'); return; }
@@ -109,9 +123,10 @@ export default function EventPartnerReport(props: Props) {
         e.event_expense_categories?.name || '', e.description || '',
         e.status === 'paid' ? 'Pago' : 'Pendente', e.paid_by || '', Number(e.amount || 0),
       ]));
-      const div: any[][] = [['Sócio', '%', 'Valor a receber (R$)']];
-      partners.forEach((p: any) => div.push([p.name, Number(p.percent), netProfit * Number(p.percent) / 100]));
-      div.push([], ['TOTAL', totalPct, netProfit * totalPct / 100]);
+      const div: any[][] = [['Sócio', '%', 'Lucro (R$)', 'Reembolso (R$)', 'Total a receber (R$)']];
+      partners.forEach((p: any) => div.push([p.name, Number(p.percent), lucroFor(p), reembolsoFor(p.name), acertoFor(p)]));
+      div.push([], ['TOTAL', totalPct, netProfit, totReembolso, totAcerto]);
+      if (caixaComum > 0.009) div.push([], ['Caixa comum (despesas sem sócio)', '', '', caixaComum, '']);
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
@@ -136,7 +151,7 @@ export default function EventPartnerReport(props: Props) {
       return `<tr><td>${r.bib_number ?? ''}</td><td>${nome}</td><td>${r.categories?.name || ''}</td><td class="r">${brl(r.total_paid)}</td></tr>`;
     }).join('');
     const despRows = expenses.map((e: any) => `<tr><td>${new Date(e.expense_date).toLocaleDateString('pt-BR')}</td><td>${e.event_expense_categories?.name || ''}</td><td>${(e.description || '').replace(/</g, '&lt;')}</td><td>${e.status === 'paid' ? 'Pago' : 'Pendente'}</td><td class="r">${brl(e.amount)}</td></tr>`).join('');
-    const divRows = partners.map((p: any) => `<tr><td>${(p.name || '').replace(/</g, '&lt;')}</td><td>${p.percent}%</td><td class="r">${brl(netProfit * Number(p.percent) / 100)}</td></tr>`).join('');
+    const divRows = partners.map((p: any) => `<tr><td>${(p.name || '').replace(/</g, '&lt;')}</td><td>${p.percent}%</td><td class="r">${brl(lucroFor(p))}</td><td class="r">${brl(reembolsoFor(p.name))}</td><td class="r"><b>${brl(acertoFor(p))}</b></td></tr>`).join('');
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Relatório ${eventTitle}</title>
       <style>
         body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:32px;max-width:800px;margin:auto}
@@ -153,8 +168,9 @@ export default function EventPartnerReport(props: Props) {
         <div class="box"><div class="lbl">Despesas pagas</div><div class="big">${brl(totalPaid)}</div></div>
         <div class="box"><div class="lbl">Lucro líquido</div><div class="big ${netProfit >= 0 ? 'pos' : 'neg'}">${brl(netProfit)}</div></div>
       </div>
-      <h2>Divisão entre Sócios</h2>
-      <table><thead><tr><th>Sócio</th><th>%</th><th class="r">Valor a receber</th></tr></thead><tbody>${divRows || '<tr><td colspan="3">Sem sócios cadastrados</td></tr>'}</tbody></table>
+      <h2>Acerto entre Sócios (lucro + reembolso do que cada um pagou)</h2>
+      <table><thead><tr><th>Sócio</th><th>%</th><th class="r">Lucro</th><th class="r">Reembolso</th><th class="r">Total a receber</th></tr></thead><tbody>${divRows || '<tr><td colspan="5">Sem sócios cadastrados</td></tr>'}</tbody></table>
+      ${caixaComum > 0.009 ? `<p style="font-size:12px;color:#666">Despesas do caixa comum (sem sócio atribuído): ${brl(caixaComum)}</p>` : ''}
       <h2>Inscrições / Receita (${brl(revenue)})</h2>
       <table><thead><tr><th>Nº</th><th>Nome / Equipe</th><th>Categoria</th><th class="r">Valor pago</th></tr></thead><tbody>${inscRows || '<tr><td colspan="4">Sem inscrições</td></tr>'}</tbody></table>
       <h2>Despesas (${brl(totalExecuted)} lançadas)</h2>
@@ -203,21 +219,38 @@ export default function EventPartnerReport(props: Props) {
       {partners.length === 0 ? (
         <p className="text-zinc-600 text-sm text-center py-3">Nenhum sócio cadastrado.</p>
       ) : (
-        <div className="space-y-2">
-          {partners.map((p: any) => (
-            <div key={p.id} className="flex items-center justify-between bg-[#111] border border-[#262626] rounded-lg px-4 py-2.5">
-              <span className="text-sm font-bold text-white">{p.name}</span>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-zinc-400">{Number(p.percent)}%</span>
-                <span className="text-sm font-black text-emerald-400 w-28 text-right">{brl(netProfit * Number(p.percent) / 100)}</span>
-                <button onClick={() => delPartner(p.id)} className="text-zinc-500 hover:text-red-500 text-xs">🗑</button>
-              </div>
-            </div>
-          ))}
-          <div className={`flex justify-between px-4 py-2 text-sm font-bold ${Math.abs(totalPct - 100) < 0.01 ? 'text-zinc-400' : 'text-orange-400'}`}>
-            <span>Total</span>
-            <span>{totalPct}% {Math.abs(totalPct - 100) < 0.01 ? '✓' : '⚠ (deve somar 100%)'}</span>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-zinc-500 uppercase text-[10px]">
+              <tr>
+                <th className="text-left p-2">Sócio</th><th className="text-right p-2">%</th>
+                <th className="text-right p-2">Lucro</th><th className="text-right p-2">Reembolso</th>
+                <th className="text-right p-2">A receber</th><th></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1a1a1a]">
+              {partners.map((p: any) => (
+                <tr key={p.id}>
+                  <td className="p-2 font-bold text-white">{p.name}</td>
+                  <td className="p-2 text-right text-zinc-400">{Number(p.percent)}%</td>
+                  <td className={`p-2 text-right ${lucroFor(p) >= 0 ? 'text-zinc-300' : 'text-red-400'}`}>{brl(lucroFor(p))}</td>
+                  <td className="p-2 text-right text-blue-300">{brl(reembolsoFor(p.name))}</td>
+                  <td className="p-2 text-right font-black text-emerald-400">{brl(acertoFor(p))}</td>
+                  <td className="p-2 text-right"><button onClick={() => delPartner(p.id)} className="text-zinc-500 hover:text-red-500 text-xs">🗑</button></td>
+                </tr>
+              ))}
+              <tr className="font-black text-zinc-300 border-t border-[#262626]">
+                <td className="p-2">TOTAL</td>
+                <td className={`p-2 text-right ${Math.abs(totalPct - 100) < 0.01 ? '' : 'text-orange-400'}`}>{totalPct}%</td>
+                <td className="p-2 text-right">{brl(netProfit)}</td>
+                <td className="p-2 text-right">{brl(totReembolso)}</td>
+                <td className="p-2 text-right">{brl(totAcerto)}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+          {caixaComum > 0.009 && <p className="text-[11px] text-zinc-500 mt-2">Despesas do caixa comum (sem sócio atribuído): {brl(caixaComum)}</p>}
+          {Math.abs(totalPct - 100) >= 0.01 && <p className="text-[11px] text-orange-400 mt-1">⚠ Os % devem somar 100%.</p>}
         </div>
       )}
     </div>

@@ -50,6 +50,13 @@ export default function PartnerFinancialReport() {
 
   const d = data;
   const totalPct = d.partners.reduce((s: number, p: any) => s + Number(p.percent || 0), 0);
+  const norm = (s: string) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toUpperCase().trim();
+  const reembolsoFor = (name: string) => {
+    const pn = norm(name); if (!pn) return 0;
+    return d.expenses.filter((e: any) => { const pb = norm(e.paid_by); return pb && (pb === pn || pb.includes(pn)); }).reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+  };
+  const lucroFor = (p: any) => d.netProfit * Number(p.percent) / 100;
+  const totReembolso = d.partners.reduce((s: number, p: any) => s + reembolsoFor(p.name), 0);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white px-4 py-8">
@@ -66,19 +73,27 @@ export default function PartnerFinancialReport() {
         </div>
 
         {/* Divisão */}
-        <h2 className="text-lg font-black uppercase italic text-[#EDAC02] border-b border-[#EDAC02]/30 pb-1 mb-3">Divisão entre Sócios</h2>
-        <div className="rounded-xl border border-[#1a1a1a] overflow-hidden mb-8">
+        <h2 className="text-lg font-black uppercase italic text-[#EDAC02] border-b border-[#EDAC02]/30 pb-1 mb-3">Acerto entre Sócios</h2>
+        <p className="text-xs text-zinc-500 mb-2">Cada sócio recebe a parte do lucro + o reembolso do que pagou do bolso.</p>
+        <div className="rounded-xl border border-[#1a1a1a] overflow-x-auto mb-2">
           <table className="w-full text-sm">
-            <thead className="bg-[#0a0a0a] text-zinc-500 uppercase text-xs"><tr><th className="text-left p-3">Sócio</th><th className="text-right p-3">%</th><th className="text-right p-3">Valor a receber</th></tr></thead>
+            <thead className="bg-[#0a0a0a] text-zinc-500 uppercase text-xs"><tr><th className="text-left p-3">Sócio</th><th className="text-right p-3">%</th><th className="text-right p-3">Lucro</th><th className="text-right p-3">Reembolso</th><th className="text-right p-3">A receber</th></tr></thead>
             <tbody className="divide-y divide-[#111]">
-              {d.partners.length === 0 ? <tr><td colSpan={3} className="p-3 text-zinc-600 text-center">Sem sócios cadastrados.</td></tr>
+              {d.partners.length === 0 ? <tr><td colSpan={5} className="p-3 text-zinc-600 text-center">Sem sócios cadastrados.</td></tr>
               : d.partners.map((p: any, i: number) => (
-                <tr key={i}><td className="p-3 font-bold">{p.name}</td><td className="p-3 text-right text-zinc-400">{Number(p.percent)}%</td><td className="p-3 text-right font-black text-emerald-400">{brl(d.netProfit * Number(p.percent) / 100)}</td></tr>
+                <tr key={i}>
+                  <td className="p-3 font-bold">{p.name}</td>
+                  <td className="p-3 text-right text-zinc-400">{Number(p.percent)}%</td>
+                  <td className={`p-3 text-right ${lucroFor(p) >= 0 ? 'text-zinc-300' : 'text-red-400'}`}>{brl(lucroFor(p))}</td>
+                  <td className="p-3 text-right text-blue-300">{brl(reembolsoFor(p.name))}</td>
+                  <td className="p-3 text-right font-black text-emerald-400">{brl(lucroFor(p) + reembolsoFor(p.name))}</td>
+                </tr>
               ))}
-              {d.partners.length > 0 && <tr className="bg-[#0a0a0a]"><td className="p-3 font-black">TOTAL</td><td className="p-3 text-right">{totalPct}%</td><td className="p-3 text-right font-black">{brl(d.netProfit * totalPct / 100)}</td></tr>}
+              {d.partners.length > 0 && <tr className="bg-[#0a0a0a] font-black"><td className="p-3">TOTAL</td><td className="p-3 text-right">{totalPct}%</td><td className="p-3 text-right">{brl(d.netProfit)}</td><td className="p-3 text-right">{brl(totReembolso)}</td><td className="p-3 text-right">{brl(d.netProfit + totReembolso)}</td></tr>}
             </tbody>
           </table>
         </div>
+        {(d.totalExecuted - totReembolso) > 0.009 && <p className="text-[11px] text-zinc-500 mb-8">Despesas do caixa comum (sem sócio atribuído): {brl(d.totalExecuted - totReembolso)}</p>}
 
         {/* Inscrições / Receita */}
         <h2 className="text-lg font-black uppercase italic text-[#EDAC02] border-b border-[#EDAC02]/30 pb-1 mb-3">Inscrições / Receita ({brl(d.revenue)})</h2>
