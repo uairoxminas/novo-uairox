@@ -52,6 +52,33 @@ export default function EventPartnerReport(props: Props) {
     qc.invalidateQueries({ queryKey: ['event-partners', eventId] });
   };
 
+  // ── Link público (token) da página de relatório ─────────────────────────────
+  const { data: link } = useQuery({
+    queryKey: ['report-link', eventId],
+    queryFn: async () => {
+      const { data } = await supabase.from('event_partner_links' as any)
+        .select('id, token').eq('event_id', eventId).eq('type', 'financeiro').is('revoked_at', null)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      return data as any;
+    },
+  });
+  const reportUrl = link ? `${window.location.origin}/relatorio/${link.token}` : '';
+  const genLink = async () => {
+    const { error } = await supabase.from('event_partner_links' as any).insert({ event_id: eventId, label: 'Relatório Sócios', type: 'financeiro' });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ['report-link', eventId] });
+    toast.success('Link gerado!');
+  };
+  const revokeAndRegen = async () => {
+    if (!confirm('Revogar o link atual e gerar um novo? O link antigo deixa de funcionar.')) return;
+    if (link) await supabase.from('event_partner_links' as any).update({ revoked_at: new Date().toISOString() }).eq('id', link.id);
+    const { error } = await supabase.from('event_partner_links' as any).insert({ event_id: eventId, label: 'Relatório Sócios', type: 'financeiro' });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ['report-link', eventId] });
+    toast.success('Link revogado e novo gerado!');
+  };
+  const copyLink = () => { navigator.clipboard.writeText(reportUrl); toast.success('Link copiado!'); };
+
   // ── Excel (abas: Resumo, Inscrições, Despesas, Divisão) ──────────────────────
   const exportExcel = async () => {
     try {
@@ -140,6 +167,20 @@ export default function EventPartnerReport(props: Props) {
       </div>
 
       <p className="text-xs text-zinc-500 mb-3">Divisão do <b className="text-white">lucro líquido ({brl(netProfit)})</b> entre os sócios. Cadastre cada sócio com seu %.</p>
+
+      {/* Link da página (mesmo conteúdo do PDF) */}
+      <div className="mb-4 p-3 rounded-lg bg-[#111] border border-[#262626]">
+        <p className="text-[11px] uppercase tracking-wide text-zinc-500 font-bold mb-2">🔗 Link da página (mesmo conteúdo do PDF)</p>
+        {link ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <input readOnly value={reportUrl} onFocus={e => e.currentTarget.select()} className="flex-1 min-w-[200px] bg-[#0a0a0a] border border-[#262626] rounded px-3 py-2 text-xs text-zinc-300" />
+            <button onClick={copyLink} className="px-3 py-2 bg-[#EDAC02] text-black font-black text-xs rounded hover:bg-[#EDAC02]/90">Copiar</button>
+            <button onClick={revokeAndRegen} className="px-3 py-2 border border-red-600/40 text-red-400 text-xs font-bold rounded hover:bg-red-600/10">Revogar e gerar novo</button>
+          </div>
+        ) : (
+          <button onClick={genLink} className="px-4 py-2 bg-[#EDAC02] text-black font-black text-xs rounded hover:bg-[#EDAC02]/90">Gerar link</button>
+        )}
+      </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do sócio"
